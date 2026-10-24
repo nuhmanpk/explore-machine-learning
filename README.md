@@ -231,4 +231,4 @@ If this helped you, a star on the repo goes a long way, and GPU credits help me 
 
 ## License
 
-No license file has been added yet. Add one (for example MIT) before others reuse the code.
+ CC BY 4.0 
