@@ -231,4 +231,4 @@ If this helped you, a star on the repo goes a long way, and GPU credits help me 
 
 ## License
 
- CC BY 4.0 
+[Apache License](http://www.apache.org/licenses/)
