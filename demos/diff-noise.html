@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fuzz &amp; Un-Fuzz · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .pics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 560px) { .pics { grid-template-columns: 1fr; } }
+    .pic { display: grid; gap: 6px; }
+    .pic .cap { font-family: var(--font-head); font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .pic .cap .chip { font-family: var(--font-body); }
+    .pic canvas { image-rendering: pixelated; cursor: crosshair; }
+    #guess { cursor: default; }
+    .strip { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; margin-top: 14px; }
+    .strip button { border: 2px solid var(--line); background: var(--bg-2); border-radius: 10px; padding: 3px; cursor: pointer; display: grid; gap: 2px; }
+    .strip button canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 6px; }
+    .strip button span { font-size: 0.7rem; font-weight: 800; color: var(--muted); }
+    .strip button.on { border-color: var(--accent); }
+    .strip button.on span { color: var(--accent); }
+    .strip-label { display: flex; justify-content: space-between; font-weight: 800; font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+    .palette { display: flex; flex-wrap: wrap; gap: 6px; }
+    .swatch { width: 32px; height: 32px; border-radius: 10px; border: 3px solid var(--line); cursor: pointer; padding: 0; }
+    .swatch.on { border-color: var(--ink); transform: scale(1.12); }
+    .book { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 10px; }
+    .page { position: relative; border: 3px solid var(--line); border-radius: 14px; padding: 5px; background: var(--bg-2); cursor: pointer; text-align: center; transition: opacity .2s, border-color .2s; }
+    .page canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 8px; }
+    .page .nm { font-size: 0.72rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .page .bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 3px; }
+    .page .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+    .page.off { opacity: 0.35; }
+    .page.top { border-color: var(--accent); }
+    .page .x { position: absolute; top: -9px; right: -9px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); background: var(--card); font-size: 12px; line-height: 1; cursor: pointer; padding: 0; display: grid; place-items: center; }
+    .book-card h3 { margin-bottom: 0; }
+    .film-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 16px 0 8px; font-size: .86rem; font-weight: 700; }
+    .film-head h3 { margin: 0; display: flex; gap: 8px; align-items: center; font-size: 1.1rem; }
+    #film .ckpt { width: 92px; }
+    #film .ckpt canvas { image-rendering: pixelated; aspect-ratio: 1; }
+    #film .ckpt.new { animation: fIn .35s ease; }
+    @keyframes fIn { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .left-col { display: grid; gap: 20px; min-width: 0; }
+  </style>
+</head>
+<body data-page="demo" data-topic="diff" data-demo="diff-noise">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="noise"></i> Diffusion · Star demo</span>
+      <h1>Fuzz &amp; <span class="em">Un-Fuzz</span></h1>
+      <p class="hero-sub">Draw a picture and bury it in static. Then watch Robo clean fresh static back into a picture, one step at a time.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Draw something on the left (or pick a doodle). Then slide the <b>fuzz knob</b> and watch your picture disappear!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="left-col">
+      <div class="canvas-box">
+        <div class="overlay-msg" id="msg"></div>
+        <div class="pics">
+          <div class="pic">
+            <div class="cap"><span id="cap-left">Your picture</span><span class="chip" id="chip-t">step 0</span></div>
+            <canvas id="draw"></canvas>
+          </div>
+          <div class="pic">
+            <div class="cap"><span><i data-icon="robot"></i> Robo's guess</span><span class="chip accent" id="chip-guess">—</span></div>
+            <canvas id="guess"></canvas>
+          </div>
+        </div>
+        <div class="strip" id="strip"></div>
+        <div class="strip-label"><span><i data-icon="arrow-left"></i> clear picture</span><span>pure static <i data-icon="arrow-right"></i></span></div>
+        <div id="film-wrap" class="hidden">
+          <div class="film-head"><h3><i data-icon="film"></i> Cleaning film</h3><span class="muted">Top: the picture. Bottom: Robo's guess. Tap a frame.</span></div>
+          <div class="checkpoints" id="film"></div>
+        </div>
+      </div>
+
+    <div class="card book-card">
+        <div class="row" style="justify-content: space-between">
+          <div>
+            <h3><i data-icon="book"></i> Robo's picture book</h3>
+            <p class="muted" style="margin:0">The only pictures Robo has ever seen. Bars = Robo's guess. Tap to hide or show.</p>
+          </div>
+          <button class="btn" id="add"><i data-icon="plus"></i> Add my drawing to the book</button>
+        </div>
+        <div class="book" id="book" style="margin-top:14px"></div>
+      </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="palette"></i> Draw</h3>
+          <div class="palette" id="palette"></div>
+          <div class="row">
+            <div class="seg" id="brush">
+              <button data-b="1">Thin</button><button data-b="2" class="on">Chunky</button><button data-b="3">Huge</button>
+            </div>
+            <button class="btn small ghost" id="clear"><i data-icon="eraser"></i> Clear</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Or start from a doodle</span>
+            <div class="btn-row" id="presets"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="tv"></i> Fuzz it</h3>
+          <div class="field">
+            <label for="t">Fuzz knob <span class="val" data-for="t"></span></label>
+            <input type="range" id="t" min="0" max="100" value="0" step="1">
+            <div class="hint">Slide right to sprinkle more static on top.</div>
+          </div>
+          <div class="btn-row">
+            <button class="btn small" id="fuzz-play"><i data-icon="play"></i> Fuzz it all</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Picture</div><div class="v" id="st-sig">100<small>%</small></div></div>
+            <div class="stat"><div class="k">Static</div><div class="v" id="st-noise">0<small>%</small></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> Un-fuzz it</h3>
+          <div class="field">
+            <label for="steps">Cleaning steps <span class="val" data-for="steps"></span></label>
+            <input type="range" id="steps" min="3" max="60" value="20" step="1">
+            <div class="hint">More steps = slower but more careful cleaning.</div>
+          </div>
+          <div class="seg" id="mode">
+            <button data-m="0" class="on">Smooth</button><button data-m="1">Jiggly</button>
+          </div>
+          <button class="btn primary" id="clean"><i data-icon="sparkles"></i> Clean up fresh static!</button>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="pencil"></i></div><h3>Start with a picture</h3><p>To a computer a picture is a grid of little colored squares. Each square is just a number.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="noise"></i></div><h3>Add static, bit by bit</h3><p>Each step sprinkles a little more fuzz on top. After enough steps, it's only static. Messing up is easy!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Guess what's underneath</h3><p>Robo looks at the fuzzy mess and guesses the clean picture. At first the guess is blurry. That's OK!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wand"></i></div><h3>Clean a tiny bit, repeat</h3><p>Robo wipes off a little static toward its guess, then guesses again. Step by step, a picture appears.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Adding static is easy: a little more fuzz each step until the picture is gone.</li>
+        <li>Cleaning is the clever part: at every step Robo <b>guesses the clean picture</b>, then wipes off a little static toward that guess.</li>
+        <li>The film shows the guess going from a blurry mix to one sharp picture.</li>
+        <li>Robo can only rebuild pictures from its book. Real AIs learn from millions of pictures, so they can mix ideas into new ones.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <ul>
+          <li><span class="term">Forward process.</span> Each picture is a 32×32×3 vector <code>x₀</code> in [−1, 1]. Noising follows the DDPM closed form <code>xₜ = √ᾱₜ·x₀ + √(1−ᾱₜ)·ε</code>, ε ~ 𝒩(0, I), with the cosine schedule <code>ᾱₜ = cos²((t/T + s)/(1+s) · π/2)</code>, T = 100. The ε is fixed, so scrubbing the slider is smooth and deterministic.</li>
+          <li><span class="term">The denoiser is exact, not a neural net.</span> Real diffusion models train a network to predict ε (or x₀). Here the "training set" is the picture book, so we can write down the <em>optimal</em> denoiser: <code>E[x₀ | xₜ] = Σᵢ wᵢ·xᵢ</code> with <code>wᵢ = softmax(−‖xₜ − √ᾱₜ·xᵢ‖² / 2(1−ᾱₜ))</code>. The bars under each page are those wᵢ.</li>
+          <li><span class="term">Sampling.</span> "Smooth" is DDIM (η = 0, a probability-flow ODE discretisation); "Jiggly" is ancestral DDPM-style sampling (η = 1), which injects fresh noise each step. Very few steps make the early, blurry average guesses stick.</li>
+          <li><span class="term">Why the guess locks on so fast.</span> Pictures live in 3,072 dimensions, so even at fairly high noise the likelihoods of different book pages differ by huge factors and the softmax becomes nearly one-hot. Learned denoisers stay blurrier for longer.</li>
+          <li><span class="term">Memorisation.</span> Because the optimal denoiser for a finite dataset just reproduces training images, this sampler can only output pages from the book. Real models are deliberately imperfect (finite capacity, smooth inductive biases), which is what lets them <em>generalise</em> and make new pictures. Text-to-image models also add a text <span class="term">condition</span> and work in a compressed <span class="term">latent space</span>.</li>
+          <li>Further reading: <a href="https://poloclub.github.io/diffusion-explainer/" target="_blank" rel="noopener">Diffusion Explainer (Polo Club)</a>, Ho et al. 2020 "Denoising Diffusion Probabilistic Models", Song et al. 2021 "DDIM", Nichol &amp; Dhariwal 2021 (cosine schedule).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/diff-noise.js"></script>
+</body>
+</html>

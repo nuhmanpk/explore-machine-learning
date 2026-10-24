@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Creature Learns to Walk · Explore ML</title>
+  <meta name="description" content="Wobbly creatures made of bones and muscles evolve, generation by generation, to walk further, and adapt to hills, ice, wind and heavy backpacks.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .mode-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .fly-pad { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+    .fly-pad .btn { min-width: 64px; }
+    .challenges { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .challenges .btn { justify-content: flex-start; font-size: .88rem; padding: 8px 10px; white-space: normal; text-align: left; }
+    .chart-label { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 6px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .chart-label .k { display: inline-flex; align-items: center; gap: 5px; text-transform: none; letter-spacing: 0; font-weight: 700; }
+    .chart-label .k i { width: 14px; height: 10px; border-radius: 3px; display: inline-block; }
+    .io { display: grid; grid-template-columns: 70px 1fr 112px; gap: 6px; align-items: center; font-size: .82rem; font-weight: 700; }
+    .io .bar { height: 10px; border-radius: 999px; background: var(--bg-2); position: relative; overflow: hidden; border: 1px solid var(--line); }
+    .io .bar span { position: absolute; top: 0; bottom: 0; background: var(--accent); }
+    .io .num { font-family: var(--font-mono); font-size: .75rem; text-align: right; color: var(--ink-2); }
+    #inside { height: auto; min-height: 250px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-walker">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="gamepad"></i> Game Lab · Evolution</span>
+      <h1>Creature learns to <span class="em">walk</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">These wobbly creatures are made of bones (grey) and muscles (pink). Nobody tells the muscles when to squeeze. Press <b>Evolve</b> and watch them discover walking!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Change the world while they evolve. The walk that worked yesterday may fail today, until the family adapts.</p>
+          <div class="challenges" id="challenges">
+            <button class="btn ghost" data-c="hills"><i data-icon="trend"></i> Hills</button>
+            <button class="btn ghost" data-c="ice"><i data-icon="sparkles"></i> Slippery ice</button>
+            <button class="btn ghost" data-c="wind"><i data-icon="wave"></i> Headwind</button>
+            <button class="btn ghost" data-c="backpack"><i data-icon="gift"></i> Heavy backpack</button>
+            <button class="btn ghost" data-c="moon"><i data-icon="moon"></i> Low gravity</button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <div class="mode-row">
+          <div class="seg" id="body">
+            <button data-b="worm">Worm</button><button data-b="biped">Two legs</button><button data-b="box" class="on">Four legs</button>
+          </div>
+          <span class="chip" id="gen-chip">40 creatures race for 10 seconds</span>
+        </div>
+        <canvas id="world"></canvas>
+        <div class="chart-label">
+          <span><i data-icon="trend"></i> Each generation</span>
+          <span class="k"><i style="background:var(--accent);opacity:.5"></i> best distance</span>
+          <span class="k"><i style="background:var(--ink);height:3px"></i> everyone's average</span>
+          <span class="k"><i style="background:var(--bad);height:3px"></i> challenge on</span>
+        </div>
+        <canvas id="chart"></canvas>
+      </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> Evolution</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Evolve</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed">
+              <button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button>
+            </div>
+          </div>
+          <label class="row" style="font-weight:800;font-size:.9rem;cursor:pointer"><input type="checkbox" id="babies" checked style="width:18px;height:18px;accent-color:var(--accent)"> Show the babies</label>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.03" max="0.5" step="0.01" value="0.15">
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Generation</div><div class="v" id="st-gen">0</div></div>
+            <div class="stat"><div class="k">Best walk</div><div class="v" id="st-best">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Evolve to see the leader's muscles at work.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion walker over time. Tap one to watch it walk in today's world.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>A body</h3><p>Dots joined by sticks. Grey sticks are bones that stay the same length. Pink ones are muscles that stretch and squeeze.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="music"></i></div><h3>A rhythm</h3><p>Each muscle squeezes to a beat. Its "genes" say how hard it squeezes and when, compared to the others.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="flag"></i></div><h3>A race</h3><p>40 creatures with different genes race for 10 seconds. Whoever walks furthest (staying upright!) wins.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Babies</h3><p>Winners' genes are mixed and slightly changed. Over many generations, the rhythm turns into a walk.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Adapt</h3><p>Hills, ice or a heavy backpack break the old rhythm. Selection quickly finds a new one that works.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The first creatures just wobbled in place, because their muscles squeezed at random times.</li>
+        <li>Each race kept the furthest walkers, and step by step a real walk appeared, with no one designing it.</li>
+        <li>When you changed the world, the old walk stopped working, and the family evolved a new one. That's adaptation!</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">evolved locomotion</span>, in the spirit of Karl Sims' <em>Evolved Virtual Creatures</em> (1994) and the many "evolution simulator" toys since.</p>
+        <ul>
+          <li><b>Physics:</b> point masses integrated with <span class="term">Verlet integration</span>; bones and muscles are distance constraints solved iteratively (6 passes per step). Ground contact projects nodes out of the ground and damps their tangential velocity (Coulomb-ish friction). Ice lowers that damping; headwind is a constant horizontal acceleration; the backpack makes the top node 4× heavier.</li>
+          <li><b>Controller:</b> open-loop <span class="term">central pattern generator</span>: muscle <i>i</i> has rest length <code>L·(1 + aᵢ·sin(ωt + φᵢ))</code>. The genome is one tempo ω plus (aᵢ, φᵢ) per muscle.</li>
+          <li><b>Genetic algorithm:</b> population 40, elitism of 1, top 20% as parents, uniform crossover per muscle. Mutation is Gaussian with a per-child <span class="term">spread</span> (early children get tiny tweaks, later ones bold changes) and an automatic boost when the champion hasn't been beaten for a few generations. Babies start with weak muscles so the climb is visible.</li>
+          <li><b>Fitness shaping:</b> fitness = forward displacement of the centre of mass after 600 steps × (1 − 1.5·time not upright − 0.6·time dragging the body). Without it, evolution happily found rolling, flipping and lying-on-its-side hopping "gaits". The simulation is deterministic, so the champion can never get worse.</li>
+          <li><b>Adaptation:</b> challenges change the environment, so the fitness landscape shifts and the elite gets re-selected. Since the controller is open-loop (it can't sense the ground), adapting requires evolution, not reflexes.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-rw-kit.js"></script>
+  <script src="js/game-walker-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-walker.js"></script>
+</body>
+</html>

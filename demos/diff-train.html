@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Watch Diffusion Learn · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .left-col { display: grid; gap: 20px; min-width: 0; }
+    #view.drawing { cursor: crosshair; }
+    #view { cursor: pointer; }
+    .view-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .view-head .title { font-family: var(--font-head); font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+    .playbar { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin-top: 12px; }
+    .playbar .field { margin: 0; }
+    .toggles { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .ck-head { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 8px; gap: 8px; flex-wrap: wrap; }
+    .ck-head h3 { margin: 0; display: flex; gap: 8px; align-items: center; }
+    .ckpt { position: relative; }
+    .ckpt.pending { opacity: 0.6; }
+    .ckpt .q { display: block; height: 6px; border-radius: 99px; background: var(--line); margin-top: 4px; overflow: hidden; }
+    .ckpt .q i { display: block; height: 100%; background: var(--accent); }
+    .ckpt.new { animation: ckIn .5s ease; }
+    @keyframes ckIn { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .ck-empty { color: var(--muted); font-weight: 700; padding: 18px 4px; }
+    #loss { width: 100%; background: var(--canvas-bg); border-radius: 12px; }
+    .shape-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .shape-seg .btn { padding: 8px 6px; }
+    .inside-grid { display: grid; grid-template-columns: 220px 1fr; gap: 18px; align-items: center; }
+    @media (max-width: 640px) { .inside-grid { grid-template-columns: 1fr; } .inside-grid canvas { max-width: 260px; margin: 0 auto; } }
+    #zoom { width: 100%; border-radius: 14px; background: var(--canvas-bg); border: 2px solid var(--line); }
+    .flow .row-i { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border-radius: 12px; padding: 8px 12px; border: 2px solid var(--line); }
+    .flow .row-i .n { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 0.8rem; }
+    .flow .row-i span.t { font-weight: 700; }
+    .flow .mono { font-family: var(--font-mono); color: var(--accent); }
+    .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin: 0 2px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="diff" data-demo="diff-train">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="sparkles"></i> Diffusion · Main lesson</span>
+      <h1>Watch a Diffusion Model <span class="em">Learn</span></h1>
+      <p class="hero-sub">A brand-new baby brain only knows how to make fog. Press play and watch it practise cleaning up noisy dots, getting better every round, until it can make your shape out of nothing.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Pick a shape, then press <b>Start learning</b>!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="left-col">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="msg"></div>
+          <div class="view-head">
+            <span class="title" id="view-title"><i data-icon="film"></i> Making dots</span>
+            <span class="chip accent" id="view-chip">step 0 brain</span>
+          </div>
+          <canvas id="view"></canvas>
+          <div class="playbar">
+            <button class="btn small" id="replay"><i data-icon="repeat"></i> Replay</button>
+            <div class="field">
+              <label for="scrub">Fuzz level <span class="val" data-for="scrub"></span></label>
+              <input type="range" id="scrub" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+          <div class="toggles">
+            <button class="btn small on" id="tg-arrows"><i data-icon="arrow-right"></i> Arrows</button>
+            <button class="btn small on" id="tg-trails"><i data-icon="trend"></i> Trails</button>
+            <button class="btn small on" id="tg-ghost"><i data-icon="target"></i> Real shape</button>
+          </div>
+
+          <div class="ck-head">
+            <h3><i data-icon="flag"></i> Checkpoints</h3>
+            <span class="muted" style="font-size:.88rem;font-weight:700">Every so often the brain tries making dots. Tap a card to replay it.</span>
+          </div>
+          <div class="checkpoints" id="ckpts"><div class="ck-empty">Press <b>Start learning</b> to make the first checkpoint.</div></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="search"></i> What's happening inside</h3>
+          <div class="inside-grid">
+            <canvas id="zoom"></canvas>
+            <div class="flow" id="flow">
+              <div class="row-i"><span class="n" style="background:var(--ink-2)">1</span><span class="t" id="f1">Tap any dot in the big picture to follow it.</span></div>
+              <div class="arrow"><i data-icon="arrow-down"></i></div>
+              <div class="row-i"><span class="n" style="background:var(--nn)">2</span><span class="t" id="f2">The brain looks at where the dot is and how fuzzy things are.</span></div>
+              <div class="arrow"><i data-icon="arrow-down"></i></div>
+              <div class="row-i"><span class="n" style="background:var(--bad)">3</span><span class="t" id="f3">It guesses which way the noise pushed the dot.</span></div>
+              <div class="arrow"><i data-icon="arrow-down"></i></div>
+              <div class="row-i"><span class="n" style="background:var(--good)">4</span><span class="t" id="f4">So the dot takes a small step the other way.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="target"></i> Shape to learn</h3>
+          <div class="shape-seg" id="shapes">
+            <button class="btn small" data-s="heart"><i data-icon="heart"></i> Heart</button>
+            <button class="btn small on" data-s="star"><i data-icon="star"></i> Star</button>
+            <button class="btn small" data-s="smiley">Smiley</button>
+            <button class="btn small" data-s="spiral">Spiral</button>
+            <button class="btn small" data-s="moons">Moons</button>
+            <button class="btn small" data-s="draw"><i data-icon="pencil"></i> Draw</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="cpu"></i> Training</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Start learning</button>
+            <button class="btn" id="reset" title="New baby brain"><i data-icon="reset"></i> Reset</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="0">Slow</button><button data-v="1" class="on">Normal</button><button data-v="2">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Practice</div><div class="v" id="st-step">0</div></div>
+            <div class="stat"><div class="k">Oops score</div><div class="v" id="st-loss">–</div></div>
+          </div>
+          <canvas id="loss"></canvas>
+          <div class="hint muted" style="font-size:.82rem;margin-top:-6px">Oops score = how wrong the noise guesses are. Lower is better.</div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Brain settings</h3>
+          <div class="field">
+            <span class="lbl">Brain size</span>
+            <div class="seg" id="size"><button data-v="32">Small</button><button data-v="64" class="on">Medium</button><button data-v="128">Big</button></div>
+            <div class="hint">Bigger brains learn tricky shapes but think slower. Changing this starts over.</div>
+          </div>
+          <div class="field">
+            <label for="lr">Learning speed <span class="val" data-for="lr"></span></label>
+            <input type="range" id="lr" min="0" max="4" value="2" step="1">
+            <div class="hint">Too slow = takes forever. Too fast = wobbly, messy learning.</div>
+          </div>
+          <div class="field">
+            <label for="nsteps">Cleaning steps <span class="val" data-for="nsteps"></span></label>
+            <input type="range" id="nsteps" min="0" max="3" value="3" step="1">
+            <div class="hint">How many small cleaning steps to go from fog to shape.</div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="noise"></i></div><h3>Make a mess on purpose</h3><p>Take dots from the real shape and shake each one with a random push. Remember the push!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Guess the push</h3><p>Show the brain the shaken dot and how hard we shook. It guesses which way the push went.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Fix the brain a little</h3><p>Compare the guess with the real push. Nudge the brain's numbers so next time the guess is a bit closer.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Make something new</h3><p>Start from pure fog. Ask the brain "which way was the push?", step the other way, and repeat 100 times.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first the brain was brand new, so its dots stayed as <b>random fog</b>.</li>
+        <li>It only ever practised one tiny job: <b>guess the noise</b> on shaken-up dots.</li>
+        <li>The oops score dropped, and each checkpoint looked more like the real shape: fog → blob → shape.</li>
+        <li>To make dots, it starts from fog and <b>removes a little guessed noise at a time</b>. That's diffusion!</li>
+        <li>Picture-making AIs do exactly this, with millions of pixels instead of two numbers per dot.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <ul>
+          <li><span class="term">Real training, in your browser.</span> A plain-JavaScript MLP (no libraries) is trained live with backprop and Adam (batch 128, gradient clipping at 1).</li>
+          <li><span class="term">Objective.</span> The DDPM "simple" loss from Ho et al. 2020: sample <code>x₀</code> from the dataset, <code>t ~ U{0..99}</code>, <code>ε ~ 𝒩(0, I)</code>, form <code>xₜ = √ᾱₜ x₀ + √(1−ᾱₜ) ε</code>, and minimise <code>‖ε − ε̂θ(xₜ, t)‖²</code>. Linear β schedule 1e-4 → 0.08, T = 100.</li>
+          <li><span class="term">Network.</span> Input is (x, y), Fourier features <code>sin/cos(k·x)</code> for k ∈ {1, 2, 4, 8}, and a sinusoidal timestep embedding (34 numbers). Then 3 ReLU hidden layers of 32 / 64 / 128 units and 2 outputs (ε̂). The loss never reaches 0: even a perfect model can't know the exact noise, only its conditional mean, so the floor is well above 0, especially at high t.</li>
+          <li><span class="term">Sampling.</span> Ancestral DDPM: <code>xₜ₋₁ = (xₜ − βₜ/√(1−ᾱₜ) · ε̂) / √αₜ + σₜ z</code>, with σₜ² = β̃ₜ. With fewer cleaning steps we use strided DDPM steps (a respaced schedule), as in Nichol &amp; Dhariwal 2021. The arrows show <code>−ε̂</code> (the score direction, since <code>∇log pₜ = −ε̂/√(1−ᾱₜ)</code>).</li>
+          <li><span class="term">Checkpoints.</span> At steps 0, 25, 75, 150 … the weights are snapshotted and 500 samples are drawn. The bar is the overlap between the sample histogram and the data histogram, divided by what genuine data samples score.</li>
+          <li>Inspired by <a href="https://github.com/tanelp/tiny-diffusion" target="_blank" rel="noopener">tiny-diffusion</a>. See the <a href="https://poloclub.github.io/diffusion-explainer/" target="_blank" rel="noopener">Diffusion Explainer (Polo Club)</a> for the same process inside Stable Diffusion, where ε̂ comes from a U-Net working on image latents and is guided by text.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/diff-train-core.js"></script>
+  <script src="js/diff-train.js"></script>
+</body>
+</html>

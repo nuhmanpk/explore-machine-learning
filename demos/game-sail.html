@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sailboat Beats the Wind · Explore ML</title>
+  <meta name="description" content="A fleet of sailboats with tiny brains discovers how to zig-zag (tack) upwind to a buoy, then adapts to wind shifts, gusts, currents, islands and a moving buoy.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .steer-pad { display: none; grid-template-columns: repeat(2, 64px); gap: 10px; justify-content: center; margin-top: 10px; }
+    .steer-pad.show { display: grid; }
+    .steer-pad .btn { padding: 0; height: 48px; font-size: 20px; }
+    .polar-wrap { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; }
+    .polar-wrap p { margin: 0; font-size: .82rem; color: var(--muted); font-weight: 700; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-sail">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Game Lab · Evolution</span>
+      <h1>Sailboat <span class="em">beats the wind</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">The buoy is straight <b>into the wind</b>, and a sailboat can't sail straight into the wind! Can 60 little boats figure out the trick? Press <b>Play</b>.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Change the sea. Watch the fleet struggle, then adapt.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="shift"><i data-icon="repeat"></i> Wind shift <span class="tag">60°</span></button>
+            <button class="btn small" data-c="gusts"><i data-icon="sparkles"></i> Gusty wind <span class="tag">puffs + lulls</span></button>
+            <button class="btn small" data-c="current"><i data-icon="wave"></i> Current <span class="tag">pushes right</span></button>
+            <button class="btn small" data-c="islands"><i data-icon="map"></i> Islands <span class="tag">in the way</span></button>
+            <button class="btn small" data-c="moveBuoy"><i data-icon="flag"></i> Move the buoy <span class="tag">each round</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn" id="steer"><i data-icon="gamepad"></i> I'll sail a boat</button>
+          <p class="muted" style="margin:0;font-size:.85rem">Left/right arrows or the buttons under the sea. Try sailing straight at the buoy. What happens?</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How fast can a boat go?</h3>
+          <div class="polar-wrap">
+            <canvas id="polar"></canvas>
+            <p>Each direction's speed. Straight into the wind (the grey slice) = <b>stop</b>. Just outside it = fast. This is why boats zig-zag.</p>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="sea"></canvas>
+          <div class="steer-pad" id="pad">
+            <button class="btn" data-k="left" aria-label="Steer left"><i data-icon="arrow-left"></i></button>
+            <button class="btn" data-k="right" aria-label="Steer right"><i data-icon="arrow-right"></i></button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the best half did, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Reached the buoy (%)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip"><i data-icon="step"></i> Next round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3">3×</button><button data-v="10" class="on">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <label class="row babies-toggle" style="font-weight:800;font-size:.9rem;cursor:pointer"><input type="checkbox" checked style="width:18px;height:18px;accent-color:var(--accent)" onchange="window.__showBabies = this.checked"> Show the babies</label>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-round">1</div></div>
+            <div class="stat"><div class="k">At buoy</div><div class="v" id="st-done">0</div></div>
+            <div class="stat"><div class="k">Best half</div><div class="v" id="st-top">–</div></div>
+            <div class="stat"><div class="k">Leader's tacks</div><div class="v" id="st-tacks">0</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the leading boat's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion boat from each round, with its path. Tap to replay it on today's sea.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="gauge"></i></div><h3>No sailing into the wind</h3><p>Point straight at the wind and the sail just flaps. The boat stops. Point a bit to the side, and it zooms!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>What a boat feels</h3><p>Where the wind comes from, where the buoy is, how fast it goes, how close the shore is, and 5 feelers for islands.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain picks a course</h3><p>It says "go 45° right of the wind" or "45° left". An autopilot turns the rudder to hold it.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Discover zig-zag</h3><p>Boats that switch sides before the shore get closer to the buoy. Their brains get copied. That's how <b>tacking</b> is discovered.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In round 1 boats pointed at the buoy, stalled, or crashed into the shore.</li>
+        <li>After a few rounds the best boats <b>zig-zagged</b>: left of the wind, then right, then left, all the way to the buoy. Real sailors call that <b>tacking</b>.</li>
+        <li>Nobody taught them. Boats that happened to switch sides earlier did better, and their brains were copied.</li>
+        <li>Some challenges barely bothered them, because they already think in "angle to the wind". Others (islands, a moving buoy, current) broke their plan, and they had to adapt.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p><span class="term">Neuroevolution</span> of a small tanh network <code>[14 → 8 → 1]</code> over a population of 60, using the same genetic algorithm as the river boats (elitism, 30% crossover, spread Gaussian mutation).</p>
+        <ul>
+          <li><b>Sailing model:</b> target speed follows a <span class="term">polar diagram</span>: 0 inside the ±38° no-go zone, rising to full speed at 75–110° off the wind, easing off downwind. Speed eases toward the target (boats coast through a tack), plus leeway drift and optional current.</li>
+          <li><b>Action space:</b> the network outputs a desired course relative to the wind (−100°…+100°); a proportional autopilot steers to it. Choosing <em>where to point</em> rather than raw rudder made tacking evolvable: with direct rudder control the population never found it.</li>
+          <li><b>Inputs:</b> sin/cos of the buoy bearing and the wind direction relative to the heading, speed, distance, current, position across the channel and 5 ray-cast distances to islands and shores.</li>
+          <li><b>Fitness:</b> reaching the buoy scores 2 + time bonus; otherwise mostly the furthest progress along the start→buoy line, so one long diagonal earns something, but crashing (×0.5) or stalling in irons (×0.7) is penalised. The channel is deliberately narrow, which makes a single diagonal a poor strategy and rewards tacking.</li>
+          <li><b>Robustness vs adaptation:</b> because inputs are relative to the wind, wind shifts and gusts are a mild <span class="term">distribution shift</span>; islands and a moving buoy change the task itself, so performance drops sharply and must be re-learned.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-sail-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-sail.js"></script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pathfinder · Explore ML</title>
+  <meta name="description" content="Watch blind search and A* explore the same map, draw walls and mud, and see why a good guess saves hundreds of steps.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .ctls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 760px) { .ctls { grid-template-columns: 1fr; } }
+    .ctl { min-width: 0; }
+    /* Everything that updates while it runs has a FIXED size, so nothing below ever moves. */
+    .ctl-head { display: flex; align-items: center; gap: 8px; margin: 0 0 6px 2px; font-weight: 800; height: 24px; overflow: hidden; white-space: nowrap; }
+    .ctl-head .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+    .ctl-head small { margin-left: auto; font-weight: 700; color: var(--muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .ctl canvas { cursor: crosshair; touch-action: none; }
+    .bubble.fixed { height: 122px; min-height: 0; overflow-y: auto; flex: 1 1 auto; max-width: 760px; }
+    @media (max-width: 560px) { .bubble.fixed { height: 176px; } }
+    .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .tools button { justify-content: center; padding: 8px 4px; }
+    .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .presets button { justify-content: flex-start; }
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .stat { min-height: 66px; }
+    .stat .v { white-space: nowrap; overflow: hidden; }
+    .inblock { border-top: 2px dashed var(--line); padding-top: 8px; margin-top: 8px; }
+    .inblock:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+    .inblock h4 { margin: 0 0 4px; font-size: .95rem; display: flex; align-items: center; gap: 6px; height: 22px; overflow: hidden; white-space: nowrap; }
+    .inblock p { margin: 0; font-size: .84rem; font-weight: 700; height: 92px; overflow: hidden; }
+    .verdict { font-weight: 800; height: 44px; overflow: hidden; font-size: .88rem; }
+    .verdict.good { color: var(--good); }
+    .verdict.warn { color: var(--rl); }
+    .key { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .78rem; font-weight: 700; color: var(--ink-2); margin-top: 8px; } /* static text: its height never changes */
+    .key i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -3px; margin-right: 5px; border: 2px solid rgba(31,33,64,.25); }
+  </style>
+</head>
+<body data-page="demo" data-topic="ai" data-demo="ai-pathfinder">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="map"></i> Artificial intelligence · Search</span>
+      <h1>Pathfinder: <span class="em">a good guess</span> saves steps</h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble fixed" id="say">How does a map app find the best route? Not by learning. By <b>searching</b>! Press <b>Play</b> and watch two searchers race across the same map.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="pencil"></i> Draw the map</h3>
+          <div class="tools" id="tools">
+            <button class="btn small on" data-t="1"><i data-icon="minus"></i> Wall</button>
+            <button class="btn small" data-t="2"><i data-icon="noise"></i> Mud</button>
+            <button class="btn small" data-t="0"><i data-icon="eraser"></i> Erase</button>
+          </div>
+          <p class="muted" style="margin:0;font-size:.82rem">Drag on either map. Drag the <b>green start</b> or the <b>red goal</b> to move them. Mud is slow: it costs 4 steps.</p>
+          <div class="presets" id="presets">
+            <button class="btn small" data-p="maze"><i data-icon="layers"></i> Maze</button>
+            <button class="btn small" data-p="field"><i data-icon="map"></i> Open field</button>
+            <button class="btn small" data-p="trap"><i data-icon="target"></i> The trap</button>
+            <button class="btn small" data-p="city"><i data-icon="groups"></i> City blocks</button>
+            <button class="btn small" data-p="lake"><i data-icon="noise"></i> Mud lake</button>
+            <button class="btn small ghost" data-p="empty"><i data-icon="reset"></i> Clear</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="bulb"></i> How big is the hunch?</h3>
+          <div class="field">
+            <label for="w">Trust in the guess <span class="val" data-for="w"></span></label>
+            <input type="range" id="w" min="0" max="5" step="0.25" value="1">
+            <div class="hint">0 = no guess at all (blind). 1 = A*. High = hasty: fast, but it may take a worse route. Try the <b>Mud lake</b>!</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Change the map</h3>
+          <p class="muted" style="margin:0;font-size:.82rem">Each change makes both searchers start again, instantly, so you can compare the work.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="wall"><i data-icon="minus"></i> Drop a wall on the path <span class="tag">block it</span></button>
+            <button class="btn small" data-c="mud"><i data-icon="noise"></i> Add mud <span class="tag">slow zones</span></button>
+            <button class="btn small" data-c="goal"><i data-icon="target"></i> Move the goal <span class="tag">new place</span></button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <div class="ctls">
+            <div class="ctl">
+              <div class="ctl-head"><span class="dot" style="background:var(--sup)"></span> Blind search <small>no guess: spreads out evenly</small></div>
+              <canvas id="cv-a"></canvas>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><span class="dot" style="background:var(--accent)"></span> <span id="b-name">A*</span> <small id="b-sub">uses a guess to aim at the goal</small></div>
+              <canvas id="cv-b"></canvas>
+            </div>
+          </div>
+          <div class="key" id="key">
+            <span><i style="background:#58c2d9"></i>explored: cheap to reach</span>
+            <span><i style="background:#f2c14e"></i>explored: costly to reach</span>
+            <span><i style="background:#fff4d6"></i>on the frontier (next candidates)</span>
+            <span><i style="background:#8a5a34"></i>mud</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Squares explored, run after run</h3>
+          <canvas id="hist"></canvas>
+          <div class="legend"><span><i style="background:var(--sup)"></i>Blind search</span><span><i style="background:var(--accent)"></i>The guessing searcher</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="step"><i data-icon="step"></i> One square</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Search again</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="3">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Blind: explored</div><div class="v" id="st-ae">0</div></div>
+            <div class="stat"><div class="k">Guessing: explored</div><div class="v" id="st-be">0</div></div>
+            <div class="stat"><div class="k">Blind: path cost</div><div class="v" id="st-ac">–</div></div>
+            <div class="stat"><div class="k">Guessing: path cost</div><div class="v" id="st-bc">–</div></div>
+          </div>
+          <div class="verdict" id="verdict"></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="inblock"><h4><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--sup)"></span> Blind search</h4><p id="in-a" class="muted">Press Play to see what it picks next.</p></div>
+          <div class="inblock"><h4><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--accent)"></span> Guessing search</h4><p id="in-b" class="muted">Press Play to see what it picks next.</p></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="map"></i></div><h3>Keep a to-do list</h3><p>Both searchers keep a list of squares to look at next (the frontier). They start with just the start square.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Add it up</h3><p>For each square: how much did it cost to get here, plus (for the guesser) a guess of how far the goal still is.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Pick the smallest</h3><p>They always look at the square with the smallest total next, then add its neighbours to the list.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="flag"></i></div><h3>Reach the goal</h3><p>When the goal comes up, they follow the trail back to the start. That trail is the path.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Both searchers found the <b>cheapest</b> path. The guesser found it by looking at far <b>fewer squares</b>.</li>
+        <li>The guess ("the goal is that way") pulled the search toward the goal. The blind one spread out like ripples in a pond.</li>
+        <li>With a hasty guess, it can be fooled: on the <b>Mud lake</b> it plunges straight through the slow mud.</li>
+        <li>Nothing here was <b>learned</b>. This is classic AI: clever search with a hand-made guess. Machine learning could learn a better guess from examples.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Both searchers are instances of <span class="term">best-first search</span> with priority <code>f(n) = g(n) + w·h(n)</code>, where <code>g</code> is the cost so far and <code>h</code> is a heuristic estimate of the cost remaining.</p>
+        <ul>
+          <li><b>Blind search = Dijkstra's algorithm</b> (<code>w = 0</code>). On a map without mud it is exactly breadth-first search. It is guaranteed optimal but explores a disc around the start.</li>
+          <li><b>A*</b> (<code>w = 1</code>) uses Manhattan distance, which never over-estimates the true remaining cost on a 4-connected grid with minimum step cost 1. That makes it <span class="term">admissible</span>, so A* is still guaranteed to return an optimal path, while expanding far fewer nodes.</li>
+          <li><b>Weighted A* / greedy</b> (<code>w &gt; 1</code>) trades optimality for speed. On the Mud lake preset, <code>w ≤ 2</code> finds the cost-32 route; <code>w ≥ 3</code> finds a cost-53 route through the mud but expands only 21 squares instead of 114.</li>
+          <li><b>Measured in Node:</b> A* returned the same cost as Dijkstra on all five presets and on 60 random messy mazes (0 differences). Squares explored, Dijkstra vs A*: open map 286 vs 19, field 284 vs 21, city 291 vs 37, trap 383 vs 130, lake 394 vs 114.</li>
+          <li>Implementation: a binary heap frontier with ties broken by lower <code>h</code>, then insertion order. Stale heap entries are skipped when popped. Used in GPS routing, game AI (NPC pathing) and robot motion planning.</li>
+          <li>Further reading: Hart, Nilsson &amp; Raphael (1968), <i>A Formal Basis for the Heuristic Determination of Minimum Cost Paths</i>; Amit Patel's <a href="https://www.redblobgames.com/pathfinding/a-star/introduction.html" target="_blank" rel="noopener">Introduction to A*</a>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ai-pathfinder-core.js"></script>
+  <script src="js/ai-pathfinder.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Twenty Questions Trees · Explore ML</title>
+  <meta name="description" content="Grow a decision tree one yes/no question at a time, then plant a whole random forest and watch the trees vote.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .stage canvas#cv { cursor: crosshair; }
+    #tree { width: 100%; }
+    .forest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+    .forest-grid .ft { border: 3px solid var(--line); border-radius: 10px; padding: 3px; background: var(--card); transition: border-color .15s; }
+    .forest-grid .ft canvas { width: 100%; border-radius: 6px; display: block; }
+    .forest-grid .ft span { display: block; font-size: .7rem; font-weight: 800; color: var(--muted); text-align: center; }
+    .shape { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; }
+    .tool-seg button { display: inline-flex; align-items: center; gap: 6px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="sup" data-demo="sup-forest">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="teacher"></i> Learning from Examples</span>
+      <h1>Twenty Questions <span class="em">Trees</span></h1>
+      <p class="hero-sub">A decision tree plays twenty questions: "Is it left of this line? Is it above that one?" Grow one question at a time, then plant a whole forest of trees that vote together.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">See the red, blue and yellow shapes? I want to sort them with as few <b>yes/no questions</b> as I can. Press <b>Ask one question</b> and watch me draw my first line!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv"></canvas>
+        <div class="overlay-msg" id="ov"></div>
+        <div class="row" style="margin-top:10px; justify-content:space-between">
+          <div class="seg tool-seg" id="tools" role="group" aria-label="What to add">
+            <button data-tool="0" class="on"><span class="shape" data-shape="0"></span>Red</button>
+            <button data-tool="1"><span class="shape" data-shape="1"></span>Blue</button>
+            <button data-tool="2"><span class="shape" data-shape="2"></span>Yellow</button>
+            <button data-tool="erase" title="Remove"><i data-icon="eraser"></i></button>
+          </div>
+          <div class="btn-row">
+            <button class="btn small" id="p-blobs"><i data-icon="groups"></i> Islands</button>
+            <button class="btn small" id="p-checks"><i data-icon="layers"></i> Checkers</button>
+            <button class="btn small" id="p-messy"><i data-icon="shuffle"></i> Messy</button>
+            <button class="btn small on" id="t-test"><i data-icon="target"></i> Test shapes</button>
+          </div>
+        </div>
+        <p class="muted" style="margin:8px 4px 0; font-size:.88rem; font-weight:700">Tap to add shapes · point at any spot to see how the trees decide · hollow shapes are test shapes the trees never learn from</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="seg" id="mode" role="group" aria-label="Mode">
+            <button data-mode="tree" class="on"><i data-icon="layers"></i> One tree</button>
+            <button data-mode="forest"><i data-icon="groups"></i> Forest</button>
+          </div>
+          <div class="field">
+            <label for="depth">Questions in a row (depth) <span class="val" data-for="depth"></span></label>
+            <input type="range" id="depth" min="1" max="10" step="1" value="6">
+            <div class="hint">Deeper = pickier tree. Too picky and it memorises mistakes!</div>
+          </div>
+          <div data-for-mode="tree" class="btn-row">
+            <button class="btn primary" id="grow1"><i data-icon="step"></i> Ask one question</button>
+            <button class="btn" id="growAll"><i data-icon="play"></i> Grow it all</button>
+            <button class="btn ghost small" id="chop"><i data-icon="reset"></i> Chop down</button>
+          </div>
+          <div data-for-mode="forest" class="hidden" style="display:grid; gap:12px">
+            <div class="field">
+              <label for="ntrees">Trees in the forest <span class="val" data-for="ntrees"></span></label>
+              <input type="range" id="ntrees" min="1" max="25" step="1" value="15">
+              <div class="hint">Each tree sees a random handful of shapes and random questions.</div>
+            </div>
+            <button class="btn primary" id="plant"><i data-icon="sparkles"></i> Plant a forest</button>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Practice score</div><div class="v" id="s-train">–</div></div>
+            <div class="stat"><div class="k">Test score</div><div class="v" id="s-test">–</div></div>
+          </div>
+          <div class="chart-box"><canvas id="chart"></canvas></div>
+          <div class="legend" id="chart-legend"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid-2 lesson-row">
+      <div class="card">
+        <h3><i data-icon="network"></i> <span id="tree-title">The question tree</span></h3>
+        <canvas id="tree"></canvas>
+        <div class="hint muted" style="font-size:.85rem" id="tree-hint">Each box asks a question. Its bar shows <b>how mixed</b> the shapes inside are: a long bar = very mixed, empty bar = all the same.</div>
+      </div>
+      <div class="card">
+        <h3><i data-icon="groups"></i> The forest</h3>
+        <div class="forest-grid" id="forest"></div>
+        <div class="hint muted" style="font-size:.85rem" id="forest-hint">Switch to <b>Forest</b> and press <b>Plant a forest</b>. Point at the big map to see how each little tree votes.</div>
+      </div>
+    </section>
+
+    <section class="card lesson-row">
+      <div class="cp-head">
+        <h3><i data-icon="clock"></i> Snapshots while learning</h3>
+        <button class="viewing-badge" id="viewing"></button>
+      </div>
+      <p class="muted" style="margin:6px 0 4px; font-size:.9rem; font-weight:700" id="cp-hint">A photo of the map after 1, 2, 4, 8… questions. Tap one to look back.</p>
+      <div class="checkpoints" id="cps"></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Try every question</h3><p>The tree tries every possible straight line: "left or right of here?", "above or below here?"</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gauge"></i></div><h3>Pick the tidiest split</h3><p>It keeps the question that leaves each side the least mixed up.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Ask again inside</h3><p>Each side gets its own new question, until every box is tidy or we run out of questions.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="groups"></i></div><h3>Forest votes</h3><p>Many slightly different trees each guess. The most popular answer wins — fewer silly mistakes!</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The tree split the map with yes/no questions, one at a time.</li>
+      <li>Each question was chosen to make the boxes less mixed.</li>
+      <li>A very deep tree gets every practice shape right but trips on new test shapes — it memorised instead of learning.</li>
+      <li>A forest of different trees voting together makes smoother, safer guesses.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a <span class="term">CART decision tree</span> and a <span class="term">random forest</span> on two features.</p>
+        <ul>
+          <li>Each split is an axis-aligned threshold chosen to minimise weighted <span class="term">Gini impurity</span> <code>G = 1 − Σ pₖ²</code> of the two children ("how mixed is this box"). The tree here grows <span class="term">best-first</span>: each click splits the leaf with the biggest impurity reduction.</li>
+          <li><span class="term">Max depth</span> limits complexity. Deep trees have low bias but high <span class="term">variance</span>: practice (training) accuracy → 100% while test accuracy drops — <span class="term">overfitting</span>.</li>
+          <li>A random forest trains each tree on a <span class="term">bootstrap sample</span> (draw n points with replacement) and considers a random feature subset at each split (here: one of the two axes). Predictions average the trees' class probabilities (<span class="term">bagging</span>), which cuts variance.</li>
+          <li>The small multiples show each tree's own decision map; the big map is the averaged vote.</li>
+        </ul>
+        <p>Further reading: Breiman (2001) "Random Forests" · R2D3 "A visual introduction to machine learning" · <i>ISLR</i> ch. 8.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/sup-kit.js"></script>
+  <script src="js/sup-forest.js"></script>
+</body>
+</html>

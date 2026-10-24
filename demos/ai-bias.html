@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unfair AI · Explore ML</title>
+  <meta name="description" content="Teach an AI bouncer from lopsided past decisions and watch it become unfair to purple creatures. Then fix it by fixing the examples, and see which fixes really work.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    #data { width: 100% !important; max-height: none !important; }
+    .hover-info { height: 2.9em; overflow: hidden; font-weight: 700; font-size: .9rem; color: var(--ink-2); margin-top: 8px; }
+    .learned { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .learned { grid-template-columns: 1fr; } }
+    .sub-h { font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+    .wrow { display: grid; grid-template-columns: 112px 1fr 44px; gap: 8px; align-items: center; font-weight: 800; font-size: .85rem; margin-bottom: 7px; }
+    .wrow .t { position: relative; height: 14px; background: var(--bg-2); border-radius: 999px; border: 2px solid var(--line); }
+    .wrow .t::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--muted); }
+    .wrow .f { position: absolute; top: 0; bottom: 0; border-radius: 999px; transition: left .1s, width .1s; }
+    .wrow b { font-family: var(--font-mono); font-size: .78rem; text-align: right; }
+    .wrow.off { opacity: .4; }
+    .meter { display: grid; gap: 10px; }
+    .mrow { display: grid; grid-template-columns: 100px 1fr 44px; gap: 8px; align-items: center; font-weight: 800; font-size: .88rem; }
+    .mrow .t { height: 20px; background: var(--bg-2); border-radius: 999px; overflow: hidden; border: 2px solid var(--line); }
+    .mrow .f { height: 100%; border-radius: 999px; transition: width .15s; }
+    .mrow b { font-family: var(--font-mono); font-size: .8rem; text-align: right; }
+    .gap-wrap { height: 48px; overflow: hidden; }
+    .gap-pill { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: .88rem; }
+    .gap-pill.bad { background: color-mix(in srgb, var(--bad) 16%, var(--card)); color: var(--bad); }
+    .gap-pill.ok { background: color-mix(in srgb, var(--good) 16%, var(--card)); color: var(--good); }
+    .gap-pill.mid { background: color-mix(in srgb, var(--warn) 22%, var(--card)); color: #8a5a00; }
+    .tiles3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+    @media (max-width: 560px) { .tiles3 { grid-template-columns: 1fr; } }
+    .tile3 { background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+    .tile3 .k { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .tile3 .v { font-family: var(--font-head); font-size: 1.7rem; font-weight: 600; line-height: 1.1; }
+    .tile3 .n { font-size: .78rem; color: var(--ink-2); font-weight: 600; height: 2.4em; overflow: hidden; }
+    .tile3 .k { height: 2.4em; overflow: hidden; }
+    .fixes { display: grid; gap: 8px; }
+    .fixes .btn { min-height: 76px; justify-content: flex-start; width: 100%; white-space: normal; text-align: left; line-height: 1.25; }
+    .fixes .btn small { display: block; font-weight: 600; opacity: .75; font-size: .76rem; }
+    .fixes .btn .ic { flex: none; }
+    .ask-grid { display: grid; gap: 8px; }
+    .ask-grid .seg { width: 100%; }
+    .ask-grid .seg button { flex: 1; }
+    .verdict { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: center; height: 96px; }
+    .verdict .say { overflow: hidden; max-height: 92px; }
+    #pet { width: 84px; height: 84px; background: var(--bg-2); border-radius: 18px; }
+    .verdict .say { font-family: var(--font-head); font-weight: 600; font-size: 1.15rem; line-height: 1.2; }
+    .verdict .say small { display: block; font-family: var(--font-body); font-weight: 700; font-size: .8rem; color: var(--ink-2); margin-top: 2px; }
+    .strip-card .checkpoints { min-height: 176px; align-items: flex-start; }
+    .strip-card .ckpt { width: 124px; }
+    .strip-card .ckpt canvas { aspect-ratio: 124 / 56; }
+    .legend-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: .82rem; font-weight: 700; color: var(--ink-2); margin-top: 8px; }
+    .legend-row span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-row i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .unfair-toggle { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .88rem; cursor: pointer; }
+
+    /* ---- Layout stability: every live-updating box has a FIXED height, so nothing below it ever moves. ---- */
+    .robo-say .bubble { flex: 1; min-width: 0; height: 112px; min-height: 0; overflow-y: auto; }
+    .stage-left { grid-template-columns: minmax(0, 1fr); } /* a wide checkpoint row must scroll, not stretch the column */
+    @media (max-width: 700px) { .robo-say .bubble { height: 168px; } }
+    #inside { height: 300px; overflow-y: auto; }
+  </style>
+</head>
+<body data-page="demo" data-topic="ai" data-demo="ai-bias">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="eye"></i> Artificial Intelligence · Fairness</span>
+      <h1>The <span class="em">unfair</span> AI</h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">The Treehouse Club has one rule: <b>bring a snack</b>. A grumpy old bouncer let creatures in for years, and now an AI is copying his decisions. Let's see what it learns!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Fix the unfair AI</h3>
+          <p class="muted" style="margin:0;font-size:.86rem">Each button changes the examples (or what the AI may look at). The AI then trains again from scratch.</p>
+          <div class="fixes">
+            <button class="btn" id="fix-more"><i data-icon="plus"></i><span>Add 15 fairly-judged purple creatures<small>More examples of the rare group</small></span></button>
+            <button class="btn" id="fix-hide"><i data-icon="eye"></i><span id="fix-hide-t">Hide the colour from the AI<small>It can't use what it can't see</small></span></button>
+            <button class="btn" id="fix-copy"><i data-icon="layers"></i><span>Balance the crowd by copying<small>Copy the purple creatures we have</small></span></button>
+            <button class="btn" id="fix-relabel"><i data-icon="pencil"></i><span>Fix the unfair old decisions<small>Let in purple creatures who brought snacks</small></span></button>
+          </div>
+          <label class="unfair-toggle"><input type="checkbox" id="show-unfair"> Highlight the unfair old decisions</label>
+          <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="question"></i> Ask the AI</h3>
+          <p class="muted" style="margin:0;font-size:.86rem">Build a creature and see if the bouncer lets it in.</p>
+          <div class="ask-grid">
+            <div class="seg" id="a-col"><button data-v="0" class="on">Green</button><button data-v="1">Purple</button></div>
+            <div class="seg" id="a-big"><button data-v="0">Small</button><button data-v="1" class="on">Big</button></div>
+            <div class="seg" id="a-hat"><button data-v="0" class="on">No hat</button><button data-v="1">Hat</button></div>
+            <div class="seg" id="a-snack"><button data-v="0">No snack</button><button data-v="1" class="on">Snack</button></div>
+          </div>
+          <div class="verdict"><canvas id="pet" width="168" height="168"></canvas><div class="say" id="verdict"></div></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <p class="sub-h" style="margin-left:2px">The old decisions the AI learns from <span id="n-ex" class="muted"></span></p>
+          <canvas id="data"></canvas>
+          <div class="hover-info" id="hover-info">Hover a creature to see its story.</div>
+          <div class="legend-row">
+            <span><i style="background:#2fbf62"></i>Green</span><span><i style="background:#9b5cff"></i>Purple</span>
+            <span>Corner badge: <b style="color:var(--good)">&nbsp;let in</b> / <b style="color:var(--bad)">&nbsp;turned away</b></span>
+            <span>Cookie = brought a snack · Triangle = hat · Bigger = big</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="learned">
+            <div>
+              <p class="sub-h">What the AI learned <span class="muted" style="text-transform:none;letter-spacing:0">(right = "let in", left = "turn away")</span></p>
+              <div id="weights"></div>
+            </div>
+            <div>
+              <p class="sub-h">Would it let in a creature who brought a snack?</p>
+              <div class="meter" id="meter"></div>
+              <div class="gap-wrap" style="margin-top:10px"><span class="gap-pill" id="gap"></span></div>
+            </div>
+          </div>
+          <div class="tiles3" id="tiles"></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="train"><i data-icon="play"></i> Train again</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Training speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="3">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-ep">0</div></div>
+            <div class="stat"><div class="k">Oopsie</div><div class="v" id="st-loss">–</div></div>
+          </div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card strip-card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the AI after each fix. Tap one to compare how fair it was.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="book"></i></div><h3>Old decisions</h3><p>The AI is shown lots of creatures and whether the old bouncer let them in.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Find the clues</h3><p>It works out which clues (colour, size, hat, snack) went with "let in".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Copy the pattern</h3><p>It copies the pattern it saw, fair or not. It can't tell the difference.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Check every group</h3><p>A good score overall can hide a bad score for a small group, so we check each group on its own.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Fix the examples</h3><p>To fix an unfair AI, fix what it learns from: the examples, the labels, or what it's allowed to look at.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The AI looked great on the old decisions, but a <b>fair test</b> showed purple creatures were treated badly. A single score can hide unfairness.</li>
+        <li>Nobody told the AI to dislike purple. It just <b>copied the old bouncer</b>, because purple creatures were rare and often turned away.</li>
+        <li>Adding fairly-judged examples, hiding colour, and fixing the old decisions all helped. <b>Copying</b> the same unfair examples did not, because the copies carry the same unfairness.</li>
+        <li>AI is only as fair as the examples it learns from. People have to check, and fix.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The bouncer is a <span class="term">logistic regression</span> trained by full-batch gradient descent with a little L2 decay on features <code>[purple, big, hat, snack]</code> plus a bias. This is a deliberately small, transparent demonstration of <span class="term">dataset bias</span>, not a claim about any real system.</p>
+        <ul>
+          <li><b>The two problems baked into the data:</b> (1) <i>representation</i>: only 10% of the 160 examples are purple; (2) <i>label bias</i>: the old bouncer let in purple creatures that brought a snack only 15% of the time, against about 96% for green creatures. The fair rule ("let in anyone with a snack") is the ground truth used by the fair test.</li>
+          <li><b>Why one number misleads:</b> accuracy on held-out old decisions (drawn from the same biased process, 10% purple) is about 94%. On a balanced fair test it is 100% for green creatures and about 48% for purple. The summary metric is dominated by the majority group.</li>
+          <li><b>Fairness meter:</b> this is an <span class="term">equal-opportunity</span> style check: among creatures that genuinely qualify (brought a snack), how confident is the model that they should be let in, per group? We show the average predicted probability because the hard 0/1 decision flips abruptly.</li>
+          <li><b>Add fairly-judged examples:</b> collecting more, correctly labelled data for the under-represented group. The colour weight shrinks as evidence accumulates.</li>
+          <li><b>Hide the colour:</b> "fairness through unawareness". It works here because no other feature is a proxy for colour. In real data, other features often leak the same information, so this is rarely enough.</li>
+          <li><b>Balance by copying:</b> oversampling duplicates adds no new information and, with biased labels, makes the model <i>more</i> confident in the bias (the fair-test gap grows). Resampling helps with imbalance, not with label bias.</li>
+          <li><b>Fix the labels:</b> relabelling the unfairly rejected examples removes the bias at its source. Real projects do this with audits, relabelling and careful data collection.</li>
+          <li>Fairness has several competing definitions (demographic parity, equalised odds, calibration) that cannot all be satisfied together in general. Further reading: Google's <i>Responsible AI</i> practices, <i>Fairness and Machine Learning</i> (Barocas, Hardt, Narayanan).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ai-bias-core.js"></script>
+  <script src="js/ai-bias.js"></script>
+</body>
+</html>

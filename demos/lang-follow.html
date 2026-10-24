@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robo Follows Instructions · Explore ML</title>
+  <meta name="description" content="Watch a tiny attention model learn to turn words into actions, live in your browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .instr { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; min-height: 44px; }
+    .instr .lbl { font-weight: 800; color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+    .tok {
+      position: relative; padding: 6px 12px; border-radius: 12px; font-weight: 800; border: 2px solid var(--line);
+      background: var(--card); transition: background .2s, transform .2s, border-color .2s;
+    }
+    .tok .w { position: absolute; left: 6px; right: 6px; bottom: 2px; height: 3px; border-radius: 3px; background: var(--accent); transform-origin: left; }
+    .views { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .att-note { font-weight: 700; color: var(--ink-2); font-size: .92rem; min-height: 1.4em; }
+    .pick { display: grid; gap: 8px; }
+    .pick .seg button { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    #inside { height: 250px; overflow-y: auto; }
+  </style>
+</head>
+<body data-page="demo" data-topic="lang" data-demo="lang-follow">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="chat"></i> Words → actions · Attention</span>
+      <h1>Robo <span class="em">follows instructions</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I get a little instruction, like <b>go to the blue star</b>. At first the words mean nothing to me. Press <b>Train</b> and watch me learn!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <div class="instr" id="instr"></div>
+        <canvas id="grid"></canvas>
+        <p class="att-note" id="att-note" style="margin:10px 4px 0"></p>
+        <p class="view-label" style="margin:12px 0 6px 4px;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
+          <i data-icon="trend"></i> How often Robo picks the right thing (last 50 tries)</p>
+        <canvas id="chart"></canvas>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="train"><i data-icon="play"></i> Train</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed">
+              <button data-v="0.25">Slow</button><button data-v="0.5">0.5×</button><button data-v="1" class="on">Normal</button><button data-v="6">Fast</button><button data-v="200">Turbo</button>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Tries</div><div class="v" id="st-ep">0</div></div>
+            <div class="stat"><div class="k">Right (last 50)</div><div class="v" id="st-rate">–</div></div>
+            <div class="stat"><div class="k">Test score</div><div class="v" id="st-test">–</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your instruction</h3>
+          <div class="pick">
+            <div class="seg" id="pick-color"><button data-v="">any</button><button data-v="red" class="on"><span class="dot" style="background:#ff4d5e"></span>red</button><button data-v="blue"><span class="dot" style="background:#2f9bff"></span>blue</button><button data-v="green"><span class="dot" style="background:#2fbf62"></span>green</button></div>
+            <div class="seg" id="pick-shape"><button data-v="">any</button><button data-v="star" class="on">star</button><button data-v="circle">circle</button><button data-v="square">square</button></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="test"><i data-icon="play"></i> Try it</button>
+            <button class="btn" id="shuffle"><i data-icon="shuffle"></i> New world</button>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Train to peek inside.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— Robo's brain saved along the way. Tap one to watch it try the same test.</span></h3>
+      <div class="checkpoints" id="ckpts"><span class="muted">They appear after 1, 25, 100, 300, 1000 and 3000 tries.</span></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="scissors"></i></div><h3>Words become numbers</h3><p>Each word gets its own list of numbers. At first they're random.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Look at the words</h3><p>For every thing on the grid, Robo asks: which words are about <em>me</em>? That's <b>attention</b>.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Pick and walk</h3><p>The thing that matches the words best gets the biggest chance. Robo walks toward it.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Treat or oops</h3><p>Right thing = reward. Wrong thing = oops. The word numbers get nudged after every try.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first, words were just random numbers to Robo, so it wandered to any old thing.</li>
+        <li>Every reward taught it a bit more about which words go with which colours and shapes.</li>
+        <li>Soon it <b>paid attention</b> to the important words (blue, star) and ignored filler (go, to, the).</li>
+        <li>Chatbots and robot helpers turn words into actions with this same attention trick, just much bigger.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>A tiny <span class="term">attention</span>-based policy, trained from scratch by <span class="term">policy gradient</span>. No pretrained model, nothing downloaded.</p>
+        <ul>
+          <li><b>Embeddings:</b> each of the 9 vocabulary tokens has a learned vector <code>e ∈ ℝ⁸</code>.</li>
+          <li><b>Queries:</b> each object's features (colour + shape one-hots) are projected to a query <code>q = W·f</code>. Attention of object <i>k</i> on token <i>t</i> is <code>softmax_t(q_k·e_t)</code>, shown as the glow under each word chip.</li>
+          <li><b>Grounding:</b> object scores <code>m_k = Σ_t q_k·e_t</code> → <code>p = softmax(m)</code>. Move probabilities mix "moves that approach object k" weighted by <code>p_k</code> (plus 4% exploration).</li>
+          <li><b>Learning:</b> <span class="term">REINFORCE</span> with a running baseline. Reward +1 for the right object, −1 for a wrong one, −0.5 for running out of steps. Gradients flow through <code>p</code> into both the embeddings and <code>W</code>.</li>
+          <li>From ~33% (chance with 3 objects) it typically reaches ~95% on 200 held-out tasks within ~1000 episodes (well under a second of compute).</li>
+          <li>Real systems (instruction-following agents, vision-language-action models) use the same ingredients: token embeddings, attention to ground words in what the agent sees, and RL or imitation to learn actions.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/lang-follow-core.js"></script>
+  <script src="js/lang-follow.js"></script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brain Painter · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .paint-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+    @media (max-width: 720px) { .paint-grid { grid-template-columns: 1fr; } }
+    .paint-grid h4 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; font-family: var(--font-body); font-weight: 800; }
+    #board { cursor: crosshair; }
+    .counter { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 800; }
+    .counter .ctl { display: flex; align-items: center; gap: 8px; }
+    .counter .num { font-family: var(--font-head); font-size: 1.5rem; min-width: 1.4em; text-align: center; color: var(--accent); }
+    .counter .btn { width: 40px; height: 40px; padding: 0; font-size: 1.2rem; }
+    #spark { width: 100%; height: 56px; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .presets .btn { justify-content: flex-start; }
+    .cp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0 8px; flex-wrap: wrap; }
+    .checkpoints { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; min-height: 40px; }
+    .ckpt { flex: none; width: 92px; border: 3px solid var(--line); border-radius: 14px; background: var(--card); padding: 6px; cursor: pointer; font: inherit; color: inherit; text-align: center; }
+    .ckpt:hover { border-color: var(--accent); }
+    .ckpt.on { border-color: var(--accent); background: var(--accent-soft); }
+    .ckpt img { width: 100%; aspect-ratio: 1; border-radius: 8px; display: block; }
+    .ckpt .t { font-weight: 800; font-size: 0.75rem; margin-top: 4px; }
+    .ckpt .m { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+    .cp-empty { margin: 0; font-size: 0.88rem; }
+    .lines { display: grid; gap: 4px; font-size: 0.88rem; }
+    .lines .ln { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 10px; background: var(--bg-2); }
+    .lines .ln .eq { margin-left: auto; font-family: var(--font-mono); font-weight: 700; white-space: nowrap; }
+    .lines .total { background: var(--accent-soft); font-weight: 800; }
+    .lines .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; border: 1px solid var(--line); }
+    .seg .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); vertical-align: -1px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="nn" data-demo="nn-playground">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="palette"></i> Neural Networks</span>
+      <h1>Brain <span class="em">Painter</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">My job: paint the board so every <b style="color:var(--bad)">red</b> dot sits on red and every <b style="color:var(--sup)">blue</b> dot sits on blue. Tap the board to add dots!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="paint-grid">
+          <div>
+            <h4><i data-icon="image"></i> The board — tap to add dots</h4>
+            <canvas id="board"></canvas>
+          </div>
+          <div>
+            <h4><i data-icon="network"></i> The brain inside</h4>
+            <canvas id="net"></canvas>
+            <p class="muted" style="font-size:.85rem;margin:8px 0 0">Each little square shows what one neuron "sees". Lines are knobs: <b style="color:var(--sup)">blue</b> = plus, <b style="color:var(--rl)">orange</b> = minus, thick = strong.</p>
+          </div>
+        </div>
+        <div class="cp-head">
+          <h4 style="margin:0"><i data-icon="flag"></i> Snapshots while learning — tap to time-travel</h4>
+          <button class="btn small hidden" id="live"><i data-icon="arrow-left"></i> Back to live</button>
+        </div>
+        <div class="checkpoints" id="cps"></div>
+        <div class="pill-note" style="margin-top:14px"><span class="e"><i data-icon="trophy"></i></span><span>Challenges: ① Solve the circle with <b>0</b> layers (spoiler: impossible!) ② Solve it with the fewest neurons. ③ Tame the spiral — try 3 layers, 8 neurons and Turbo.</span></div>
+        <div class="overlay-msg" id="msg"></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="pause"></i> Pause</button>
+            <button class="btn" id="step"><i data-icon="step"></i> Step</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Forget</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Rounds</div><div class="v" id="epoch">0</div></div>
+            <div class="stat"><div class="k">Right</div><div class="v" id="acc">–</div></div>
+          </div>
+          <div>
+            <div class="lbl" style="font-weight:800;font-size:.92rem;display:flex;justify-content:space-between"><span>Oops-meter (loss)</span><span class="val" id="loss" style="font-family:var(--font-mono);color:var(--accent)">–</span></div>
+            <canvas id="spark"></canvas>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="lines" id="inside"><p class="muted" style="margin:0">Point at (or tap) any spot on the board to see how the brain decides there.</p></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="layers"></i> Build the brain</h3>
+          <div class="counter"><span>Thinking layers</span><span class="ctl"><button class="btn small" id="l-">−</button><span class="num" id="layers">0</span><button class="btn small" id="l+">+</button></span></div>
+          <div class="counter"><span>Neurons per layer</span><span class="ctl"><button class="btn small" id="n-">−</button><span class="num" id="neurons">4</span><button class="btn small" id="n+">+</button></span></div>
+          <div class="field">
+            <label for="lr">Step size <span class="val" data-for="lr"></span></label>
+            <input type="range" id="lr" min="0" max="6" step="1" value="4">
+            <div class="hint">tiny careful steps ← → giant wild jumps</div>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-s="0.25">Slow</button><button data-s="0.5">0.5×</button><button data-s="1" class="on">Fast</button><button data-s="8"><i data-icon="zap"></i> Turbo</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="target"></i> Dots</h3>
+          <div class="seg" id="brush"><button data-b="0" class="on"><span class="dot" style="background:var(--bad)"></span> Red</button><button data-b="1"><span class="dot" style="background:var(--sup)"></span> Blue</button><button data-b="-1"><i data-icon="eraser"></i> Erase</button></div>
+          <div class="presets">
+            <button class="btn small" data-p="blobs"><i data-icon="groups"></i> Two piles</button>
+            <button class="btn small" data-p="circle"><i data-icon="target"></i> Circle</button>
+            <button class="btn small" data-p="xor"><i data-icon="x"></i> Corners</button>
+            <button class="btn small" data-p="spiral"><i data-icon="repeat"></i> Spiral</button>
+          </div>
+          <button class="btn ghost small" id="clear"><i data-icon="x"></i> Clear all dots</button>
+        </div>
+      </aside>
+    </section>
+
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Every spot is a question</h3><p>For each spot on the board the brain asks: "red or blue here?" It looks at just two numbers: left-right and up-down.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>Neurons team up</h3><p>One neuron can only draw one straight line. Many neurons each draw a line, and the next layer mixes them into curvy shapes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Count the oopsies</h3><p>Dots sitting on the wrong color make the oops-meter go up. The brain wants it as low as possible.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Nudge every knob</h3><p>Each round it figures out which way to turn every single knob to shrink the oopsies — then turns each one a tiny bit.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The brain painted the board red or blue, and counted the dots sitting on the wrong color.</li>
+      <li>Every round it nudged all of its knobs a tiny bit to make fewer oopsies.</li>
+      <li>With <b>no</b> thinking neurons it could only draw one straight line — not enough for a circle.</li>
+      <li>With more neurons, each one drew its own line, and together they bent into curves that fit the dots.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>A real <span class="term">multi-layer perceptron (MLP)</span> is training live in your browser, written from scratch in plain JavaScript — no libraries.</p>
+        <ul>
+          <li><b>Architecture:</b> 2 inputs <code>(x, y) ∈ [−1, 1]²</code> → <code>L</code> hidden layers of <code>N</code> <span class="term">tanh</span> units → 1 <span class="term">sigmoid</span> output = P(blue). With 0 hidden layers this is plain <span class="term">logistic regression</span>, whose decision boundary is always a straight line — so it cannot separate the circle or XOR data.</li>
+          <li><b>Loss:</b> <span class="term">binary cross-entropy</span> <code>−[y·log p + (1−y)·log(1−p)]</code>, averaged over all dots (the "oops-meter").</li>
+          <li><b>Training:</b> <span class="term">backpropagation</span> computes the gradient of the loss w.r.t. every weight via the chain rule; <span class="term">mini-batch stochastic gradient descent</span> (batch size 10, shuffled each epoch) updates <code>w ← w − η·∂L/∂w</code>. The step-size slider is the <span class="term">learning rate</span> η — too large and the loss bounces or explodes.</li>
+          <li><b>Initialisation:</b> Xavier/Glorot-style <code>w ~ N(0, 1/fan_in)</code>. "Forget" re-randomises the weights, so you can see that different starting points find different solutions.</li>
+          <li><b>Neuron thumbnails:</b> each hidden unit's activation evaluated over the whole input plane — early layers draw straight lines (tanh of a linear function), deeper layers combine them into curves. This is the key idea behind <span class="term">representation learning</span>.</li>
+          <li>Inspired by <a href="https://playground.tensorflow.org" target="_blank" rel="noopener">TensorFlow Playground</a>. For more visual explainers see <a href="https://poloclub.github.io/" target="_blank" rel="noopener">Polo Club</a> (e.g. CNN Explainer).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/nn-playground.js"></script>
+</body>
+</html>

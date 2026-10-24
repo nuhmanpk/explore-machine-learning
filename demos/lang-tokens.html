@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Word Chopper · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .lt-main { display: grid; gap: 20px; min-width: 0; }
+    .box-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .box-head h2 { font-size: 1.3rem; margin: 0; display: flex; align-items: center; gap: 8px; }
+    .box-head h2 svg, .card h3 svg, .s-emoji { color: var(--accent); }
+    textarea#txt { min-height: 74px; resize: vertical; font-size: 1.15rem; font-weight: 700; }
+    .mode-row { margin: 12px 0; }
+    .chips {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; min-height: 70px; padding: 12px;
+      background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px;
+    }
+    .tok {
+      --h: 200; display: inline-flex; flex-direction: column; align-items: center; gap: 0; border-radius: 10px;
+      background: hsl(var(--h) 85% 86%); border: 2px solid hsl(var(--h) 55% 62%); color: #1f2140;
+      padding: 3px 8px 2px; font-weight: 800; line-height: 1.2; animation: pop 0.3s ease both;
+    }
+    :root[data-theme="dark"] .tok { background: hsl(var(--h) 40% 28%); border-color: hsl(var(--h) 50% 50%); color: #f4f1ff; }
+    .tok .tt { font-size: 1.05rem; white-space: pre; }
+    .tok .tt .sp { opacity: 0.45; }
+    .tok .ti { font-family: var(--font-mono); font-size: 0.68rem; opacity: 0.7; }
+    .tok.unk { --h: 355; border-style: dashed; }
+    .note { margin: 10px 0 0; font-weight: 700; color: var(--ink-2); min-height: 1.5em; }
+    .cmp { display: grid; gap: 6px; margin-top: 14px; }
+    .cmp-row { display: grid; grid-template-columns: 130px 1fr 74px; gap: 10px; align-items: center; font-weight: 800; font-size: 0.92rem; border-radius: 10px; padding: 3px 6px; cursor: pointer; border: 2px solid transparent; }
+    .cmp-row.on { border-color: var(--accent); background: var(--accent-soft); }
+    .cmp-row .track { height: 14px; background: var(--bg-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+    .cmp-row .fill { display: block; height: 100%; width: 0; border-radius: 999px; transition: width 0.4s ease; }
+    .cmp-row .n { font-family: var(--font-mono); text-align: right; }
+    @media (max-width: 520px) { .cmp-row { grid-template-columns: 96px 1fr 60px; font-size: 0.82rem; } }
+
+    .merge-now {
+      display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; min-height: 96px;
+      background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 14px; font-size: 1.4rem; font-weight: 800;
+    }
+    .mt { display: inline-block; padding: 6px 14px; border-radius: 12px; background: var(--card); border: 3px solid var(--ink); font-family: var(--font-mono); white-space: pre; }
+    .mt.ab { background: var(--lang); color: #1f2140; }
+    .merge-now.go .mt.a { animation: slideR 0.5s ease; }
+    .merge-now.go .mt.b { animation: slideL 0.5s ease; }
+    .merge-now.go .mt.ab { animation: pop 0.5s ease 0.3s both; }
+    @keyframes slideR { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes slideL { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .merge-now small { display: block; width: 100%; text-align: center; font-size: 0.9rem; color: var(--muted); font-weight: 700; }
+    .samples { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+    .sample { display: flex; gap: 2px; padding: 6px; border-radius: 12px; background: var(--bg-2); border: 2px solid var(--line); }
+    .sample .tok { padding: 2px 6px; }
+    .sample .tok.fresh { animation: squish 0.6s ease; }
+    @keyframes squish { 0% { transform: scaleX(1.6); } 60% { transform: scaleX(0.85); } 100% { transform: scaleX(1); } }
+    .merge-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 120px; overflow-y: auto; margin-top: 12px; }
+    .merge-list .mchip { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; background: var(--bg-2); border: 2px solid var(--line); border-radius: 999px; padding: 2px 9px; white-space: pre; }
+    .merge-list .mchip.new { border-color: var(--lang); background: color-mix(in srgb, var(--lang) 25%, var(--card)); }
+    .ckpt .cp-n { display: block; font-family: var(--font-mono); color: var(--accent); }
+    .sub-h { margin: 16px 0 8px; font-size: 1rem; display: flex; align-items: center; gap: 6px; }
+
+    .map-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+    @media (max-width: 960px) { .map-grid { grid-template-columns: 1fr; } }
+    #map { cursor: crosshair; }
+    .ana-btns { display: grid; gap: 8px; }
+    .ana-out { font-weight: 800; font-size: 1.05rem; min-height: 1.6em; }
+    .nb-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .map-status { position: absolute; left: 24px; bottom: 22px; font-weight: 800; font-size: 0.85rem; color: var(--muted); background: var(--card); padding: 3px 10px; border-radius: 999px; border: 2px solid var(--line); }
+    .inside .flow b { color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="lang" data-demo="lang-tokens">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="chat"></i> Language Models</span>
+      <h1>Word <span class="em">Chopper</span></h1>
+      <p class="hero-sub">Computers can't read letters. They chop text into little pieces called <b>tokens</b> and turn every piece into a number. Type anything and watch it get chopped!</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Type something in the box! I'll chop it into pieces and give every piece its own number.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="lt-main">
+        <div class="canvas-box">
+          <div class="box-head">
+            <h2><i data-icon="scissors"></i> Chop it!</h2>
+            <span class="chip" id="tok-count">0 pieces</span>
+          </div>
+          <textarea id="txt" aria-label="Text to chop" spellcheck="false">The happy puppy jumped over the purple rainbow!</textarea>
+          <div class="mode-row">
+            <div class="seg" id="mode-seg">
+              <button data-m="letters">Letters</button>
+              <button data-m="words">Whole words</button>
+              <button data-m="bpe" class="on">Robo's chunks</button>
+              <button data-m="gpt2">Real GPT-2</button>
+            </div>
+          </div>
+          <div class="chips" id="chips" aria-live="polite"></div>
+          <p class="note" id="note"></p>
+          <div class="cmp" id="cmp"></div>
+        </div>
+
+        <div class="canvas-box">
+          <div class="box-head">
+            <h2><i data-icon="layers"></i> Watch Robo invent chunks</h2>
+            <span class="chip" id="step-chip">Step 0</span>
+          </div>
+          <p style="margin:0 0 12px">Robo starts with only letters. Then, over and over, it finds the <b>two pieces that sit together most often</b> in its stories and glues them into one new piece.</p>
+          <div class="merge-now" id="merge-now"></div>
+          <h4 class="sub-h"><i data-icon="eye"></i> Watch these words get glued</h4>
+          <div class="samples" id="samples"></div>
+          <h4 class="sub-h"><i data-icon="flag"></i> Your sentence at each step (tap one)</h4>
+          <div class="checkpoints" id="ckpts"></div>
+          <h4 class="sub-h"><i data-icon="book"></i> Robo's chunk book (newest first)</h4>
+          <div class="merge-list" id="merge-list"></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Chunk book size</h3>
+          <div class="field">
+            <label for="merges">Glued chunks <span class="val" data-for="merges"></span></label>
+            <input type="range" id="merges" min="0" max="500" step="1" value="0">
+            <div class="hint">0 = letters only · more = bigger chunks</div>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="next"><i data-icon="step"></i> Glue next</button>
+            <button class="btn" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Reset</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="layers"></i> Numbers</h3>
+          <div class="stats">
+            <div class="stat"><div class="k">Pieces Robo knows</div><div class="v" id="s-vocab">96</div></div>
+            <div class="stat"><div class="k">Pieces in your text</div><div class="v" id="s-pieces">0</div></div>
+            <div class="stat"><div class="k">Letters per piece</div><div class="v" id="s-avg">1.0</div></div>
+            <div class="stat"><div class="k">Words Robo read</div><div class="v" id="s-read">0</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="pill-note"><span class="e"><i data-icon="bulb"></i></span><span>Try a made-up word like <b>flibberjab</b>. Whole words can't handle it, but chunks can!</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="canvas-box" style="margin-bottom:28px">
+      <div class="box-head">
+        <h2><i data-icon="map"></i> Words as points</h2>
+        <button class="btn small" id="shake"><i data-icon="shuffle"></i> Shake &amp; re-sort</button>
+      </div>
+      <p style="margin:0 0 12px">After chopping, every word gets a list of numbers that describes <b>which words it hangs out with</b>. Words with similar friends end up close together on this map.</p>
+      <div class="map-grid">
+        <div style="position:relative">
+          <canvas id="map"></canvas>
+          <span class="map-status" id="map-status"></span>
+        </div>
+        <div class="panel">
+          <div class="legend" id="map-legend"></div>
+          <div class="card inside">
+            <h3><i data-icon="eye"></i> What's happening inside</h3>
+            <div class="flow" id="inside">Point at a word on the map (or tap it).</div>
+          </div>
+          <div class="card">
+            <h3><i data-icon="wand"></i> Word math</h3>
+            <div class="ana-btns" id="ana-btns"></div>
+            <div class="ana-out" id="ana-out"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="scissors"></i></div><h3>Chop</h3><p>Text gets cut into pieces. Not too big (Robo couldn't learn every word ever), not too small (too many pieces).</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Glue the buddies</h3><p>Robo starts with letters and keeps gluing the two pieces that are seen together the most: t + h → th, th + e → the.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="cpu"></i></div><h3>Number them</h3><p>Every piece in Robo's chunk book has a number. Computers only work with numbers, so "the" might be piece #262.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="map"></i></div><h3>Place them</h3><p>Each word also gets a spot on a map, near words used in the same way: cat near dog, red near blue.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>You saw three ways to chop text: <b>letters</b> (too many pieces), <b>whole words</b> (breaks on new words) and <b>chunks</b> (just right).</li>
+        <li>Robo learned its chunks itself, one glue step at a time, by counting which two pieces sit together most.</li>
+        <li>Every piece became a <b>number</b>. That list of numbers is all a language model ever sees.</li>
+        <li>Words that are used in similar places got similar number-lists, so they landed close together on the map. Even "king − man + woman" lands on "queen"!</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <ul>
+          <li><b>Byte-Pair Encoding (BPE)</b> (Sennrich et al., 2016; used by GPT-2/3/4). Pre-tokenise with a GPT-2-style regex (a leading space stays attached to the word, shown as “·”), start from a base vocabulary of 96 characters, then repeatedly count adjacent symbol pairs (weighted by word frequency) and merge the most frequent pair into a new symbol. Robo learns up to 500 merges from the ~3,500-word built-in corpus, live in your browser. Encoding applies the learned merges in rank order.</li>
+          <li><b>Why sub-words?</b> A character vocabulary makes sequences long. A word vocabulary is huge and has out-of-vocabulary words (shown as <code>[?]</code>). BPE trades off between the two and never hits an unknown token, since it can always fall back to characters (real GPT-2 goes down to bytes).</li>
+          <li><b>Real GPT-2</b> mode loads the actual <code>Xenova/gpt2</code> tokenizer (50,257 tokens, byte-level BPE) through <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener">Transformers.js</a>. Only the tokenizer files download (about 2 MB), not the model.</li>
+          <li><b>Word map.</b> For each word we count neighbours within ±2 words inside a sentence, convert counts to <span class="term">PPMI</span> (positive pointwise mutual information, with context smoothing α = 0.75), and L2-normalise. That is a classic count-based <i>distributional embedding</i> (“you shall know a word by the company it keeps”). The 2D picture is a live <span class="term">t-SNE</span> (perplexity 10, exact gradients) of those vectors. Distances in 2D are only roughly faithful, so neighbours and word math are computed in the full space with cosine similarity.</li>
+          <li><b>Word math</b> is the vector-offset analogy test from word2vec (Mikolov et al., 2013): <code>argmax cos(v, king − man + woman)</code>, excluding the three input words. It works here because the small “Word Garden” corpus uses gender words (his/her, he/she) and royal words (crown, castle) consistently. On real corpora the effect is noisier.</li>
+          <li>Real LLMs learn embeddings by gradient descent as part of the network instead of counting, but the intuition carries over. See the <a href="https://poloclub.github.io/transformer-explainer/" target="_blank" rel="noopener">Transformer Explainer (Polo Club)</a> for how token embeddings flow into attention.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/lang-corpus.js"></script>
+  <script src="js/lang-ai.js"></script>
+  <script src="js/lang-tokens.js"></script>
+</body>
+</html>

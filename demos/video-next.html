@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Next-Frame Dreamer · Explore ML</title>
+  <meta name="description" content="Watch a tiny neural network learn to predict the next frame of a bouncing-ball video, then dream up its own video.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .twin { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .twin canvas { image-rendering: pixelated; }
+    #real { cursor: crosshair; }
+    .view-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px 4px; display: flex; align-items: center; gap: 6px; }
+    .view-label .tag { margin-left: auto; text-transform: none; letter-spacing: 0; color: var(--accent); }
+    .chart canvas { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .inside-frames { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; align-items: end; }
+    .inside-frames figure { margin: 0; text-align: center; font-size: 0.7rem; font-weight: 800; color: var(--ink-2); }
+    .inside-frames canvas { width: 100%; border-radius: 8px; image-rendering: pixelated; border: 2px solid var(--line); background: var(--canvas-bg); }
+    .inside-text { font-weight: 700; font-size: 0.92rem; margin: 0; }
+    .ckpt canvas { image-rendering: pixelated; }
+    .live-chip { display: none; }
+    .live-chip.show { display: inline-flex; }
+    .s-emoji { color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="video" data-demo="video-next">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="film"></i> Video generation</span>
+      <h1>The Next-Frame <span class="em">Dreamer</span></h1>
+      <p class="hero-sub">A video is just pictures shown one after another. If a computer can guess the <b>next</b> picture, it can make up a whole video!</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I want to learn how a bouncing ball moves. Press <b>Start learning</b> and I'll watch lots of tiny videos. Right now my dreams are just fuzz!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <div class="twin">
+          <div>
+            <p class="view-label"><i data-icon="eye"></i> Real world</p>
+            <canvas id="real"></canvas>
+          </div>
+          <div>
+            <p class="view-label"><i data-icon="sparkles"></i> Robo's dream <span class="tag" id="dream-tag">live brain</span></p>
+            <canvas id="dream"></canvas>
+          </div>
+        </div>
+        <p class="muted" style="font-size:.85rem;margin:8px 4px 0">Both start from the same two pictures. After that, the dream only uses Robo's own guesses. Drag on the real world to throw the ball your way.</p>
+        <div class="chart" style="margin-top:12px">
+          <p class="view-label"><i data-icon="trend"></i> How wrong the guesses are (lower is better)</p>
+          <canvas id="loss"></canvas>
+        </div>
+        <p class="view-label" style="margin-top:14px"><i data-icon="flag"></i> Checkpoints: tap one to watch that old brain dream</p>
+        <div class="checkpoints" id="ckpts"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn small live-chip" id="back-live"><i data-icon="arrow-left"></i> Back to the live brain</button>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="train"><i data-icon="play"></i> Start learning</button>
+            <button class="btn" id="again"><i data-icon="repeat"></i> Dream again</button>
+            <button class="btn ghost small" id="forget"><i data-icon="reset"></i> Forget everything</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Learning speed</span>
+            <div class="seg" id="speed">
+              <button data-v="0.25">Slow</button><button data-v="0.5">0.5×</button><button data-v="1" class="on">Normal</button><button data-v="12">Turbo</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Practice rounds</div><div class="v" id="st-steps">0</div></div>
+            <div class="stat"><div class="k">Videos watched</div><div class="v" id="st-seen">0</div></div>
+            <div class="stat"><div class="k">Next-picture guess</div><div class="v" id="st-one">0<small>%</small></div></div>
+            <div class="stat"><div class="k">Dream match</div><div class="v" id="st-dream">0<small>%</small></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Change the world</h3>
+          <div class="btn-row">
+            <button class="btn small" id="gravity"><i data-icon="arrow-down"></i> Gravity</button>
+            <button class="btn small" id="two"><i data-icon="plus"></i> Two balls</button>
+            <button class="btn small ghost" id="randstart"><i data-icon="shuffle"></i> Random starts</button>
+          </div>
+          <div class="hint muted" style="font-size:.85rem">New rules = new things to learn. Watch Robo get confused, then figure it out.</div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="inside-frames">
+            <figure><canvas id="in-a"></canvas>Picture 1</figure>
+            <figure><canvas id="in-b"></canvas>Picture 2</figure>
+            <figure><canvas id="in-p"></canvas>My guess</figure>
+            <figure><canvas id="in-c"></canvas>Real next</figure>
+            <figure><canvas id="in-e"></canvas>Oops map</figure>
+          </div>
+          <p class="inside-text" id="inside-text">Press Start learning to see me think.</p>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="film"></i></div><h3>Watch</h3><p>Robo watches thousands of tiny videos of a bouncing ball. Each picture is only 24 × 24 dots.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Guess the next picture</h3><p>It looks at two pictures in a row and guesses where every dot will be in the next one.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Check</h3><p>It compares its guess with the real next picture. Red dots on the oops map are mistakes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Tweak</h3><p>It nudges its brain's numbers so the next guess is a tiny bit less wrong. Over and over.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Dream</h3><p>Now feed it its <b>own</b> guess as the next picture, then guess again… That's a made-up video!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Mistakes pile up</h3><p>Small mistakes grow with each new picture, so long dreams get blurry. Big video AIs fight this too.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first Robo's brain was random, so its dreams were just fuzz.</li>
+        <li>By guessing the next picture and checking, it slowly learned that balls keep moving the same way and bounce off walls.</li>
+        <li>Once it could guess one picture ahead, it could chain guesses together and <b>dream a whole video</b>.</li>
+        <li>The checkpoints show the same brain getting better: fuzz → blob → bouncing ball.</li>
+        <li>Nobody told it the rules of bouncing. It found them by watching.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is an <span class="term">autoregressive next-frame predictor</span>, the simplest kind of video generator, trained live in your browser.</p>
+        <ul>
+          <li><b>Data:</b> endless synthetic clips of 1–2 anti-aliased balls on a 24×24 grid (optionally with gravity). Each training example is a triple of frames <code>(x<sub>t−1</sub>, x<sub>t</sub>) → x<sub>t+1</sub></code>; two input frames are needed so the model can infer velocity.</li>
+          <li><b>Model:</b> an MLP <code>1152 → 96 ReLU → 576 sigmoid</code>, written in plain JavaScript. Because input frames are mostly black, the first layer only touches the lit pixels (a sparse matmul), which is what makes in-browser training fast.</li>
+          <li><b>Training:</b> per-pixel binary cross-entropy (lit pixels up-weighted ×3 so the ball isn't ignored), mini-batches of 16, Adam (lr 0.002). “Next-picture guess” is the IoU between the thresholded one-step prediction and the true frame; “dream match” is the average IoU over a 15-frame rollout.</li>
+          <li><b>Dreaming:</b> rollouts feed predictions back as inputs. Since the model was only trained on real frames, its own slightly-blurry outputs are out-of-distribution, so errors compound. This is called <span class="term">exposure bias</span>.</li>
+        </ul>
+        <p><b>How real video generators extend this:</b> modern systems (e.g. OpenAI's Sora, Google's Veo) first compress video into a smaller <span class="term">latent</span> space with an autoencoder, cut it into <span class="term">spacetime patches</span> (little cubes of space × time), and use a <span class="term">diffusion transformer</span> to denoise all patches of a clip together rather than one frame at a time. That joint denoising keeps long clips consistent. Text conditioning steers what appears. Autoregressive “world models” (like DeepMind's Genie) are much closer to this demo: predict the next frame, given the past and an action.</p>
+        <p>Further reading: <a href="https://openai.com/index/video-generation-models-as-world-simulators/" target="_blank" rel="noopener">Video generation models as world simulators</a> (OpenAI), and <a href="https://arxiv.org/abs/2212.09748" target="_blank" rel="noopener">Scalable Diffusion Models with Transformers</a> (Peebles &amp; Xie).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/video-next-core.js"></script>
+  <script src="js/video-next.js"></script>
+</body>
+</html>

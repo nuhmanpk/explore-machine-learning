@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Words ↔ Pictures · Explore ML</title>
+  <meta name="description" content="Draw a picture, type some words, and watch a real CLIP model turn both into numbers and find the best match.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="vlm-shared.css">
+</head>
+<body data-page="demo" data-topic="vlm" data-demo="vlm-match">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="image"></i> Vision-Language Models · CLIP</span>
+      <h1>Words <span class="em">↔</span> Pictures</h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I can turn a <b>picture</b> into a list of numbers, and a <b>word</b> into a list of numbers too. If the two lists look alike, they match! Press <b>Wake up the model</b> to start.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box" id="src"></div>
+
+      <aside class="panel">
+        <div class="card dl-card" id="dl">
+          <h3><i data-icon="cpu"></i> The model</h3>
+          <p class="muted" style="margin:0;font-size:.9rem">A real CLIP model (about <b>150 MB</b>, downloaded once, then it runs right here in your browser).</p>
+          <button class="btn primary wake" id="wake"><i data-icon="zap"></i> Wake up the model</button>
+          <span class="ready-badge"><i data-icon="check"></i> Awake and ready</span>
+          <div class="dl-bar"><span></span></div>
+          <div class="dl-txt">Sleeping</div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="chat"></i> Words to try</h3>
+          <div class="seg" id="presets">
+            <button data-set="animals" class="on">Animals</button><button data-set="weather">Weather</button><button data-set="feelings">Feelings</button><button data-set="things">Things</button>
+          </div>
+          <div class="chips" id="chips"></div>
+          <form class="add-row" id="add-form">
+            <input type="text" id="add-word" placeholder="Add a word… (e.g. pizza)" maxlength="40" autocomplete="off">
+            <button class="btn small" type="submit"><i data-icon="plus"></i></button>
+          </form>
+          <div class="field">
+            <span class="lbl">Robo reads each word as…</span>
+            <select id="template">
+              <option value="auto" selected>Automatic (drawing / photo)</option>
+              <option value="a drawing of {}">“a drawing of …”</option>
+              <option value="a photo of {}">“a photo of …”</option>
+              <option value="{}">just the word</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="trophy"></i> Best match</h3>
+          <div class="bars" id="bars"><p class="muted" style="margin:0">Wake up the model to see scores.</p></div>
+          <button class="btn" id="score" disabled><i data-icon="search"></i> Match now</button>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="layers"></i> Inside the model</h2>
+    <div class="card inside">
+      <div class="pipe" id="pipe">
+        <div class="pstep" data-s="0"><b>1</b>Chop picture into squares</div>
+        <div class="pstep" data-s="1"><b>2</b>Picture → 512 numbers</div>
+        <div class="pstep" data-s="2"><b>3</b>Words → 512 numbers</div>
+        <div class="pstep" data-s="3"><b>4</b>Compare the lists</div>
+        <div class="pstep" data-s="4"><b>5</b>Pick the winner</div>
+      </div>
+      <div class="inside-grid">
+        <div>
+          <p class="mini-title"><i data-icon="cpu"></i> Each list of numbers drawn as a barcode</p>
+          <canvas id="codes"></canvas>
+        </div>
+        <div>
+          <p class="mini-title"><i data-icon="map"></i> Word map: the picture is pulled toward its matches</p>
+          <canvas id="map"></canvas>
+        </div>
+      </div>
+      <div class="say-flow">
+        <div class="flow" id="flow">
+          <div id="f1">Your picture</div><div class="arrow"><i data-icon="arrow-right"></i></div>
+          <div id="f2">512 numbers</div><div class="arrow"><i data-icon="arrow-right"></i></div>
+          <div id="f3">Best match</div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="repeat"></i> How the guess changed</h2>
+    <p class="muted" style="margin-top:-6px">Every time Robo looks, a snapshot lands here. Draw stroke by stroke and watch the guess change! Tap a snapshot to look at it again.</p>
+    <div class="checkpoints" id="ckpts"></div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="image"></i></div><h3>Chop the picture</h3><p>The picture is cut into 49 little squares, like a puzzle. The model studies every square and how they fit together.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="cpu"></i></div><h3>Picture numbers</h3><p>A "picture brain" squeezes everything it saw into a list of 512 numbers. That list is the picture's secret code.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="chat"></i></div><h3>Word numbers</h3><p>A "word brain" turns each word into its own list of 512 numbers, in the very same secret code.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Compare</h3><p>Multiply the two lists number by number and add it all up. Big total = the codes agree = good match.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Winner</h3><p>The word whose code agrees most with the picture wins. That's how the model "reads" a picture with words.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>A real model turned your picture into 512 numbers and each word into 512 numbers.</li>
+        <li>Pictures and words that mean the same thing get <b>look-alike</b> numbers, because the model practised on 400 million pictures with captions.</li>
+        <li>Matching is just "how alike are these two number lists?" No one taught it your exact drawing.</li>
+        <li>Adding strokes changed the picture's numbers, so the best word changed too.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This runs OpenAI's <span class="term">CLIP</span> (ViT-B/32, 8-bit quantised, via <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener">Transformers.js</a> + ONNX Runtime WebAssembly) entirely in the browser. Model: <code>Xenova/clip-vit-base-patch32</code>.</p>
+        <ul>
+          <li><b>Two encoders, one space:</b> a Vision Transformer splits the 224×224 image into 7×7 patches of 32 px and produces an image embedding; a Transformer text encoder produces a text embedding. Both are projected to 512 dimensions and L2-normalised.</li>
+          <li><b>Contrastive training:</b> trained on ~400M (image, caption) pairs so matching pairs have high cosine similarity and mismatched pairs low (InfoNCE loss).</li>
+          <li><b>Zero-shot classification:</b> similarity <code>s = ⟨u, v⟩</code> for each label prompt, then <code>softmax(100 · s)</code>. Raw cosines are small (≈0.2–0.3); the learned temperature (logit scale 100) turns small gaps into confident probabilities. Prompt templates such as “a drawing of a …” noticeably change results.</li>
+          <li><b>The barcodes</b> are the actual 512-d vectors; the "agreement" strip is the element-wise product whose sum is the cosine similarity.</li>
+          <li><b>The map</b> places words by PCA of their text embeddings; the picture is drawn at the probability-weighted average of word positions. (Projecting image and text together would mostly show CLIP's "modality gap" between images and texts.)</li>
+        </ul>
+        <p>Further reading: <a href="https://openai.com/research/clip" target="_blank" rel="noopener">CLIP (OpenAI)</a> · <a href="https://poloclub.github.io/cnn-explainer/" target="_blank" rel="noopener">CNN Explainer</a> · <a href="https://poloclub.github.io/transformer-explainer/" target="_blank" rel="noopener">Transformer Explainer</a>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/vlm-shared.js"></script>
+  <script src="js/vlm-match.js"></script>
+</body>
+</html>

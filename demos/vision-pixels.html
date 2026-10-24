@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robot Eyes · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    #view { cursor: crosshair; }
+    #lens { width: 100%; border-radius: 12px; background: var(--canvas-bg); }
+    .src-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .src-grid .btn { padding: 8px 6px; font-size: 0.86rem; }
+    .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .duo figure, .trio figure { margin: 0; }
+    .duo canvas, .trio canvas { width: 100%; aspect-ratio: 4 / 3; border-radius: 12px; background: #000; }
+    .duo figcaption, .trio figcaption { font-weight: 800; font-size: 0.88rem; color: var(--ink-2); margin-top: 6px; text-align: center; }
+    .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+    .trio-arrow { display:flex; justify-content:center; align-items:center; gap:6px; text-align: center; font-weight: 800; color: var(--muted); margin-top: 12px; font-size: 0.9rem; }
+    @media (max-width: 560px) { .duo { grid-template-columns: 1fr; } .trio { grid-template-columns: 1fr 1fr; } }
+    .k-btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .k-btns .btn { justify-content: flex-start; padding: 8px 10px; font-size: 0.88rem; white-space: normal; text-align: left; min-width: 0; }
+    .stage > * { min-width: 0; }
+    #stack-btn { white-space: normal; }
+    .kgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 220px; }
+    .kgrid input {
+      width: 100%; text-align: center; font-family: var(--font-mono); font-weight: 700; font-size: 1rem;
+      border: 2px solid var(--line); background: var(--bg-2); border-radius: 10px; padding: 8px 2px;
+    }
+    .kgrid input:focus { outline: none; border-color: var(--accent); }
+    .kgrid input.pos { color: var(--vision); } .kgrid input.neg { color: var(--bad); }
+    .kdiv { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+    .kdiv input { width: 70px; text-align: center; font-family: var(--font-mono); border: 2px solid var(--line); background: var(--bg-2); border-radius: 10px; padding: 6px; }
+
+    /* sliding-window explainer */
+    .conv-wrap { display: grid; grid-template-columns: auto auto auto; gap: 22px; align-items: start; justify-content: center; }
+    @media (max-width: 860px) { .conv-wrap { grid-template-columns: 1fr; justify-items: center; } }
+    .conv-col h4 { font-family: var(--font-head); font-weight: 600; text-align: center; margin-bottom: 8px; }
+    .cgrid { display: grid; gap: 3px; }
+    .cgrid div {
+      width: 36px; height: 36px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+      border-radius: 6px; transition: box-shadow 0.15s, transform 0.15s; cursor: default;
+    }
+    .cgrid.in div.win { box-shadow: 0 0 0 3px var(--accent); transform: scale(1.06); z-index: 1; }
+    .cgrid.out div { cursor: pointer; background: var(--bg-2); color: var(--muted); }
+    .cgrid.out div.cur { box-shadow: 0 0 0 3px var(--accent); }
+    @media (max-width: 420px) { .cgrid div { width: 30px; height: 30px; font-size: 0.62rem; } }
+    .math { display: grid; gap: 10px; justify-items: center; }
+    .prod { display: grid; grid-template-columns: repeat(3, auto); gap: 4px; }
+    .prod span { font-family: var(--font-mono); font-size: 0.78rem; background: var(--bg-2); border-radius: 6px; padding: 4px 6px; text-align: center; min-width: 74px; }
+    .prod span b { color: var(--accent); }
+    .sum { font-family: var(--font-head); font-size: 1.5rem; font-weight: 600; }
+    .sum .big { color: var(--accent); }
+    .conv-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 16px; align-items: center; }
+    .conv-controls .field { min-width: 180px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="vision" data-demo="vision-pixels">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="eye"></i> Computer Vision</span>
+      <h1>Robot <span class="em">Eyes</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Hi! You see a picture. I see <b>lots and lots of numbers</b>. Drag the square on the picture to peek through my magnifying glass!</p>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> Part 1 · Pictures are made of numbers</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="view"></canvas>
+        <div class="overlay-msg" id="ov"></div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="image"></i> Pick a picture</h3>
+          <div class="src-grid">
+            <button class="btn small on" data-src="house">House</button>
+            <button class="btn small" data-src="smiley">Smiley</button>
+            <button class="btn small" data-src="letter">Letter A</button>
+            <button class="btn small" id="upload-btn"><i data-icon="upload"></i> Upload</button>
+            <button class="btn small" id="cam-btn"><i data-icon="camera"></i> Camera</button>
+            <input type="file" id="file" accept="image/*" hidden>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="search"></i> Magnifying lens</h3>
+          <canvas id="lens"></canvas>
+          <div class="seg" id="lens-mode">
+            <button data-m="color" class="on">Colors</button>
+            <button data-m="num">Numbers</button>
+            <button data-m="gray">Gray</button>
+          </div>
+          <p class="muted" style="margin:0;font-size:.88rem">Drag on the picture to move the lens. Every square is one <b>pixel</b> = 3 numbers: <span style="color:#e5484d;font-weight:800">Red</span>, <span style="color:#2fbf62;font-weight:800">Green</span>, <span style="color:#2f7bff;font-weight:800">Blue</span>.</p>
+        </div>
+        <div class="card">
+          <div class="field">
+            <label for="block">Make it blocky <span class="val" data-for="block"></span></label>
+            <input type="range" id="block" min="0" max="13" step="1" value="0">
+            <div class="hint">Slide right: photo → chunky blocks → numbers!</div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Pixels</div><div class="v" id="st-px">–</div></div>
+            <div class="stat"><div class="k">Numbers</div><div class="v" id="st-num">–</div></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="wand"></i> Part 2 · Magic glasses (filters)</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="duo">
+          <figure><canvas id="orig"></canvas><figcaption>What you see</figcaption></figure>
+          <figure><canvas id="filt"></canvas><figcaption id="filt-cap">What the glasses see</figcaption></figure>
+        </div>
+        <div id="stack" class="hidden">
+          <div class="trio-arrow"><i data-icon="arrow-down"></i> Layer 1 finds lines · Layer 2 mixes them to find corners <i data-icon="arrow-down"></i></div>
+          <div class="trio">
+            <figure><canvas id="st-v"></canvas><figcaption>Layer 1: up-down lines</figcaption></figure>
+            <figure><canvas id="st-h"></canvas><figcaption>Layer 1: side lines</figcaption></figure>
+            <figure><canvas id="st-c"></canvas><figcaption>Layer 2: corners!</figcaption></figure>
+          </div>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wand"></i> Try on glasses</h3>
+          <div class="k-btns" id="k-btns"></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="book"></i> The glasses' recipe</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Each pair of glasses is just 9 numbers. Change them and see what happens!</p>
+          <div class="kgrid" id="kgrid"></div>
+          <div class="kdiv">then divide by <input type="number" id="kdiv" value="1" min="1" step="1"></div>
+          <button class="btn" id="stack-btn"><i data-icon="layers"></i> Stack the glasses (like a real vision brain)</button>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="layers"></i> Part 3 · How do the glasses work?</h2>
+    <div class="card">
+      <p style="text-align:center;font-weight:700;margin-bottom:16px">The glasses slide a little 3×3 window over the numbers. At each spot: <b>multiply</b> each pair, then <b>add</b> them all up. That's one new number!</p>
+      <div class="conv-wrap">
+        <div class="conv-col"><h4>Picture numbers</h4><div class="cgrid in" id="cin"></div></div>
+        <div class="conv-col math">
+          <h4>Multiply &amp; add</h4>
+          <div class="prod" id="prod"></div>
+          <div class="sum" id="sum"></div>
+          <div class="muted" id="kname" style="font-weight:700"></div>
+        </div>
+        <div class="conv-col"><h4>New picture</h4><div class="cgrid out" id="cout"></div></div>
+      </div>
+      <div class="conv-controls">
+        <button class="btn primary" id="c-play"><i data-icon="play"></i> Play</button>
+        <button class="btn" id="c-step"><i data-icon="step"></i> One step</button>
+        <button class="btn ghost" id="c-lens"><i data-icon="search"></i> Use the lens's spot</button>
+        <button class="btn ghost" id="c-reset"><i data-icon="reset"></i> Reset</button>
+        <div class="field">
+          <label for="c-speed">Speed <span class="val" data-for="c-speed"></span></label>
+          <input type="range" id="c-speed" min="1" max="10" value="4">
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="palette"></i></div><h3>Pixels</h3><p>A picture is a grid of tiny squares. Each square is just 3 numbers: how much red, green and blue light.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wand"></i></div><h3>Glasses</h3><p>A filter is a tiny 3×3 recipe of numbers. It slides over the picture and makes a new one that shows just edges, or blur.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Stack them</h3><p>Robots stack lots of glasses. First edges, then corners, then eyes and wheels, then whole cats and cars!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="robot"></i></div><h3>Learn the recipe</h3><p>The cool part: real vision brains aren't told the recipes. They <b>learn</b> the best 9 numbers from millions of photos.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>You zoomed in until the picture turned into <b>tiny squares</b>, and each square into <b>3 numbers</b> (red, green, blue).</li>
+        <li>You tried on <b>magic glasses</b>: 9 numbers that slide over the picture and make a new one showing edges, blur or sharpness.</li>
+        <li>You watched the 3×3 window <b>multiply and add</b>, one spot at a time — that's a <b>convolution</b>.</li>
+        <li>Stacking glasses turned lines into corners. Real vision brains stack many layers and <b>learn</b> their own recipes.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <ul>
+          <li>An RGB image is a tensor of shape <code>H × W × 3</code> with values 0–255. The "Numbers" count is literally <code>H·W·3</code>.</li>
+          <li>Each pair of "glasses" is a <span class="term">convolution kernel</span> (strictly a cross-correlation, as in deep-learning libraries): <code>out[y,x] = Σᵢⱼ K[i,j] · in[y+i, x+j]</code>, here with a 3×3 kernel, stride 1, and edge pixels clamped.</li>
+          <li>The edge kernels are <span class="term">Sobel</span> operators. "All edges" is the gradient magnitude <code>√(Gx² + Gy²)</code> computed on luminance <code>0.299R + 0.587G + 0.114B</code>. Blur is a 3×3 Gaussian approximation (÷16).</li>
+          <li>"Stack the glasses" mimics a two-layer <span class="term">CNN</span>: layer 1 gives two feature maps (|Gx|, |Gy|); layer 2 blurs and multiplies them, which lights up where both directions are present — corners and diagonals. It resembles the structure tensor used in the Harris corner detector.</li>
+          <li>In a real CNN the kernel weights are <b>learned</b> by gradient descent, there are dozens to hundreds of kernels per layer, each spanning all input channels, with a nonlinearity (ReLU) and pooling in between. Early layers famously end up looking like these hand-made edge detectors.</li>
+          <li>Everything here runs on plain Canvas <code>getImageData</code> loops — no library. Further reading: <a href="https://poloclub.github.io/cnn-explainer/" target="_blank" rel="noopener">CNN Explainer (Polo Club)</a>, <a href="https://setosa.io/ev/image-kernels/" target="_blank" rel="noopener">Image Kernels explained visually</a>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <video id="video" playsinline muted hidden></video>
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/vision-pixels.js"></script>
+</body>
+</html>

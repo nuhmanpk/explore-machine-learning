@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Car Learns to Drive · Explore ML</title>
+  <meta name="description" content="Watch hundreds of little cars with tiny neural-network brains learn to drive through traffic by trial, error and copying the best driver.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .car-views { display: grid; grid-template-columns: 300fr 360fr; gap: 12px; }
+    .car-views canvas { height: auto; }
+    .view-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px 4px; display: flex; align-items: center; gap: 6px; }
+    .progress { height: 14px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; position: relative; }
+    .progress > span { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: 999px; transition: width 0.2s; }
+    .progress-row { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 0.85rem; color: var(--ink-2); }
+    .progress-row .progress { flex: 1; }
+    .chart-wrap { margin-top: 12px; }
+    .drive-pad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: 52px 52px; gap: 8px; justify-content: center; }
+    .drive-pad .btn { padding: 0; font-size: 22px; }
+    .drive-pad .up { grid-column: 2; grid-row: 1; }
+    .drive-pad .left { grid-column: 1; grid-row: 2; }
+    .drive-pad .down { grid-column: 2; grid-row: 2; }
+    .drive-pad .right { grid-column: 3; grid-row: 2; }
+    .drive-box { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; margin-top: 12px; padding: 12px; border-radius: 16px; background: var(--accent-soft); }
+    .drive-box > p { grid-column: 1 / -1; }
+    .drive-side { display: grid; gap: 8px; }
+    @media (max-width: 560px) { .drive-box { grid-template-columns: 1fr; } }
+    .stage-left { display: grid; gap: 20px; min-width: 0; }
+    /* Keep the game and every control on screen together. */
+    main.wrap { max-width: 1560px; }
+    .stage.three { grid-template-columns: 290px minmax(0, 1fr) 300px; }
+    .stage.three .panel.left { order: 0; }
+    @media (max-width: 1200px) { .stage.three { grid-template-columns: 260px minmax(0, 1fr) 270px; } }
+    @media (max-width: 960px) { .stage.three { grid-template-columns: 1fr; } .stage.three .panel.left { order: 2; } }
+    .stage .panel { position: sticky; top: 72px; max-height: calc(100vh - 84px); overflow-y: auto; padding-right: 4px; gap: 12px; }
+    .stage .panel .card { padding: 14px; gap: 10px; }
+    .car-views canvas { max-height: calc(100vh - 260px); width: auto; max-width: 100%; margin: 0 auto; }
+    .settings .tabs { width: 100%; }
+    .settings .tabs button { flex: 1; display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
+    .tab-body { display: grid; gap: 12px; }
+    /* Wide screens: the left column has room for every group, so show them all. */
+    @media (min-width: 961px) {
+      .settings .tabs { display: none; }
+      .settings .tab-body, .settings .tab-body.hidden { display: grid !important; padding-top: 10px; border-top: 2px dashed var(--line); }
+      .settings .tab-body:first-of-type { border-top: 0; padding-top: 0; }
+      .settings .tab-body::before { content: attr(data-label); font-family: var(--font-head); font-weight: 600; font-size: 1.05rem; }
+    }
+    #inside { height: 190px; }
+    @media (max-width: 960px) { .stage .panel { position: static; max-height: none; overflow: visible; } .car-views canvas { max-height: none; width: 100%; } }
+    .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+    .settings-grid .card { display: grid; gap: 12px; }
+    @media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; } }
+    .finish-cta { display: none; }
+    .finish-cta.show { display: flex; }
+    @media (max-width: 520px) {
+      .car-views { gap: 8px; }
+      .canvas-box { padding: 8px; }
+    }
+  </style>
+</head>
+<body data-page="demo" data-topic="nn" data-demo="nn-car">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="network"></i> Neural networks · Evolution</span>
+      <h1>The car that <span class="em">learns to drive</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Press <b>Play</b>! Lots of baby cars will try to drive. None of them know how… yet.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <p class="muted" style="margin:0;font-size:.9rem">Drive yourself, then let a robot car learn by copying you.</p>
+          <button class="btn" id="drive"><i data-icon="gamepad"></i> I want to drive!</button>
+          </div>
+        <div class="card settings">
+          <div class="seg tabs" id="tabs"><button data-t="road" class="on"><i data-icon="map"></i> Road</button><button data-t="babies" class=""><i data-icon="sparkles"></i> Babies</button><button data-t="car" class=""><i data-icon="wrench"></i> Car</button></div>
+          <div class="tab-body" data-t="road" data-label="The road">
+          <div class="seg" id="shape"><button data-v="0" class="on">Straight</button><button data-v="1">Curvy</button><button data-v="2">Crossroads</button></div>
+          <div class="btn-row">
+            <button class="btn" id="newroad"><i data-icon="shuffle"></i> New road</button>
+            <button class="btn" id="graduate"><i data-icon="teacher"></i> Trained driver</button>
+          </div>
+          <div class="hint muted" style="font-size:.85rem">“Trained driver” loads a brain that practised on lots of roads.</div>
+          </div>
+          <div class="tab-body hidden" data-t="babies" data-label="The babies">
+          <div class="field">
+            <label for="pop">How many babies? <span class="val" data-for="pop"></span></label>
+            <input type="range" id="pop" min="20" max="400" step="10" value="200">
+            <div class="hint">More cars = more chances that one gets lucky.</div>
+          </div>
+          <div class="field">
+            <label for="mut">How different are they? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0" max="0.6" step="0.01" value="0.15">
+            <div class="hint">Small = copies of the champ. Big = wild new ideas.</div>
+          </div>
+          </div>
+          <div class="tab-body hidden" data-t="car" data-label="Build the car (starts over)">
+          <div class="field">
+            <label for="eyes">Eyes (sensors) <span class="val" data-for="eyes"></span></label>
+            <input type="range" id="eyes" min="1" max="9" step="1" value="5">
+            <div class="hint">Each eye is a ray that feels how close things are.</div>
+          </div>
+          <div class="field">
+            <label for="hidden">Thinking neurons <span class="val" data-for="hidden"></span></label>
+            <input type="range" id="hidden" min="1" max="12" step="1" value="6">
+            <div class="hint">The middle row of the brain.</div>
+          </div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+      <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <div class="car-views">
+          <div>
+            <p class="view-label"><i data-icon="car"></i> The road</p>
+            <canvas id="road"></canvas>
+          </div>
+          <div>
+            <p class="view-label"><i data-icon="network"></i> <span id="brain-label">Best car's brain</span></p>
+            <canvas id="brain"></canvas>
+          </div>
+        </div>
+          <div id="drive-ui" class="hidden drive-box">
+          <p class="muted" style="margin:0;font-size:.9rem">Use the arrow keys (or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>) or these buttons. Every move you make is saved as a lesson for a robot car!</p>
+          <div class="drive-pad">
+            <button class="btn up" data-k="forward" aria-label="Gas"><i data-icon="arrow-up"></i></button>
+            <button class="btn left" data-k="left" aria-label="Left"><i data-icon="arrow-left"></i></button>
+            <button class="btn down" data-k="reverse" aria-label="Brake"><i data-icon="arrow-down"></i></button>
+            <button class="btn right" data-k="right" aria-label="Right"><i data-icon="arrow-right"></i></button>
+          </div>
+          <div class="drive-side">
+            <div class="stat"><div class="k">Moves recorded</div><div class="v" id="st-rec">0</div></div>
+            <button class="btn primary" id="copy" disabled><i data-icon="teacher"></i> Teach a car to copy me</button>
+            <div class="hint muted" style="font-size:.82rem" id="copy-hint">Drive for a bit first (at least 300 moves).</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <div class="progress-row"><i data-icon="flag"></i><span>Finish line</span><div class="progress"><span id="prog"></span></div><span id="prog-txt">0%</span></div>
+          <p class="view-label" style="margin-top:12px"><i data-icon="trend"></i> Best distance each round</p>
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip" title="End this round now"><i data-icon="step"></i> Next round</button>
+            <button class="btn ghost small" id="restart" title="Throw away all learning"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed">
+              <button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="3">3×</button><button data-v="10">10×</button><button data-v="30">Turbo</button>
+            </div>
+          </div>
+          <div class="pill-note finish-cta" id="finish-cta">
+            <span class="e" style="color:var(--good)"><i data-icon="trophy"></i></span>
+            <span>It made it! Now test it on a road it has never seen.</span>
+          </div>
+        </div>
+
+                        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the best car's brain.</span></div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-gen">1</div></div>
+            <div class="stat"><div class="k">Still driving</div><div class="v" id="st-alive">0</div></div>
+            <div class="stat"><div class="k">Best now</div><div class="v" id="st-best">0<small> m</small></div></div>
+            <div class="stat"><div class="k">Record</div><div class="v" id="st-record">0<small> m</small></div></div>
+          </div>
+        </div>
+
+
+
+      </aside>
+    </section>
+
+    <div class="card" style="margin-top:-8px">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion brain from each round. Tap one to watch it drive.</span></h3>
+      <div class="checkpoints" id="ckpts"><span class="muted">Each finished round saves its champion here.</span></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Eyes</h3><p>Each car has invisible feelers (the yellow lines). They turn darker when they touch a wall or another car.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>The feelers send numbers into a pretend brain. It decides: gas, brake, left or right?</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="dice"></i></div><h3>Random at first</h3><p>In round 1 every brain is random, so cars wobble and bonk into things.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Pick the best</h3><p>The car that got the furthest wins. Its brain is kept.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Copy with tiny changes</h3><p>The winner's brain is copied into all new babies, each with a little random tweak.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Again and again</h3><p>Good tweaks survive, bad ones don't. After a few rounds, a car can drive!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gamepad"></i></div><h3>Or copy a person</h3><p>When you drive, the car writes down what its eyes saw and which keys you pressed. Then it practises until it does the same.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Round 1 cars had <b>random brains</b>, so they bonked into everything.</li>
+        <li>Each round, the furthest car became the parent, and its babies got small random changes.</li>
+        <li>The bars and checkpoints show the cars getting better, round after round, with <b>no teacher</b> at all.</li>
+        <li>A champion from one road may crash on a new road. Learning one road by heart is not the same as learning to drive!</li>
+        <li>When you drove, the car learned a different way: by <b>copying you</b>. Then evolution could make your copycat even better.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: a neural network trained by a <span class="term">genetic algorithm</span> instead of backpropagation. Nobody labels the right action; the only signal is how far a car got.</p>
+        <ul>
+          <li><b>Sensors:</b> N rays spread over 90° are ray-cast against the road borders and nearby traffic polygons. Input <code>i = 1 − d/L</code> (closer = bigger, 0 if nothing is hit).</li>
+          <li><b>Network:</b> a fully-connected feed-forward net <code>[rays → hidden → 4]</code> with a <span class="term">step activation</span>: a neuron outputs 1 if <code>Σ wᵢxᵢ &gt; b</code>, else 0. The 4 outputs drive forward / left / right / reverse.</li>
+          <li><b>Fitness:</b> distance gained relative to the slowly moving traffic. Cars die on collision or after ~4 seconds without progress.</li>
+          <li><b>Selection &amp; mutation:</b> elitism with a single parent. Car #0 is an exact copy of the champion (so the record never gets worse, because the simulation is deterministic); every other car is <code>w ← lerp(w, U(−1,1), α)</code> for every weight and bias, where α is the “how different” slider.</li>
+          <li><b>Copy my driving:</b> this is <span class="term">behaviour cloning</span> (imitation learning), which is supervised learning. Each recorded frame is a pair (sensor readings + speed → the 4 keys you held). A sigmoid network <code>[rays+1 → 8 → 4]</code> is trained by backpropagation on binary cross-entropy. The copycat then seeds the genetic algorithm, much like an LLM is first trained to imitate text and then improved with rewards (RLHF).</li>
+          <li><b>Curvy roads:</b> the road centre is a sum of sines; borders are short segments, so the same ray-casting works on bends.</li>
+          <li><b>Generalisation:</b> a champion evolved on one road often fails on a new one (overfitting!). The “trained driver” was evolved in Node.js across several random roads, so it copes better, though still not perfectly.</li>
+        </ul>
+        <p>Inspired by Radu Mariescu-Istodor's free course <a href="https://www.youtube.com/watch?v=Rs_rAxEsAvI" target="_blank" rel="noopener">Self-driving car with JavaScript</a> (freeCodeCamp) and its <a href="https://github.com/gniziemazity/Self-driving-car" target="_blank" rel="noopener">source code</a>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/car-sim.js"></script>
+  <script src="js/car-graduate.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/nn-car.js"></script>
+  <script>
+    document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b));
+      document.querySelectorAll(".tab-body").forEach((x) => x.classList.toggle("hidden", x.dataset.t !== b.dataset.t));
+    }));
+  </script>
+</body>
+</html>

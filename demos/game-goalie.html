@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Goalie vs You · Explore ML</title>
+  <meta name="description" content="Take penalty kicks against a goalie that learns your habits. Change your style and watch it adapt, or kick randomly and watch it give up guessing.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button, .kickers button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .kickers { display: grid; gap: 6px; }
+    .kick-row { display: flex; gap: 4px; flex-wrap: wrap; min-height: 22px; }
+    .kick-row i { width: 18px; height: 18px; border-radius: 6px; display: inline-grid; place-items: center; font-style: normal; font-size: .62rem; font-weight: 800; color: #fff; }
+    .kick-row i.save { background: var(--good); }
+    .kick-row i.goal { background: var(--bad); }
+    .trust { display: grid; gap: 5px; }
+    .trust div { display: grid; grid-template-columns: 1fr 70px; gap: 8px; align-items: center; font-size: .8rem; font-weight: 700; color: var(--ink-2); }
+    .trust .bar { height: 10px; border-radius: 999px; background: var(--bg-2); overflow: hidden; }
+    .trust .bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+    .zone-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .zone-keys .btn { padding: 8px 0; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-goalie">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Game Lab · Learning your habits</span>
+      <h1>Goalie <span class="em">vs you</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I'm the goalie! I have to dive <b>before</b> you kick, so I can't see the ball. My only trick: <b>learn your habits</b>. Tap the goal to shoot!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Who kicks?</h3>
+          <div class="seg" id="mode"><button data-m="you" class="on">You kick</button><button data-m="robo">Robo kicker</button></div>
+          <div id="you-help">
+            <p class="muted" style="margin:0 0 8px;font-size:.88rem">Tap a spot in the goal, or press <kbd>1</kbd>–<kbd>6</kbd>:</p>
+            <div class="zone-keys" id="zone-keys"></div>
+          </div>
+          <div id="robo-help" class="hidden">
+            <p class="muted" style="margin:0 0 8px;font-size:.88rem">Pick the robot kicker's habit:</p>
+            <div class="kickers" id="kickers"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Trick the goalie. Watch its saves drop, then climb back.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="switch"><i data-icon="shuffle"></i> Switch your style <span class="tag">new habit</span></button>
+            <button class="btn small" data-c="sneaky"><i data-icon="dice"></i> Sneaky kicker <span class="tag">random</span></button>
+            <button class="btn small" data-c="curve"><i data-icon="repeat"></i> Curving ball <span class="tag">bends right</span></button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="goal"></canvas>
+          <div class="legend" style="margin-top:10px">
+            <span><i style="background:var(--accent);opacity:.6"></i>Goalie's guess: where you'll kick next</span>
+            <span><i style="background:var(--good)"></i>Saved</span>
+            <span><i style="background:var(--bad)"></i>Goal</span>
+          </div>
+          <div class="kick-row" id="kick-row" style="margin-top:8px" title="Last kicks: green = saved, red = goal"></div>
+          <p class="view-label" style="margin:14px 0 6px;font-weight:800;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Saves per 10 kicks <span style="text-transform:none">(dashed grey = lucky guessing, 17%)</span></p>
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row" id="auto-btns">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget</button>
+          </div>
+          <div class="field" id="speed-field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="3">3×</button><button data-v="10">10×</button><button data-v="60">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Kicks</div><div class="v" id="st-n">0</div></div>
+            <div class="stat"><div class="k">Saves (last 20)</div><div class="v" id="st-rate">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside" style="height:auto;min-height:150px"></div>
+          <div class="trust" id="trust"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the goalie's brain saved along the way. Tap one to see what it guessed back then.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Watch</h3><p>The goalie remembers every kick: where it went, what came before, and whether you scored.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Look for clues</h3><p>It has five little detectives. Each one has its own clue, like "what does this kicker do after scoring?"</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Trust the good detectives</h3><p>Detectives that guessed right get trusted more. Wrong ones get trusted less.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Dive</h3><p>It dives where the trusted detectives point. Old memories slowly fade, so new habits get noticed.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The goalie started out guessing: about 1 save in 6, just luck.</li>
+        <li>Once it spotted your habits, its saves shot up.</li>
+        <li>When you changed your style, it got fooled for a while, then <b>adapted</b> to the new habit.</li>
+        <li>Kicking truly at random beats it, because there's no pattern to learn. That's not the goalie being silly: nothing could predict it!</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">online sequence prediction</span>, the same idea as predicting the next word, but for penalty kicks.</p>
+        <ul>
+          <li><b>Experts:</b> five frequency models over the 6 zones with different contexts: none (marginal), the last kick (order-1 Markov), the last two kicks (order-2), the goalie's last dive, and the last kick plus whether it scored. Counts use add-0.3 smoothing.</li>
+          <li><b>Forgetting:</b> each context's counts decay by 0.93 per observation, so the model tracks <span class="term">non-stationary</span> behaviour (a changed habit).</li>
+          <li><b>Mixing:</b> a multiplicative-weights / Hedge mixture: after each kick, expert <i>e</i>'s weight is multiplied by <code>(6·p<sub>e</sub>(zone))<sup>0.6</sup></code>, renormalised with a floor so dormant experts can return.</li>
+          <li><b>Decision:</b> dive to the argmax of the mixed distribution. Chance is 1/6 ≈ 17%.</li>
+          <li><b>Curving ball:</b> shots land one zone right of the aim with probability 0.6. The goalie only sees where the ball lands, so the best possible save rate is capped below 100%.</li>
+          <li>Against a truly uniform-random kicker no predictor can beat 1/6 in expectation, which is why mixed strategies are optimal in real penalty shoot-outs (game theory).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-goalie-core.js"></script>
+  <script src="js/game-goalie.js"></script>
+</body>
+</html>

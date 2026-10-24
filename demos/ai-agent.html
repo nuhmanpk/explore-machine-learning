@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robot Vacuum: Rules or Learning? · Explore ML</title>
+  <meta name="description" content="Two robot vacuums clean the same room: one follows rules you write, one learns from rewards. Change the room and see which one copes.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .ctls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 760px) { .ctls { grid-template-columns: 1fr; } }
+    .ctl { min-width: 0; }
+    /* Everything that updates while it runs has a FIXED size, so nothing below ever moves. */
+    .ctl-head { display: flex; align-items: center; gap: 8px; margin: 0 0 6px 2px; font-weight: 800; height: 24px; overflow: hidden; white-space: nowrap; }
+    .ctl-head small { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .ctl-head .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+    .ctl-head small { margin-left: auto; font-weight: 700; color: var(--muted); }
+    .ctl canvas { cursor: default; }
+    .sta { display: grid; grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) 14px minmax(0, 1fr); gap: 3px; align-items: stretch; margin: 0 0 8px; height: 62px; }
+    .sta .ic.arr { align-self: center; color: var(--muted); }
+    .sta-box { border: 2px solid var(--line); border-radius: 12px; padding: 4px 7px; background: var(--card); min-width: 0; height: 62px; overflow: hidden; }
+    .sta-box .lbl { font-weight: 800; font-size: .62rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+    .sta-box .val { font-weight: 800; font-size: .72rem; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; max-height: 2.5em; }
+    .sta-box.lit { border-color: var(--accent); background: var(--accent-soft); animation: staFlash .4s ease; }
+    .sta-box:nth-child(3).lit { animation-delay: .07s; }
+    .sta-box:nth-child(5).lit { animation-delay: .14s; }
+    @keyframes staFlash { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+    .rules { display: grid; gap: 5px; }
+    .rule { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; border: 2px solid var(--line); border-radius: 12px; padding: 4px 6px; background: var(--card); font-size: .78rem; font-weight: 700; }
+    .rule.off { opacity: .5; }
+    .rule.fired { border-color: var(--sup); background: color-mix(in srgb, var(--sup) 14%, var(--card)); }
+    .rule input { width: 16px; height: 16px; accent-color: var(--accent); }
+    .rule .then { color: var(--accent); }
+    .rule .mv { display: flex; flex-direction: column; gap: 1px; }
+    .rule .mv button { border: 0; background: var(--bg-2); border-radius: 5px; width: 20px; height: 13px; line-height: 1; cursor: pointer; font-size: 9px; color: var(--ink-2); padding: 0; }
+    .rule .mv button:hover { background: var(--accent-soft); }
+    .rule.else { border-style: dashed; opacity: .8; grid-template-columns: 1fr; }
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .qbars { display: grid; gap: 5px; margin-top: 6px; }
+    .qbar { display: grid; grid-template-columns: 78px 1fr 42px; gap: 6px; align-items: center; font-size: .78rem; font-weight: 800; }
+    .qbar .track { height: 10px; border-radius: 999px; background: var(--bg-2); position: relative; border: 2px solid var(--line); overflow: hidden; }
+    .qbar .fill { position: absolute; top: 0; bottom: 0; }
+    .qbar.best span { color: var(--accent); }
+    .qbar .num { font-family: var(--font-mono); font-size: .72rem; text-align: right; color: var(--ink-2); }
+    .inblock { border-top: 2px dashed var(--line); padding-top: 8px; margin-top: 8px; }
+    .inblock:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+    .inblock h4 { margin: 0 0 4px; font-size: .95rem; display: flex; align-items: center; gap: 6px; }
+    .inblock p { margin: 0; font-size: .85rem; font-weight: 700; }
+    .bubble.fixed { height: 122px; min-height: 0; overflow-y: auto; flex: 1 1 auto; max-width: 760px; }
+    @media (max-width: 560px) { .bubble.fixed { height: 176px; } }
+    .stat { min-height: 66px; }
+    .stat .v { white-space: nowrap; overflow: hidden; }
+    #in-r, #in-q { height: 74px; overflow: hidden; }
+    #qbars { height: 118px; overflow: hidden; align-content: start; }
+    .pill-warn { font-size: .78rem; font-weight: 800; color: var(--muted); margin-top: 6px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="ai" data-demo="ai-agent">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="robot"></i> Artificial intelligence · Agents</span>
+      <h1>Robot vacuum: <span class="em">rules or learning?</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble fixed" id="say">Two robot vacuums, one room. The <b>blue</b> one follows rules <b>you</b> write. The <b>brown</b> one has to <b>learn</b>. Press <b>Play</b> and see who cleans more!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="book"></i> Write the blue robot's rules</h3>
+          <p class="muted" style="margin:0;font-size:.82rem">The robot obeys the <b>first</b> ticked rule that fits. Tick, untick and move rules to change how it behaves.</p>
+          <div class="rules" id="rules"></div>
+          <div class="btn-row">
+            <button class="btn small" id="r-naive">Naive</button>
+            <button class="btn small" id="r-smart">Careful</button>
+            <button class="btn small ghost" id="r-none">None</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> The brown robot's curiosity</h3>
+          <div class="field">
+            <label for="eps">Tries random moves <span class="val" data-for="eps"></span></label>
+            <input type="range" id="eps" min="0" max="0.4" step="0.01" value="0.15">
+            <div class="hint">A little curiosity finds new tricks. Too much makes it clumsy.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Change the room</h3>
+          <p class="muted" style="margin:0;font-size:.82rem">The blue robot's rules never change by themselves. Does the brown learner notice?</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="hot"><i data-icon="sparkles"></i> Dirty corner <span class="tag">messy zone</span></button>
+            <button class="btn small" data-c="stairs"><i data-icon="arrow-down"></i> Stairs <span class="tag">don't fall!</span></button>
+            <button class="btn small" data-c="pet"><i data-icon="heart"></i> A pet <span class="tag">wanders</span></button>
+            <button class="btn small" data-c="furniture"><i data-icon="shuffle"></i> Move the furniture <span class="tag">new layout</span></button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <div class="ctls">
+            <div class="ctl">
+              <div class="ctl-head"><span class="dot" style="background:var(--sup)"></span> Rules robot <small id="r-sub">follows your rules</small></div>
+              <div class="sta" id="sta-r"></div>
+              <canvas id="cv-r"></canvas>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><span class="dot" style="background:var(--accent)"></span> Learning robot <small id="q-sub">learns from rewards</small></div>
+              <div class="sta" id="sta-q"></div>
+              <canvas id="cv-q"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Dirt cleaned, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--sup)"></i>Rules robot</span><span><i style="background:var(--accent)"></i>Learning robot</span><span><i style="background:var(--bad);height:3px"></i>The room changed</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="step"><i data-icon="step"></i> One move</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-ep">1</div></div>
+            <div class="stat"><div class="k">Moves left</div><div class="v" id="st-left">160</div></div>
+            <div class="stat"><div class="k">Rules: cleaned</div><div class="v" id="st-r">0</div></div>
+            <div class="stat"><div class="k">Learner: cleaned</div><div class="v" id="st-q">0</div></div>
+            <div class="stat"><div class="k">Rules: oopsies</div><div class="v" id="st-ro">0</div></div>
+            <div class="stat"><div class="k">Learner: oopsies</div><div class="v" id="st-qo">0</div></div>
+          </div>
+          <div class="pill-warn">Oopsies = falling downstairs or bumping the pet.</div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="inblock">
+            <h4><span class="dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--sup)"></span> Rules robot</h4>
+            <p id="in-r" class="muted">Press Play to see which rule fires.</p>
+          </div>
+          <div class="inblock">
+            <h4><span class="dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--accent)"></span> Learning robot</h4>
+            <p id="in-q" class="muted">Press Play to see what it has learned.</p>
+            <div class="qbars" id="qbars"></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the learner's brain saved along the way. Tap one to watch it clean today's room.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Sense</h3><p>The vacuum feels bumps, smells dirt a few squares away, and spots stairs and pets right in front.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="cpu"></i></div><h3>Think</h3><p>The blue robot looks down your list of rules. The brown robot looks up a score for each move in its notebook.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="arrow-right"></i></div><h3>Act</h3><p>Either way it can only do three things: go forward, turn left or turn right.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Feedback</h3><p>Only the brown robot uses it: crumbs are treats, bumps and falls are ouches. It changes its notebook, and next time it does better.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>A <b>rule-based</b> robot is exactly as smart as its rules. The rules you wrote never got better by themselves.</li>
+        <li>A <b>learning</b> robot starts clumsy and improves from treats and ouches, with nobody writing the rules.</li>
+        <li>When the room changed, the learner adapted. The rules robot kept falling and bumping until a person added a rule.</li>
+        <li>Both are <b>AI</b>. Only the learning one is <b>machine learning</b>.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Both vacuums are <span class="term">intelligent agents</span> in the sense of Russell &amp; Norvig: they perceive their environment through sensors and act on it. They differ only in how <b>percepts map to actions</b>.</p>
+        <ul>
+          <li><b>Rules robot:</b> a <span class="term">simple reflex agent</span>, a prioritised condition-action list. It is fast, transparent and needs no data, but it only handles situations its author imagined, and rules can fight each other (try "dirt on the left" together with "something blocks the way"). The "shake free" rule is a hack for loops, which a reflex agent with no memory cannot otherwise detect.</li>
+          <li><b>Learning robot:</b> tabular <span class="term">Q-learning</span>. State = (direction of nearest dirt within 3 squares or none, wall ahead/left/right, stairs ahead, pet ahead), which gives 160 states. Actions: forward, turn left, turn right. Update: <code>Q(s,a) ← Q(s,a) + α [r + γ·max Q(s′,·) − Q(s,a)]</code> with α = 0.2, γ = 0.9, ε-greedy exploration (default ε = 0.15). Rewards: +1 per dirt cleaned, −0.02 per move, −0.3 bump, −2 pet, −5 stairs.</li>
+          <li><b>Fair comparison:</b> both robots live in identical rooms with the same dirt story each round (same random seed). A round is 160 moves.</li>
+          <li><b>Measured in Node</b> (4 rooms, 60 rounds): naive rules about 11 dirt/round, the learner about 15, carefully written rules about 18. A learner needs no designer, but good hand-written rules can beat it in a world that never changes. Naive rules took 3–9 oopsies a round after stairs or a pet appeared and never improved. The learner fell to about 0–1 within a few rounds.</li>
+          <li>Further reading: Russell &amp; Norvig, <i>Artificial Intelligence: A Modern Approach</i> (chapter 2, agents); Sutton &amp; Barto, <i>Reinforcement Learning</i>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/ai-agent-core.js"></script>
+  <script src="js/ai-agent.js"></script>
+</body>
+</html>

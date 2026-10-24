@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What is Machine Learning? · Explore ML</title>
+  <meta name="description" content="Learn what machine learning is by teaching Robo a secret rule with examples, and watch its guesses improve one example at a time.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 8px 0 8px; }
+    @media (max-width: 760px) { .compare { grid-template-columns: 1fr; } }
+    .compare .card h3 { display: flex; gap: 8px; align-items: center; }
+    .flowline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; font-weight: 800; }
+    .flowline .box { padding: 8px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg-2); }
+    .flowline .box.hot { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .flowline .ic { color: var(--muted); }
+    .loop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+    .loop div {
+      border: 2px solid var(--line); border-radius: 14px; padding: 8px; text-align: center; font-weight: 800; font-size: .9rem;
+      color: var(--muted); transition: all .2s; background: var(--card);
+    }
+    .loop div .ic { display: block; margin: 0 auto 2px; font-size: 1.3rem; }
+    .loop div.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); transform: translateY(-3px); }
+    .history { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 12px; min-height: 18px; }
+    .history i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+    .history i.ok { background: var(--good); }
+    .history i.no { background: var(--bad); }
+    .wbar { display: grid; grid-template-columns: 92px 1fr 48px; gap: 8px; align-items: center; font-weight: 800; font-size: .88rem; }
+    .wbar .track { height: 14px; background: var(--bg-2); border-radius: 999px; position: relative; border: 2px solid var(--line); }
+    .wbar .track::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--muted); }
+    .wbar .fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; transition: all .35s; }
+    .wbar .num { font-family: var(--font-mono); font-size: .8rem; text-align: right; color: var(--ink-2); }
+    .teach-btns { display: none; gap: 10px; }
+    .teach-btns.show { display: flex; }
+    .types { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .types a { text-decoration: none; }
+    .types .card { display: grid; gap: 6px; height: 100%; }
+    .types .card:hover { border-color: var(--c); }
+    .types .ti { font-size: 28px; color: var(--c); }
+  </style>
+</head>
+<body data-page="demo" data-topic="intro" data-demo="intro-ml">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="bulb"></i> The big idea</span>
+      <h1>What is <span class="em">machine learning?</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Normal programs follow rules a person wrote. I'm different: <b>show me examples</b> and I'll figure out the rule myself. Let's try it!</p>
+      </div>
+    </section>
+
+    <div class="compare">
+      <div class="card">
+        <h3><i data-icon="book"></i> A normal program</h3>
+        <p class="muted" style="margin:0">A person writes the rules. The computer just follows them.</p>
+        <div class="flowline"><span class="box">Rules</span><i data-icon="plus"></i><span class="box">Data</span><i data-icon="arrow-right"></i><span class="box hot">Answers</span></div>
+      </div>
+      <div class="card">
+        <h3><i data-icon="sparkles"></i> Machine learning</h3>
+        <p class="muted" style="margin:0">We give examples <em>with</em> answers. The computer works out the rules. That rule-finder is called a <b>model</b>.</p>
+        <div class="flowline"><span class="box">Data</span><i data-icon="plus"></i><span class="box">Answers</span><i data-icon="arrow-right"></i><span class="box hot">Rules (model)</span></div>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="gamepad"></i> Try it: teach Robo a secret rule</h2>
+    <section class="stage" style="margin-top:0">
+      <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <canvas id="cv"></canvas>
+        <div class="loop" id="loop">
+          <div data-s="look"><i data-icon="eye"></i>Look</div>
+          <div data-s="guess"><i data-icon="question"></i>Guess</div>
+          <div data-s="check"><i data-icon="ruler"></i>Check</div>
+          <div data-s="tweak"><i data-icon="wrench"></i>Tweak</div>
+        </div>
+        <div class="history" id="history" title="Robo's guesses: green = right, red = wrong"></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="flag"></i> 1. Pick the secret rule</h3>
+          <select id="rule">
+            <option value="big">Big monsters are friendly</option>
+            <option value="blue">Blue monsters are friendly</option>
+            <option value="spiky">Spiky monsters are grumpy</option>
+            <option value="bigblue">Big AND blue = friendly</option>
+            <option value="me">I'll decide myself (you be the teacher)</option>
+          </select>
+          <div class="hint muted" style="font-size:.85rem">Robo can't see this rule. It only sees monsters and the answers.</div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="play"></i> 2. Show examples</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="next"><i data-icon="step"></i> Next monster</button>
+            <button class="btn" id="auto"><i data-icon="play"></i> Auto</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget</button>
+          </div>
+          <div class="teach-btns" id="teach">
+            <button class="btn" id="say-friendly" style="--accent:var(--good)"><i data-icon="heart"></i> Friendly</button>
+            <button class="btn" id="say-grumpy" style="--accent:var(--bad)"><i data-icon="x"></i> Grumpy</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Examples</div><div class="v" id="st-n">0</div></div>
+            <div class="stat"><div class="k">Last 10 right</div><div class="v" id="st-last">–</div></div>
+            <div class="stat"><div class="k">Test score</div><div class="v" id="st-test">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press <b>Next monster</b> to see Robo think.</span></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="search"></i> What Robo has noticed</h3>
+          <div id="weights" style="display:grid;gap:8px"></div>
+          <div class="hint muted" style="font-size:.82rem">Right = "makes it friendly", left = "makes it grumpy". These numbers are Robo's whole brain!</div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— Robo's brain saved along the way. Tap one to look back.</span></h3>
+      <div class="checkpoints" id="ckpts"><span class="muted">They'll appear after 1, 3, 10, 25 and 50 examples.</span></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Look</h3><p>Robo sees a monster: how big, how blue, how spiky, how many eyes. Just numbers!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Guess</h3><p>It multiplies each number by how much it cares about it, adds them up, and guesses.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Check</h3><p>Then it gets the real answer and sees how wrong it was.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Tweak</h3><p>It nudges its "how much I care" numbers a little, so next time it would be less wrong.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Robo started knowing <b>nothing</b>, so its first guesses were coin flips.</li>
+        <li>Every example taught it a tiny bit: the bars on the right grew toward the secret rule.</li>
+        <li>Nobody told Robo the rule. It <b>learned it from examples</b>. That's machine learning!</li>
+        <li>The tricky "big AND blue" rule takes more examples, because Robo must notice two things at once.</li>
+      </ul>
+    </div>
+
+    <h2 class="section-title"><i data-icon="map"></i> The ways machines learn (this course)</h2>
+    <div class="types" id="types"></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Robo is a <span class="term">logistic regression</span> classifier, the simplest real ML model. Each monster is a feature vector <code>x = [size, blueness, spikiness, eyes]</code> in [0, 1].</p>
+        <ul>
+          <li><b>Guess:</b> <code>p(friendly) = σ(w·x + b)</code>, where σ is the sigmoid.</li>
+          <li><b>Check:</b> the loss is cross-entropy between <code>p</code> and the true label <code>y ∈ {0,1}</code>.</li>
+          <li><b>Tweak:</b> one step of <span class="term">stochastic gradient descent</span> per example: <code>w ← w − η (p − y) x</code>, <code>b ← b − η (p − y)</code>.</li>
+          <li><b>Test score</b> is accuracy on 60 fixed monsters Robo never trains on, so it measures <span class="term">generalisation</span>, not memory.</li>
+          <li>“Big AND blue” is still linearly separable, so logistic regression can learn it; a rule like “big XOR blue” would need a neural network (see Chapter 3).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/intro-ml.js"></script>
+</body>
+</html>

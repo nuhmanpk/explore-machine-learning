@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Picture Talker · Explore ML</title>
+  <meta name="description" content="A real image-captioning model looks at your picture and writes what it sees, one word at a time. You can even pick the words yourself.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="vlm-shared.css">
+  <style>
+    .caption-box { font-family: var(--font-head); font-size: clamp(1.3rem, 3vw, 1.9rem); font-weight: 600; min-height: 2.6em; line-height: 1.35; padding: 14px 18px; background: var(--card); border: 3px solid var(--line); border-radius: 18px; }
+    .caption-box .w { display: inline-block; animation: wordIn 0.35s cubic-bezier(.2,.8,.3,1.4); }
+    .caption-box .w.kid { color: var(--accent); text-decoration: underline wavy color-mix(in srgb, var(--accent) 50%, transparent); }
+    .caption-box .cursor { display: inline-block; width: 3px; height: 1.1em; background: var(--accent); vertical-align: -0.15em; animation: blinkc 0.8s infinite; margin-left: 4px; }
+    .caption-box .placeholder { color: var(--muted); font-size: 1.05rem; font-family: var(--font-body); font-weight: 700; }
+    @keyframes wordIn { from { transform: translateY(10px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes blinkc { 50% { opacity: 0; } }
+    .cands { display: grid; gap: 8px; margin-top: 12px; }
+    .cand { display: grid; grid-template-columns: minmax(80px, 30%) 1fr 50px; gap: 8px; align-items: center; border: 2px solid var(--line); background: var(--card); border-radius: 12px; padding: 6px 10px; font-weight: 800; text-align: left; cursor: default; }
+    .cand.pick { border-color: var(--accent); background: var(--accent-soft); }
+    .cands.choose .cand { cursor: pointer; }
+    .cands.choose .cand:hover { border-color: var(--accent); transform: translateX(3px); }
+    .cand .bt { display: block; height: 14px; border-radius: 999px; background: var(--bg-2); overflow: hidden; }
+    .cand .bf { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.4s; }
+    .cand .bp { font-family: var(--font-mono); font-size: 0.82rem; text-align: right; color: var(--ink-2); }
+    .writer-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+    @media (max-width: 860px) { .writer-grid { grid-template-columns: 1fr; } }
+    .ckpt .mini { display: grid; gap: 2px; margin-top: 4px; }
+    .ckpt .mini i { display: block; height: 5px; border-radius: 3px; background: var(--accent); opacity: .7; }
+    .ckpt .mini i:first-child { opacity: 1; }
+  </style>
+</head>
+<body data-page="demo" data-topic="vlm" data-demo="vlm-caption">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="chat"></i> Vision-Language Models · Captioning</span>
+      <h1>Picture <span class="em">Talker</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Show me a picture and I'll tell you what I see, <b>one word at a time</b>. Each word is a guess about what comes next, just like a chatbot!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box" id="src"></div>
+
+      <aside class="panel">
+        <div class="card dl-card" id="dl">
+          <h3><i data-icon="cpu"></i> The model</h3>
+          <p class="muted" style="margin:0;font-size:.9rem">A real captioning model: a picture brain + a writing brain (about <b>250 MB</b>, downloaded once, then it runs in your browser).</p>
+          <button class="btn primary wake" id="wake"><i data-icon="zap"></i> Wake up the model</button>
+          <span class="ready-badge"><i data-icon="check"></i> Awake and ready</span>
+          <div class="dl-bar"><span></span></div>
+          <div class="dl-txt">Sleeping</div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="pencil"></i> How should Robo write?</h3>
+          <div class="seg" id="mode">
+            <button data-m="greedy" class="on">Safest word</button><button data-m="creative">Creative</button><button data-m="kid">You pick!</button>
+          </div>
+          <div class="field" id="temp-field">
+            <label for="temp">Silliness <span class="val" data-for="temp"></span></label>
+            <input type="range" id="temp" min="0.3" max="2" step="0.1" value="1">
+            <div class="hint">Higher = Robo picks less likely words more often.</div>
+          </div>
+          <div class="field">
+            <label for="speed">Writing speed <span class="val" data-for="speed"></span></label>
+            <input type="range" id="speed" min="0" max="3" step="1" value="2">
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="go" disabled><i data-icon="wand"></i> Describe it!</button>
+            <button class="btn ghost" id="stop" disabled><i data-icon="pause"></i> Stop</button>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="pencil"></i> Watch it write</h2>
+    <div class="writer-grid">
+      <div class="card">
+        <p class="mini-title"><i data-icon="chat"></i> The caption so far</p>
+        <div class="caption-box" id="caption"><span class="placeholder">Wake up the model, then press “Describe it!”</span></div>
+        <p class="mini-title" style="margin-top:14px"><i data-icon="trophy"></i> <span id="cand-title">Robo's guesses for the next word</span></p>
+        <div class="cands" id="cands"></div>
+      </div>
+      <div class="card inside">
+        <h3><i data-icon="layers"></i> What's happening inside</h3>
+        <div class="pipe" id="pipe" style="grid-template-columns:1fr">
+          <div class="pstep" data-s="0"><b>1</b>Chop picture into 196 squares</div>
+          <div class="pstep" data-s="1"><b>2</b>Picture brain makes a summary</div>
+          <div class="pstep" data-s="2"><b>3</b>Writing brain guesses next word</div>
+          <div class="pstep" data-s="3"><b>4</b>Pick a word, add it, repeat</div>
+        </div>
+        <div class="flow" id="inside-text" style="margin-top:12px">Nothing yet. Press “Describe it!”</div>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="repeat"></i> Every word, step by step</h2>
+    <p class="muted" style="margin-top:-6px">Each card is one step of writing. Tap a card to see what Robo was choosing between at that moment.</p>
+    <div class="checkpoints" id="ckpts"></div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="image"></i></div><h3>Chop</h3><p>The picture is cut into 196 tiny squares, like a mosaic.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Look</h3><p>The picture brain studies every square and how they fit together, then writes a "summary" made of numbers.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="chat"></i></div><h3>Guess one word</h3><p>The writing brain reads the summary and the words so far, and scores every word it knows for "what comes next?"</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Again and again</h3><p>Pick a word, glue it on, guess again, until it guesses “the end”.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The model never "sees" like you do: it turned your picture into lots of numbers first.</li>
+        <li>Then it wrote the caption <b>one word at a time</b>, each time choosing from a list of guesses with chances.</li>
+        <li>“Safest word” always takes the top guess. “Creative” rolls the dice. When <b>you</b> pick, it keeps writing from your word.</li>
+        <li>This is how chatbots that can see pictures work too, just much, much bigger.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Model: <code>Xenova/vit-gpt2-image-captioning</code> (8-bit quantised ONNX), run with <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener">Transformers.js</a> on WebAssembly. It is a <span class="term">vision encoder–decoder</span>: a ViT-Base encoder (224×224 image → 14×14 = 196 patches of 16 px → 197 tokens × 768-d) and a GPT-2 decoder that attends to those tokens through <span class="term">cross-attention</span>, trained on COCO captions.</p>
+        <ul>
+          <li><b>Step by step:</b> we call <code>generate()</code> once per word with a custom <code>LogitsProcessor</code> that forces the words already chosen and reads the softmax over the 50,257-token vocabulary at the new position. The encoder output is computed once per picture and reused.</li>
+          <li><b>Decoding:</b> “Safest word” = greedy (argmax). “Creative” = temperature sampling from the top-40 tokens. “You pick” = human-in-the-loop decoding. A no-repeat-3-gram rule stops loops like “a cat with a cat with a cat”.</li>
+          <li><b>Tokens, not words:</b> GPT-2 uses byte-pair tokens, so some “words” are word pieces.</li>
+          <li><b>Asking questions (VQA):</b> modern VLMs (LLaVA, Qwen-VL, SmolVLM, Florence-2…) can answer questions about a picture, but the ones that do so reliably are hundreds of MB to several GB, too heavy to promise a smooth in-browser experience here, so this lesson sticks to captioning.</li>
+        </ul>
+        <p>Further reading: <a href="https://poloclub.github.io/transformer-explainer/" target="_blank" rel="noopener">Transformer Explainer</a> · <a href="https://huggingface.co/nlpconnect/vit-gpt2-image-captioning" target="_blank" rel="noopener">original vit-gpt2 model card</a>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/vlm-shared.js"></script>
+  <script src="js/vlm-caption.js"></script>
+</body>
+</html>

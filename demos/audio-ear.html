@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teach the Ear · Explore ML</title>
+  <meta name="description" content="See sound as a picture, then teach Robo to tell whistles, claps and hums apart from just a few examples.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .view-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px 4px; display: flex; align-items: center; gap: 6px; }
+    .view-label .tag { margin-left: auto; text-transform: none; letter-spacing: 0; color: var(--accent); }
+    #spec { image-rendering: auto; }
+    .classes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+    .cls { border: 3px solid var(--line); border-radius: 16px; padding: 10px; background: var(--card); display: grid; gap: 6px; }
+    .cls.armed { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+    .cls.win { border-color: var(--good); }
+    .cls input { font-weight: 800; padding: 4px 8px; border-radius: 10px; }
+    .cls canvas { width: 100%; border-radius: 8px; background: var(--canvas-bg); }
+    .cls .thumbs { display: flex; gap: 3px; flex-wrap: wrap; min-height: 14px; }
+    .cls .thumbs canvas { width: 26px; height: 18px; border-radius: 4px; }
+    .cls .meta { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 800; color: var(--muted); }
+    .cls .pbar { height: 12px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .cls .pbar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
+    .cls.win .pbar span { background: var(--good); }
+    .synths { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .inside-pics { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; font-size: 0.72rem; font-weight: 800; color: var(--ink-2); text-align: center; }
+    .inside-pics canvas { width: 100%; border-radius: 8px; background: var(--canvas-bg); border: 2px solid var(--line); }
+    .inside-text { font-weight: 700; font-size: 0.92rem; margin: 0; }
+    .chart canvas { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .s-emoji { color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="audio" data-demo="audio-ear">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="wave"></i> Sound &amp; music</span>
+      <h1>Teach the <span class="em">Ear</span></h1>
+      <p class="hero-sub">Computers can't hear like you. They turn sound into a <b>picture</b>, then learn what each kind of sound's picture looks like.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Press a sound button (or turn on your microphone) and watch the sound turn into a picture! Low sounds at the bottom, high sounds at the top.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <p class="view-label"><i data-icon="wave"></i> Sound picture (spectrogram) <span class="tag" id="spec-tag">quiet</span></p>
+        <canvas id="spec"></canvas>
+        <div class="classes" id="classes"></div>
+        <div class="chart" style="margin-top:12px">
+          <p class="view-label"><i data-icon="trend"></i> Robo's quiz score as it hears more examples</p>
+          <canvas id="acc"></canvas>
+        </div>
+        <p class="view-label" style="margin-top:14px"><i data-icon="flag"></i> Checkpoints: what Robo's sound memories looked like</p>
+        <div class="checkpoints" id="ckpts"><p class="muted" style="margin:0;font-size:.9rem">Saved as Robo collects examples.</p></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wave"></i> Make a sound</h3>
+          <div class="synths">
+            <button class="btn small" data-synth="whistle">Whistle</button>
+            <button class="btn small" data-synth="clap">Clap</button>
+            <button class="btn small" data-synth="hum">Hum</button>
+            <button class="btn small" data-synth="beep">Beep</button>
+          </div>
+          <button class="btn" id="mic"><i data-icon="wave"></i> Use my microphone</button>
+          <div class="hint muted" style="font-size:.85rem">The sound buttons work without a mic. Each press sounds a little different, like real life.</div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="teacher"></i> Teach Robo</h3>
+          <p class="muted" style="margin:0;font-size:.9rem">Press <b>Record</b> on a box, then make that sound. Do it a few times for each box.</p>
+          <div class="btn-row">
+            <button class="btn primary" id="quick"><i data-icon="sparkles"></i> Teach with sound buttons</button>
+            <button class="btn small" id="add"><i data-icon="plus"></i> Add a box</button>
+            <button class="btn small ghost" id="forget"><i data-icon="reset"></i> Forget</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Examples</div><div class="v" id="st-ex">0</div></div>
+            <div class="stat"><div class="k">Quiz score</div><div class="v" id="st-acc">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="inside-pics">
+            <figure style="margin:0"><canvas id="in-now"></canvas>This sound</figure>
+            <span style="color:var(--accent)"><i data-icon="arrow-right"></i></span>
+            <figure style="margin:0"><canvas id="in-near"></canvas>Closest memory</figure>
+          </div>
+          <p class="inside-text" id="inside">Teach me at least two kinds of sound, then make one and I'll explain my guess.</p>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="wave"></i></div><h3>Sound becomes a picture</h3><p>The computer splits sound into low, middle and high parts many times a second. Loud parts glow brightly.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="image"></i></div><h3>Every sound has a shape</h3><p>A whistle is a thin line up high. A hum is a stripe down low. A clap is a short splash everywhere.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="book"></i></div><h3>Collect examples</h3><p>Each recording is saved as a little picture in its box. The big picture is their average.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Find the closest</h3><p>For a new sound, Robo finds the saved pictures that look most alike, and they vote.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Sound turned into a picture called a spectrogram: up = high notes, bright = loud.</li>
+        <li>Each example you recorded became a small picture saved in a box.</li>
+        <li>With only 1 example Robo often guessed wrong. With more, its quiz score went up. You saw it on the chart.</li>
+        <li>To guess, Robo looked for the most similar saved pictures and let them vote.</li>
+        <li>Voice assistants do the same first step: turn sound into a picture, then a model learns from lots of examples.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <ul>
+          <li><b>Spectrogram:</b> the Web Audio <code>AnalyserNode</code> runs an FFT (2048 samples) about 60× per second. The magnitudes are pooled into 32 log-spaced bands (80 Hz–8 kHz), roughly like a <span class="term">mel spectrogram</span>.</li>
+          <li><b>Segmentation:</b> a simple energy-based <span class="term">onset detector</span> (adaptive noise floor) captures ~0.75 s after each onset, so every example is aligned to its start.</li>
+          <li><b>Features:</b> the clip is pooled to a 32 × 12 time-frequency image, normalised to its own peak (so volume matters less), plus its average spectrum.</li>
+          <li><b>Classifier:</b> <span class="term">k-nearest neighbours</span> (k = 3, cosine distance, distance-weighted votes). The quiz score is <span class="term">leave-one-out accuracy</span>: each example is classified by all the others.</li>
+          <li><b>Real systems</b> (keyword spotting, speech recognition like Whisper) feed log-mel spectrograms into CNNs or transformers trained on thousands of hours of audio. Teachable Machine's audio mode uses a pretrained network's embeddings instead of raw pixels, which generalises better than this.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/audio-ear.js"></script>
+</body>
+</html>

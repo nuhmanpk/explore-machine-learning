@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delivery Drone · Explore ML</title>
+  <meta name="description" content="A fleet of little delivery drones with tiny brains learns to fly a parcel to a rooftop and back, then adapts to wind, heavy parcels, low batteries, a moving truck and rain.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .fly-pad { display: none; grid-template-columns: repeat(4, 52px); grid-template-rows: 48px; gap: 8px; justify-content: center; margin-top: 10px; }
+    .fly-pad.show { display: grid; }
+    .fly-pad .btn { padding: 0; font-size: 20px; }
+    #arena { background: #cfe8ff; }
+    #babies { width: 100%; flex-wrap: nowrap; }
+    #babies button { flex: 1; white-space: nowrap; font-size: .85rem; padding: 7px 6px; }
+    .assist { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: .88rem; cursor: pointer; }
+    .assist input { width: 18px; height: 18px; accent-color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-drone">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="rocket"></i> Game Lab · Neuroevolution</span>
+      <h1>Delivery <span class="em">Drone</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Sixty baby delivery drones, sixty random brains. A parcel is waiting for the <b>house with the orange target</b>. Press <b>Play</b>!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn" id="fly"><i data-icon="gamepad"></i> I'll fly a drone</button>
+          <label class="assist"><input type="checkbox" id="assist" checked> Auto-level helper</label>
+          <p class="muted" style="margin:0;font-size:.85rem">← → lean, ↑ ↓ climb or sink (or the buttons under the town). Hover over the target for one second to drop the parcel. Switch the helper off to feel what the brain has to learn: it has to balance two rotors by itself!</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make delivering harder. Watch the fleet struggle, then adapt.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="gusts"><i data-icon="sparkles"></i> Gusty wind <span class="tag">pushes sideways</span></button>
+            <button class="btn small" data-c="heavy"><i data-icon="layers"></i> Heavy parcel <span class="tag">needs more power</span></button>
+            <button class="btn small" data-c="lowbat"><i data-icon="gauge"></i> Low battery <span class="tag">half the charge</span></button>
+            <button class="btn small" data-c="truck"><i data-icon="car"></i> Moving truck <span class="tag">customer drives</span></button>
+            <button class="btn small" data-c="rain"><i data-icon="target"></i> Rain <span class="tag">weak, wobbly rotors</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> The fleet</h3>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.25">
+            <div class="hint">Small = careful copies. Big = wild new ideas.</div>
+          </div>
+          <div class="seg" id="babies"><button data-v="1" class="on">Show the babies</button><button data-v="0">Leader only</button></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="arena"></canvas>
+          <div class="fly-pad" id="pad">
+            <button class="btn" data-k="left" aria-label="Lean left"><i data-icon="arrow-left"></i></button>
+            <button class="btn" data-k="up" aria-label="Climb"><i data-icon="arrow-up"></i></button>
+            <button class="btn" data-k="down" aria-label="Sink"><i data-icon="arrow-down"></i></button>
+            <button class="btn" data-k="right" aria-label="Lean right"><i data-icon="arrow-right"></i></button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the best half did, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--lang)"></i>Got near the house (%)</span><span><i style="background:var(--accent)"></i>Parcel delivered (%)</span><span><i style="background:var(--vision)"></i>Back at the depot (%)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip"><i data-icon="step"></i> Next round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-round">1</div></div>
+            <div class="stat"><div class="k">Flying now</div><div class="v" id="st-alive">60</div></div>
+            <div class="stat"><div class="k">Leader's battery</div><div class="v" id="st-batt">100<small>%</small></div></div>
+            <div class="stat"><div class="k">Delivered</div><div class="v" id="st-top">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the leading drone's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion drone from each round. Tap to watch it deliver in today's town.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Eleven senses</h3><p>Each drone feels how much it is tilting and spinning, how fast it moves, where the house is, how much battery is left, the wind, and whether a building is in its way.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>Those numbers go into a small brain that decides how hard to spin the left rotor and the right rotor. Push the right one harder and the drone leans left!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Best couriers win</h3><p>Getting close, holding still over the roof, dropping the parcel quickly and gently, and having battery left all earn points. The best drones become parents.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Copy with changes</h3><p>Babies get their parents' brains with small random changes. Some changes help. Those babies win next time.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Change the weather</h3><p>Turn on a challenge. Old tricks stop working, scores drop, and the fleet has to find new tricks.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In round 1 the drones tumbled, flew off or crashed into roofs. Nobody told them how to balance two rotors.</li>
+        <li>Round after round, drones that happened to stay level and head for the house had more babies, so the whole fleet learned to fly, hover and deliver.</li>
+        <li>Challenges changed the rules. Scores fell, then climbed again as the fleet found new tricks. That is <b>adapting</b>.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: a population of 60 small feed-forward networks <code>[11 → 10 → 2]</code> (tanh) improved by a genetic algorithm, with no gradients and no labelled data. The drones are 2D rigid bodies with two rotors, so they must be actively balanced: it is a <span class="term">feedback control</span> problem.</p>
+        <ul>
+          <li><b>Physics:</b> each rotor gives lift <code>u · A / m</code> along the drone's up-axis. The lift difference <code>u<sub>L</sub> − u<sub>R</sub></code> is a torque that tilts the body, so there is no built-in self-righting: a hovering drone is unstable and has to be steered continuously. Gravity, drag, wind and a battery that drains with thrust complete the model.</li>
+          <li><b>Inputs (11):</b> tilt, spin, sideways and vertical speed, the offset to the target, battery, the wind felt, whether the parcel is on board, height above the street, and how badly a building blocks the way ahead (like a lidar reading).</li>
+          <li><b>Task:</b> take off from the depot, hover within the zone above the target roof for 1 s, drop the parcel, then fly back to the depot. The depot sits in the middle of the street so drones must fly both left and right from the first round. When it sat at the edge, evolution almost never learned the flight home, because it never practised flying left.</li>
+          <li><b>Fitness:</b> time airborne, closeness to the house, time spent hovering over it, a large bonus for delivering (more for being fast and smooth), then bonuses for heading home, landing there and battery left, summed over two town layouts per round (one shown, one scored in the background).</li>
+          <li><b>Genetic algorithm:</b> the top 8% are kept unchanged (elitism); the rest are children of the top quarter (30% uniform crossover) with Gaussian mutation whose size is spread from small to large. First-generation brains start with a small output layer, so the rotors begin near hover.</li>
+          <li><b>Measured in Node</b> (best half of the fleet, 8 runs): half the best drones deliver after 18–55 rounds (median about 38), 80% after 31–72, and 28–59% also make it back to the depot by round 100–110. In round 5 the best half already gets about 60% of the way to the house. After a challenge switched on at round 61, delivered drones dropped (e.g. heavy parcel 79% → 6%, low battery 70% → 4%, rain 24% → 14%) and recovered within about 25–40 rounds.</li>
+          <li><b>The classic alternative is PID control:</b> hand-designed loops that turn tilt and altitude errors into rotor commands. Real delivery drones such as those from Zipline or Amazon's Prime Air rely on carefully engineered flight controllers, sensors and safety systems. Evolution here finds a controller from scratch, which is slower and less safe, but it shows how a feedback policy can be learned from a score alone.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-drone-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-drone.js"></script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Boat Crosses the River · Explore ML</title>
+  <meta name="description" content="A fleet of little boats with tiny brains learns to cross a river to the dock, then adapts when you add stronger currents, wind, logs and whirlpools.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .steer-pad { display: none; grid-template-columns: repeat(3, 52px); grid-template-rows: 48px 48px; gap: 8px; justify-content: center; margin-top: 10px; }
+    .steer-pad.show { display: grid; }
+    .steer-pad .btn { padding: 0; font-size: 20px; }
+    .steer-pad .up { grid-column: 2; grid-row: 1; }
+    .steer-pad .left { grid-column: 1; grid-row: 2; }
+    .steer-pad .right { grid-column: 3; grid-row: 2; }
+    .steer-pad .down { grid-column: 2; grid-row: 2; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-boat">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Game Lab · Evolution</span>
+      <h1>Boat crosses <span class="em">the river</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Sixty little boats want to reach the dock on the other side. The river keeps pushing them sideways! Press <b>Play</b>.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make the river harder. Watch the boats struggle, then adapt.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="current"><i data-icon="wave"></i> Stronger current <span class="tag">×2</span></button>
+            <button class="btn small" data-c="wind"><i data-icon="sparkles"></i> Wind gusts <span class="tag">upstream</span></button>
+            <button class="btn small" data-c="logs"><i data-icon="layers"></i> Drifting logs <span class="tag">4 logs</span></button>
+            <button class="btn small" data-c="whirl"><i data-icon="repeat"></i> Whirlpool <span class="tag">on the path</span></button>
+            <button class="btn small" data-c="moveDock"><i data-icon="flag"></i> Move the dock <span class="tag">each round</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn" id="steer"><i data-icon="gamepad"></i> I'll steer a boat</button>
+          <p class="muted" style="margin:0;font-size:.85rem">Arrow keys or the buttons under the river. Try it with the challenges on!</p>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="river"></canvas>
+          <div class="steer-pad" id="pad">
+            <button class="btn up" data-k="up" aria-label="Faster"><i data-icon="arrow-up"></i></button>
+            <button class="btn left" data-k="left" aria-label="Turn left"><i data-icon="arrow-left"></i></button>
+            <button class="btn down" data-k="down" aria-label="Slower"><i data-icon="arrow-down"></i></button>
+            <button class="btn right" data-k="right" aria-label="Turn right"><i data-icon="arrow-right"></i></button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the best half did, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Reached the dock (%)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip"><i data-icon="step"></i> Next round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <label class="row babies-toggle" style="font-weight:800;font-size:.9rem;cursor:pointer"><input type="checkbox" checked style="width:18px;height:18px;accent-color:var(--accent)" onchange="window.__showBabies = this.checked"> Show the babies</label>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-round">1</div></div>
+            <div class="stat"><div class="k">Docked now</div><div class="v" id="st-docked">0</div></div>
+            <div class="stat"><div class="k">Best half</div><div class="v" id="st-top">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the leading boat's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion boat from each round. Tap to replay it on today's river.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Feel the river</h3><p>Each boat has 5 feelers for rocks and logs, plus a sense of where the dock is and which way the water pushes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>Those numbers go into a small brain that decides: how fast, and which way to steer.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Best boats win</h3><p>Boats that reach the dock fast score most. Their brains are copied into the next round with small changes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Change the river</h3><p>Turn on a challenge. The old tricks stop working, so scores drop, until new babies find a way.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first the boats drifted into rocks or got swept away. After a few rounds the best ones learned to aim <b>upstream</b> so the river carried them to the dock.</li>
+        <li>Each challenge broke the old plan, and the line on the chart fell. Then evolution found a new plan and the line climbed back up.</li>
+        <li>That is <b>adapting</b>: nobody re-programmed the boats. The world changed, and the learners changed with it.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span> of a small feed-forward network <code>[11 → 10 → 2]</code> with tanh units.</p>
+        <ul>
+          <li><b>Inputs:</b> 5 ray-cast distances to rocks and logs (closer = bigger), the sine and cosine of the angle to the dock relative to the heading, distance to the dock, the water + wind velocity at the boat, and its own speed.</li>
+          <li><b>Outputs:</b> throttle and rudder. Boat physics: speed eases toward the throttle; turning is stronger when moving; the current and wind are simply added to the position each step.</li>
+          <li><b>Fitness:</b> 2 + (time left) for docking; otherwise closeness to the dock, scaled down after a crash.</li>
+          <li><b>Genetic algorithm:</b> 60 genomes; the top 8% are copied unchanged (elitism); the rest are children of the top quarter (30% uniform crossover), with Gaussian mutation whose size is spread from small to large across the babies.</li>
+          <li><b>Adaptation:</b> a challenge is a <span class="term">distribution shift</span>. The population has no memory of the old river, but its diversity plus selection quickly re-tunes the policy, which is why scores drop and recover. Measured in Node (best half, 3 runs): stronger current 97–100% → 37–91% → 95–100%; wind 85–99% → 42–85% → 95–100%.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-boat-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-boat.js"></script>
+</body>
+</html>

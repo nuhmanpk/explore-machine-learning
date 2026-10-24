@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rocket Lander · Explore ML</title>
+  <meta name="description" content="Fly a little rocket onto a landing pad yourself, then watch a population of rocket brains evolve to land softly, even in wind, heavy gravity and on a moving pad.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .mode-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .fly-pad { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+    .fly-pad .btn { min-width: 64px; }
+    .challenges { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .challenges .btn { justify-content: flex-start; font-size: .88rem; padding: 8px 10px; white-space: normal; text-align: left; }
+    .chart-label { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 6px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .chart-label .k { display: inline-flex; align-items: center; gap: 5px; text-transform: none; letter-spacing: 0; font-weight: 700; }
+    .chart-label .k i { width: 14px; height: 10px; border-radius: 3px; display: inline-block; }
+    .io { display: grid; grid-template-columns: 78px 1fr 92px; gap: 6px; align-items: center; font-size: .82rem; font-weight: 700; }
+    .io .bar { height: 10px; border-radius: 999px; background: var(--bg-2); position: relative; overflow: hidden; border: 1px solid var(--line); }
+    .io .bar span { position: absolute; top: 0; bottom: 0; background: var(--accent); }
+    .io .num { font-family: var(--font-mono); font-size: .75rem; text-align: right; color: var(--ink-2); }
+    #inside { height: auto; min-height: 250px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-rocket">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="gamepad"></i> Game Lab · Evolution</span>
+      <h1>Rocket <span class="em">Lander</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Land the rocket gently on the pad! Hold <b>↑</b> (or Space) for the engine and <b>← →</b> to tilt. Then switch to <b>Robo learns</b> and watch 60 rocket brains figure it out.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Change the world while Robo practises. Watch the score drop… then climb back as the rockets adapt.</p>
+          <div class="challenges" id="challenges">
+            <button class="btn ghost" data-c="wind"><i data-icon="wave"></i> Windy day</button>
+            <button class="btn ghost" data-c="gravity"><i data-icon="arrow-down"></i> Heavy gravity</button>
+            <button class="btn ghost" data-c="movingPad"><i data-icon="shuffle"></i> Moving pad</button>
+            <button class="btn ghost" data-c="fuel"><i data-icon="gauge"></i> Low fuel</button>
+            <button class="btn ghost" data-c="bumpyPad"><i data-icon="dice"></i> Pad jumps around</button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <div class="mode-row">
+          <div class="seg" id="mode">
+            <button data-mode="you" class="on"><i data-icon="gamepad"></i> You fly</button>
+            <button data-mode="robo"><i data-icon="robot"></i> Robo learns</button>
+          </div>
+          <span class="chip" id="mode-chip">Hold ↑ for engine, ← → to tilt</span>
+        </div>
+        <canvas id="world"></canvas>
+        <div class="fly-pad" id="fly-pad">
+          <button class="btn" data-k="left" aria-label="Tilt left"><i data-icon="arrow-left"></i></button>
+          <button class="btn primary" data-k="thrust" aria-label="Engine"><i data-icon="arrow-up"></i> Engine</button>
+          <button class="btn" data-k="right" aria-label="Tilt right"><i data-icon="arrow-right"></i></button>
+        </div>
+        <div class="chart-label">
+          <span><i data-icon="trend"></i> Each generation</span>
+          <span class="k"><i style="background:var(--accent);opacity:.5"></i> champion's score</span>
+          <span class="k"><i style="background:var(--ink);height:3px"></i> everyone's average</span>
+          <span class="k"><i style="background:var(--bad);height:3px"></i> challenge on</span>
+        </div>
+        <canvas id="chart"></canvas>
+      </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="robot"></i> Robo's practice</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Practise</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed">
+              <button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="4" class="on">4×</button><button data-v="15">15×</button><button data-v="0">Turbo</button>
+            </div>
+          <label class="row babies-toggle" style="font-weight:800;font-size:.9rem;cursor:pointer"><input type="checkbox" checked style="width:18px;height:18px;accent-color:var(--accent)" onchange="window.__showBabies = this.checked"> Show the babies</label>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Generation</div><div class="v" id="st-gen">0</div></div>
+            <div class="stat"><div class="k">Champion lands</div><div class="v" id="st-land">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Practise to peek inside the champion rocket's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion brain over time. Tap one to see how it copes with today's world.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Feel</h3><p>Each rocket feels 6 numbers: where the pad is, how high it is, how fast it's moving, and how tilted it is.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>Decide</h3><p>A tiny brain turns those numbers into three choices: engine on? tilt left? tilt right?</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Score</h3><p>Each brain tries 4 landings. Close to the pad, slow and straight scores points. A soft landing scores lots.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Breed</h3><p>The best brains are mixed together and given small random changes to make the next generation.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Adapt</h3><p>When you add a challenge, old tricks stop working. The ones that cope best get picked, so the family adapts.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The first rockets had random brains, so they spun, flew away or smashed into the ground.</li>
+        <li>Each generation, the best landers became the parents, and the scores climbed.</li>
+        <li>Your challenges made the old champion fail. Nobody re-taught it: the population <b>adapted</b> by itself, the same way it learned the first time.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: a genetic algorithm searches the weights of a small neural network, with no gradients.</p>
+        <ul>
+          <li><b>Policy:</b> a fully-connected net <code>6 → 8 (tanh) → 3</code>. Inputs: pad offset, altitude, vx, vy, tilt and pad velocity. Outputs: engine (fires if &gt; 0), tilt left / right (if &gt; 0.3 and larger than the other).</li>
+          <li><b>Fitness:</b> mean over 4 landings per generation (shared start conditions, so the comparison is fair) of proximity + low impact speed + uprightness, plus a large bonus for a soft upright landing on the pad and a small bonus for fuel left.</li>
+          <li><b>Selection:</b> the top 12% are elite; children use uniform crossover of two elites and Gaussian mutation on 25% of weights. The top two are copied unchanged.</li>
+          <li><b>Non-stationary environment:</b> challenges change the dynamics (wind, gravity, fuel budget) or the task (moving / random pad). Fitness of the old champion drops, and selection pressure re-optimises the population. This is a toy version of how evolutionary strategies and RL agents handle <span class="term">distribution shift</span>.</li>
+          <li><b>Note:</b> the rockets can't feel the wind directly; they only notice it through their own drift (vx), so adaptation has to happen through evolution, not perception.</li>
+        </ul>
+        <p>Related reading: the classic <a href="https://gymnasium.farama.org/environments/box2d/lunar_lander/" target="_blank" rel="noopener">LunarLander</a> RL benchmark, and OpenAI's <a href="https://openai.com/index/evolution-strategies/" target="_blank" rel="noopener">Evolution Strategies</a> article.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-rw-kit.js"></script>
+  <script src="js/game-rocket-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-rocket.js"></script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- GitHub Pages serves this file for ANY missing address (e.g. /explore-machine-learning/foo/bar),
+       so relative links would break. Work out the site's real base and point everything at it. -->
+  <script>
+    (function () {
+      var seg = location.pathname.split("/")[1] || "";
+      var base = /\.github\.io$/.test(location.hostname) && seg ? "/" + seg + "/" : "/";
+      window.__BASE = base;
+      document.write('<base href="' + base + '">');
+      // Written here (not as plain tags) so the browser never guesses the wrong folder first.
+      document.write('<link rel="icon" type="image/svg+xml" href="' + base + 'favicon.svg">');
+      document.write('<link rel="stylesheet" href="' + base + 'css/style.css">');
+    })();
+  </script>
+  <title>404: Robo took a wrong turn · Explore Machine Learning</title>
+  <meta name="description" content="This page got lost. Watch Robo learn the way home, then jump back into the course.">
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .nf-hero { text-align: center; padding: 34px 0 6px; }
+    .nf-404 { font-family: var(--font-head); font-weight: 700; font-size: clamp(5rem, 18vw, 10rem); line-height: .9; letter-spacing: -.03em; display: flex; justify-content: center; align-items: center; gap: .04em; }
+    .nf-404 span { background: linear-gradient(90deg, var(--nn), var(--sup), var(--diff)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .nf-404 .zero { width: .72em; height: .72em; border-radius: 50%; border: .14em solid var(--rl); display: inline-grid; place-items: center; position: relative; animation: wob 3s ease-in-out infinite; }
+    .nf-404 .zero::after { content: ""; width: .18em; height: .18em; background: var(--rl); border-radius: 50%; }
+    @keyframes wob { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+    .nf-hero h1 { font-size: clamp(1.5rem, 4vw, 2.4rem); margin: 10px 0 6px; }
+    .nf-hero .path { color: var(--muted); font-family: var(--font-mono); font-size: .85rem; word-break: break-all; }
+    .nf-stage { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; margin-top: 22px; align-items: start; }
+    @media (max-width: 860px) { .nf-stage { grid-template-columns: 1fr; } }
+    .nf-stage canvas { width: 100%; }
+    .nf-side { display: grid; gap: 14px; }
+    .meter { height: 14px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .meter > span { display: block; height: 100%; width: 0; background: var(--rl); border-radius: 999px; transition: width .2s; }
+    .guess { display: grid; gap: 8px; }
+    .guess a { display: flex; gap: 10px; align-items: center; text-decoration: none; background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; font-weight: 800; }
+    .guess a:hover { border-color: var(--accent); }
+    .guess a small { display: block; color: var(--muted); font-weight: 700; font-size: .75rem; }
+    .guess .ic { color: var(--accent); font-size: 1.3rem; flex: none; }
+    .nf-chapters { display: flex; flex-wrap: wrap; gap: 8px; }
+  </style>
+</head>
+<body data-page="home" data-topic="vlm" style="--accent: var(--rl)">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="nf-hero">
+      <div class="nf-404" aria-label="404"><span>4</span><i class="zero"></i><span>4</span></div>
+      <h1>Oops! This page took a wrong turn.</h1>
+      <div class="path" id="path"></div>
+      <div class="robo-say" style="justify-content:center;margin-top:16px">
+        <div class="robo"></div>
+        <p class="bubble" id="say" style="max-width:520px;text-align:left">Hi! I got lost too. Watch me: I'll try random turns, bump into walls, and slowly work out the way home.</p>
+      </div>
+    </section>
+
+    <section class="nf-stage">
+      <div class="canvas-box"><canvas id="cv"></canvas></div>
+      <aside class="nf-side">
+        <div class="card" style="gap:10px">
+          <h3><i data-icon="maze"></i> Robo is learning</h3>
+          <div class="stats">
+            <div class="stat"><div class="k">Tries</div><div class="v" id="st-ep">0</div></div>
+            <div class="stat"><div class="k">Steps to home</div><div class="v" id="st-steps">–</div></div>
+          </div>
+          <div class="meter" title="How well Robo knows the way"><span id="meter"></span></div>
+          <div class="btn-row">
+            <button class="btn small" id="faster"><i data-icon="zap"></i> Faster</button>
+            <button class="btn small ghost" id="again"><i data-icon="reset"></i> Lose Robo again</button>
+          </div>
+        </div>
+        <div class="card" style="gap:10px">
+          <h3><i data-icon="search"></i> <span id="g-title">Were you looking for…</span></h3>
+          <div class="guess" id="guess"></div>
+        </div>
+        <div class="btn-row"><a class="btn primary" href="index.html"><i data-icon="play"></i> Take me home</a></div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="map"></i> Or pick a chapter</h2>
+    <div class="nf-chapters" id="chapters"></div>
+  </main>
+
+  <script>
+    document.write('<script src="' + window.__BASE + 'js/catalog.js"><\/script><script src="' + window.__BASE + 'js/common.js"><\/script>');
+  </script>
+  <script>
+    // ---------- what the visitor probably wanted ----------
+    const raw = decodeURIComponent((location.pathname + " " + location.search).replace(window.__BASE, " "));
+    document.getElementById("path").textContent = location.pathname + location.search;
+    const words = raw.toLowerCase().replace(/\.html?/g, " ").split(/[^a-z0-9]+/).filter((w) => w.length > 1);
+    const all = allLessons();
+    const score = (l) => {
+      const hay = (l.d.id + " " + l.d.name + " " + l.t.name + " " + l.t.id).toLowerCase();
+      let s = 0;
+      for (const w of words) {
+        if (hay.includes(w)) s += w.length;
+        else if (w.length > 3 && hay.includes(w.slice(0, 4))) s += 2;
+      }
+      return s;
+    };
+    let ranked = words.length ? all.map((l) => [score(l), l]).filter((x) => x[0] > 0).sort((a, b) => b[0] - a[0]).slice(0, 4).map((x) => x[1]) : [];
+    if (!ranked.length) {
+      document.getElementById("g-title").textContent = "Popular adventures";
+      ranked = ["nn-car", "rl-balance", "game-rocket", "intro-ml"].map((id) => all.find((l) => l.d.id === id)).filter(Boolean);
+    }
+    document.getElementById("guess").innerHTML = ranked.map((l) => `<a href="demos/${l.d.id}.html">${ML.icon(l.d.icon)}<span>${l.d.name}<small>${l.chapter === 0 ? "Start here" : "Chapter " + l.chapter} · ${l.t.name}</small></span></a>`).join("");
+    document.getElementById("chapters").innerHTML = CATALOG.map((t, i) => `<a class="btn ghost small" href="topic.html?t=${t.id}">${ML.icon(t.icon)} ${i === 0 ? "Start here" : i + ". " + t.name}</a>`).join("");
+    ML.hydrateIcons();
+
+    // ---------- Robo learns the way home (tabular Q-learning, same idea as the mouse maze) ----------
+    const MAP = [
+      "#########",
+      "#R..#...#",
+      "#.#.#.#.#",
+      "#.#...#.#",
+      "#.####..#",
+      "#...#..H#",
+      "#########",
+    ];
+    const ROWS = MAP.length, COLS = MAP[0].length, CELL = 64;
+    const cv = ML.setupCanvas(document.getElementById("cv"), COLS * CELL, ROWS * CELL);
+    const ctx = cv.ctx;
+    let start, home;
+    const wall = [];
+    MAP.forEach((row, y) => [...row].forEach((c, x) => {
+      wall[y * COLS + x] = c === "#";
+      if (c === "R") start = [x, y];
+      if (c === "H") home = [x, y];
+    }));
+    const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+    const S = ROWS * COLS;
+    let Q, ep, pos, steps, eps, speed = 1, solved, trail, greedyLen, anim;
+    function reset() {
+      Q = new Float32Array(S * 4);
+      ep = 0; eps = 1; solved = false; greedyLen = null; trail = []; anim = null;
+      pos = start.slice(); steps = 0;
+      ML.say("Hi! I got lost too. Watch me: I'll try random turns, bump into walls, and slowly work out the way home.");
+      ui();
+    }
+    const idx = (x, y) => y * COLS + x;
+    function move(p, a) {
+      const nx = p[0] + DX[a], ny = p[1] + DY[a];
+      if (wall[idx(nx, ny)]) return { p, r: -0.3, done: false, bump: true };
+      const done = nx === home[0] && ny === home[1];
+      return { p: [nx, ny], r: done ? 10 : -0.04, done, bump: false };
+    }
+    function best(s) { let b = 0; for (let a = 1; a < 4; a++) if (Q[s * 4 + a] > Q[s * 4 + b]) b = a; return b; }
+    function learnStep() {
+      const s = idx(pos[0], pos[1]);
+      const a = Math.random() < eps ? Math.floor(Math.random() * 4) : best(s);
+      const m = move(pos, a);
+      const s2 = idx(m.p[0], m.p[1]);
+      const t = m.r + (m.done ? 0 : 0.95 * Math.max(Q[s2 * 4], Q[s2 * 4 + 1], Q[s2 * 4 + 2], Q[s2 * 4 + 3]));
+      Q[s * 4 + a] += 0.5 * (t - Q[s * 4 + a]);
+      pos = m.p; steps++;
+      trail.push(pos.slice()); if (trail.length > 40) trail.shift();
+      if (m.done || steps > 300) { ep++; eps = Math.max(0.03, eps * 0.93); pos = start.slice(); steps = 0; trail = []; checkGreedy(); }
+    }
+    function greedyPath() {
+      const path = [start.slice()]; let p = start.slice();
+      for (let i = 0; i < 40; i++) {
+        const m = move(p, best(idx(p[0], p[1])));
+        if (m.bump) return null;
+        p = m.p; path.push(p.slice());
+        if (m.done) return path;
+      }
+      return null;
+    }
+    function checkGreedy() {
+      const gp = greedyPath();
+      greedyLen = gp ? gp.length - 1 : null;
+      if (gp && !solved && ep >= 12) {
+        solved = true;
+        ML.say(`I know the way! Only <b>${greedyLen} steps</b> after ${ep} tries. See the trail? Now let's get you home too.`);
+        ML.confetti(50);
+        anim = { path: gp, i: 0, t: 0 };
+      } else if (!solved) {
+        if (ep === 3) ML.say("Bonk! Walls everywhere. But every bump teaches me a little.");
+        if (ep === 10) ML.say("I'm starting to remember which turns are good. The warm colours show where I think home is.");
+      }
+      ui();
+    }
+    function ui() {
+      document.getElementById("st-ep").textContent = ep;
+      document.getElementById("st-steps").textContent = greedyLen ?? "–";
+      const known = greedyLen ? Math.max(0.1, Math.min(1, 14 / greedyLen)) : Math.min(0.4, ep / 60);
+      document.getElementById("meter").style.width = Math.round(known * 100) + "%";
+    }
+
+    // ---------- drawing ----------
+    function robo(x, y, s, happy) {
+      ctx.save(); ctx.translate(x, y);
+      ctx.fillStyle = ML.cssVar("--rl"); ctx.strokeStyle = ML.cssVar("--ink"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(-18 * s, -16 * s, 36 * s, 32 * s, 10 * s); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = ML.cssVar("--card"); ctx.beginPath(); ctx.roundRect(-12 * s, -9 * s, 24 * s, 16 * s, 6 * s); ctx.fill();
+      ctx.fillStyle = ML.cssVar("--ink");
+      ctx.beginPath(); ctx.arc(-5 * s, -2 * s, 2.6 * s, 0, 7); ctx.arc(5 * s, -2 * s, 2.6 * s, 0, 7); ctx.fill();
+      ctx.lineWidth = 2; ctx.beginPath();
+      if (happy) ctx.arc(0, 1 * s, 4 * s, 0.1 * Math.PI, 0.9 * Math.PI); else { ctx.moveTo(-3 * s, 4 * s); ctx.lineTo(3 * s, 4 * s); }
+      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -16 * s); ctx.lineTo(0, -23 * s); ctx.stroke();
+      ctx.fillStyle = ML.cssVar("--warn"); ctx.beginPath(); ctx.arc(0, -24 * s, 3.5 * s, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    function house(x, y) {
+      ctx.save(); ctx.translate(x, y);
+      ctx.fillStyle = ML.cssVar("--card"); ctx.strokeStyle = ML.cssVar("--ink"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.rect(-18, -6, 36, 26); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = ML.cssVar("--diff"); ctx.beginPath(); ctx.moveTo(-23, -6); ctx.lineTo(0, -26); ctx.lineTo(23, -6); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = ML.cssVar("--lang"); ctx.beginPath(); ctx.rect(-5, 4, 10, 16); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    function draw(t) {
+      ctx.clearRect(0, 0, COLS * CELL, ROWS * CELL);
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+        const px = x * CELL, py = y * CELL;
+        if (wall[idx(x, y)]) {
+          ctx.fillStyle = ML.cssVar("--vision"); ctx.globalAlpha = 0.9;
+          ctx.beginPath(); ctx.roundRect(px + 3, py + 3, CELL - 6, CELL - 6, 16); ctx.fill();
+          ctx.globalAlpha = 1; ctx.fillStyle = "rgba(255,255,255,.25)";
+          ctx.beginPath(); ctx.arc(px + 22, py + 22, 8, 0, 7); ctx.arc(px + 42, py + 38, 6, 0, 7); ctx.fill();
+        } else {
+          const s = idx(x, y), v = Math.max(Q[s * 4], Q[s * 4 + 1], Q[s * 4 + 2], Q[s * 4 + 3]);
+          ctx.fillStyle = (x + y) % 2 ? ML.cssVar("--bg-2") : ML.cssVar("--card");
+          ctx.fillRect(px, py, CELL, CELL);
+          if (v > 0.05) { ctx.fillStyle = ML.cssVar("--rl"); ctx.globalAlpha = Math.min(0.55, v / 14); ctx.fillRect(px, py, CELL, CELL); ctx.globalAlpha = 1; }
+        }
+      }
+      // footprints of the current try
+      ctx.fillStyle = ML.cssVar("--ink"); trail.forEach((p, i) => { ctx.globalAlpha = (i / trail.length) * 0.35; ctx.beginPath(); ctx.arc(p[0] * CELL + 32, p[1] * CELL + 32, 4, 0, 7); ctx.fill(); });
+      ctx.globalAlpha = 1;
+      // best path once learned
+      if (solved) {
+        const gp = greedyPath();
+        if (gp) {
+          ctx.strokeStyle = ML.cssVar("--good"); ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.setLineDash([2, 12]);
+          ctx.beginPath(); gp.forEach((p, i) => (i ? ctx.lineTo(p[0] * CELL + 32, p[1] * CELL + 32) : ctx.moveTo(p[0] * CELL + 32, p[1] * CELL + 32))); ctx.stroke(); ctx.setLineDash([]);
+        }
+      }
+      house(home[0] * CELL + 32, home[1] * CELL + 34);
+      let rx = pos[0] * CELL + 32, ry = pos[1] * CELL + 36;
+      if (anim) {
+        const a = anim.path[Math.min(anim.i, anim.path.length - 1)], b = anim.path[Math.min(anim.i + 1, anim.path.length - 1)];
+        rx = ML.lerp(a[0], b[0], anim.t) * CELL + 32; ry = ML.lerp(a[1], b[1], anim.t) * CELL + 36;
+      }
+      robo(rx, ry + Math.sin(t / 220) * 1.5, 0.95, !!anim || solved);
+    }
+
+    // ---------- loop ----------
+    let last = 0;
+    function frame(t) {
+      if (anim) {
+        anim.t += 0.09;
+        if (anim.t >= 1) { anim.t = 0; anim.i++; }
+        if (anim.i >= anim.path.length - 1) {
+          anim = null; pos = start.slice(); steps = 0; trail = [];
+          ML.say(`Home sweet home! That's what <b>learning from trial and error</b> looks like. Press <b>Take me home</b> to head back to the course.`);
+          setTimeout(() => { if (solved) anim = { path: greedyPath() || [start], i: 0, t: 0 }; }, 2500);
+        }
+      } else if (!solved) {
+        const n = speed * 6;
+        for (let i = 0; i < n; i++) learnStep();
+      }
+      draw(t);
+      requestAnimationFrame(frame);
+    }
+    document.getElementById("faster").addEventListener("click", () => { speed = speed >= 8 ? 1 : speed * 2; ML.toast(speed === 1 ? "Normal speed" : `${speed}× faster`); });
+    document.getElementById("again").addEventListener("click", reset);
+    reset();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

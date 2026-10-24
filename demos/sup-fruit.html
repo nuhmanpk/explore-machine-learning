@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nearest Neighbours · Explore ML</title>
+  <meta name="description" content="Teach a robot apples, lemons and pears, then drag a mystery fruit around and watch its nearest neighbours vote.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .tool-seg button { display: inline-flex; align-items: center; gap: 6px; }
+    [data-fruit] svg { width: 1.5em; height: 1.5em; display: block; }
+    .votes { display: grid; gap: 8px; }
+    .vote { display: grid; grid-template-columns: 28px 1fr 40px; align-items: center; gap: 8px; font-weight: 800; }
+    .vote .bar { height: 16px; border-radius: 999px; background: var(--card); border: 2px solid var(--line); overflow: hidden; }
+    .vote .bar i { display: block; height: 100%; width: 0; border-radius: 999px; transition: width 0.25s ease; }
+    .vote .pct { font-family: var(--font-mono); font-size: 0.85rem; text-align: right; color: var(--ink-2); }
+    .nb-list { display: grid; gap: 4px; font-size: 0.88rem; font-weight: 700; }
+    .nb-list .nb { display: flex; align-items: center; gap: 6px; }
+    .nb-list .nb svg { width: 20px; height: 20px; flex: none; }
+    .nb-list .d { margin-left: auto; font-family: var(--font-mono); color: var(--muted); font-size: 0.8rem; }
+    .stage canvas#cv { cursor: crosshair; }
+  </style>
+</head>
+<body data-page="demo" data-topic="sup" data-demo="sup-fruit">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="teacher"></i> Learning from Examples</span>
+      <h1>Nearest <span class="em">Neighbours</span></h1>
+      <p class="hero-sub">You are the teacher! Put apples, lemons and pears on the table. Then drag the mystery fruit around: the robot guesses it by asking the fruit that sit closest to it.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I can't taste or smell. I only know two things about a fruit: <b>how round</b> and <b>how yellow</b> it is. So every fruit is a spot on my table. Drag the big <b>?</b> around and I'll guess what lives there!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv"></canvas>
+        <div class="overlay-msg" id="ov"></div>
+        <div class="row" style="margin-top:10px; justify-content:space-between">
+          <div class="seg tool-seg" id="tools" role="group" aria-label="What to drop">
+            <button data-tool="0" class="on" title="Drop apples"><span data-fruit="0"></span>Apple</button>
+            <button data-tool="1" title="Drop lemons"><span data-fruit="1"></span>Lemon</button>
+            <button data-tool="2" title="Drop pears"><span data-fruit="2"></span>Pear</button>
+            <button data-tool="erase" title="Take fruit away"><i data-icon="eraser"></i></button>
+          </div>
+          <div class="btn-row">
+            <button class="btn small on" id="t-map"><i data-icon="map"></i> Robot's map</button>
+            <button class="btn small" id="t-test"><i data-icon="target"></i> Test fruit</button>
+          </div>
+        </div>
+        <p class="muted" style="margin:8px 4px 0; font-size:.88rem; font-weight:700">Tap the table to drop the fruit you picked · drag any fruit to move it · drag the big <b>?</b> to ask the robot</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="k">How many neighbours to ask (K) <span class="val" data-for="k"></span></label>
+            <input type="range" id="k" min="1" max="15" step="2" value="3">
+            <div class="hint">Ask just the closest one, or a whole crowd?</div>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="auto"><i data-icon="play"></i> Teach me automatically</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn small" id="p-neat"><i data-icon="sparkles"></i> Neat orchard</button>
+            <button class="btn small" id="p-messy"><i data-icon="shuffle"></i> Messy orchard</button>
+            <button class="btn small ghost" id="p-clear"><i data-icon="eraser"></i> Clear</button>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body">
+            <div class="muted" id="q-where" style="font-size:.88rem; font-weight:700"></div>
+            <div class="nb-list" id="nb-list"></div>
+            <div class="votes" id="votes"></div>
+            <div class="decision" id="decision"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Examples</div><div class="v" id="s-n">0</div></div>
+            <div class="stat"><div class="k">Test score</div><div class="v" id="s-acc">–</div></div>
+          </div>
+          <div class="chart-box"><canvas id="acc"></canvas></div>
+          <div class="hint muted" style="font-size:.85rem">Test score = how many of 60 fruit from the orchard (fruit I never saw while learning) I guess right.</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <div class="cp-head">
+        <h3><i data-icon="clock"></i> Snapshots while learning</h3>
+        <button class="viewing-badge" id="viewing"></button>
+      </div>
+      <p class="muted" style="margin:6px 0 4px; font-size:.9rem; font-weight:700">A photo of my map after 1, 2, 4, 8… examples. More examples = a smarter map. Tap one to look back.</p>
+      <div class="checkpoints" id="cps"></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="flag"></i></div><h3>Examples with answers</h3><p>Every fruit you drop comes with a name tag. The name tag is the "answer".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Turn fruit into spots</h3><p>Roundness goes left-right, yellowness goes up-down. Every fruit becomes a spot on the table.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="groups"></i></div><h3>Ask the neighbours</h3><p>For a new fruit, find the K fruit sitting closest to it.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="check"></i></div><h3>Most votes wins</h3><p>Each neighbour votes for its own name. The name with the most votes is the guess!</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>You gave the robot examples, each with the right answer.</li>
+      <li>The robot didn't do any hard thinking — it just remembered every example.</li>
+      <li>To guess a new fruit, it asked the closest examples and counted their votes.</li>
+      <li>More examples made the map smarter and the test score went up.</li>
+      <li>Asking 1 neighbour is jumpy; asking many is smoother but can miss small groups.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">k-Nearest Neighbours (k-NN) classification</span> with two features (roundness, yellowness) and three labels.</p>
+        <ul>
+          <li>k-NN is a <span class="term">lazy</span> / <span class="term">instance-based</span> learner: "training" is just storing examples. Prediction finds the <code>k</code> closest stored points by <span class="term">Euclidean distance</span> <code>√((x₁−x₂)² + (y₁−y₂)²)</code> and takes a majority vote.</li>
+          <li>The tinted background is the <span class="term">decision boundary</span>; colour strength shows how unanimous the vote is.</li>
+          <li><code>k</code> trades <span class="term">variance</span> for <span class="term">bias</span>: <code>k = 1</code> memorises noise (jagged islands), large <code>k</code> smooths everything and can out-vote small classes. Odd <code>k</code> avoids ties with two classes.</li>
+          <li>The test score is accuracy on a held-out <span class="term">test set</span> drawn from the same distribution; the chart is a <span class="term">learning curve</span> (accuracy vs. training-set size).</li>
+          <li>In real use, features must be on comparable scales (normalise them), and k-NN gets slow and weak in high dimensions (the <span class="term">curse of dimensionality</span>).</li>
+        </ul>
+        <p>Further reading: <i>An Introduction to Statistical Learning</i>, §2.2.3 · scikit-learn "Nearest Neighbors" guide.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/sup-kit.js"></script>
+  <script src="js/sup-fruit.js"></script>
+</body>
+</html>

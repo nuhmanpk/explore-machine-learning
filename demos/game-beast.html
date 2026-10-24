@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Build-a-Beast · Explore ML</title>
+  <meta name="description" content="Draw your own creature from joints, bones and muscles, then watch evolution teach it to run, jump and climb stairs.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .tools button { flex-direction: column; gap: 2px; padding: 8px 4px; font-size: .78rem; }
+    .tools button .ic { font-size: 1.2rem; }
+    .tpl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .tpl button { justify-content: flex-start; font-size: .82rem; }
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .build-hint { font-size: .85rem; color: var(--muted); margin: 0; min-height: 2.6em; }
+    .build-warn { font-size: .85rem; font-weight: 800; color: var(--bad); margin: 0; }
+    #view { cursor: crosshair; }
+    .mode-seg { width: 100%; }
+    .mode-seg button { flex: 1; display: inline-flex; justify-content: center; gap: 6px; }
+    .toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 800; font-size: .9rem; cursor: pointer; }
+    .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .chart-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: .78rem; font-weight: 800; color: var(--muted); margin: 10px 0 6px; text-transform: uppercase; letter-spacing: .05em; }
+    .chart-head i { display: inline-block; width: 12px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: 2px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-beast">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="pencil"></i> Game Lab · Evolution</span>
+      <h1>Build-a-<span class="em">Beast</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Draw a creature: tap to add <b>joints</b>, connect them with <b>bones</b>, then add <b>muscles</b>. Or pick a starter. Then press <b>Evolve!</b></p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <div class="seg mode-seg" id="mode"><button data-m="build" class="on"><i data-icon="pencil"></i> Build</button><button data-m="evolve"><i data-icon="sparkles"></i> Evolve</button></div>
+          <div id="build-ui" style="display:grid;gap:10px">
+            <div class="tools" id="tools">
+              <button class="btn small on" data-t="joint"><i data-icon="plus"></i>Joint</button>
+              <button class="btn small" data-t="bone"><i data-icon="minus"></i>Bone</button>
+              <button class="btn small" data-t="muscle"><i data-icon="zap"></i>Muscle</button>
+              <button class="btn small" data-t="move"><i data-icon="target"></i>Move</button>
+              <button class="btn small" data-t="erase"><i data-icon="eraser"></i>Erase</button>
+              <button class="btn small" id="undo"><i data-icon="reset"></i>Undo</button>
+            </div>
+            <p class="build-hint" id="hint">Tap anywhere to place a joint.</p>
+            <p class="build-warn" id="warn"></p>
+            <div class="lbl" style="font-weight:800;font-size:.9rem">Starters</div>
+            <div class="tpl" id="tpl">
+              <button class="btn small ghost" data-k="spider">Spider</button>
+              <button class="btn small ghost" data-k="frog">Frog</button>
+              <button class="btn small ghost" data-k="snake">Snake with arms</button>
+              <button class="btn small ghost" data-k="wheel">Wobbly wheel</button>
+              <button class="btn small ghost" data-k="chair">Chair</button>
+              <button class="btn small ghost" id="clear">Clear all</button>
+            </div>
+            <label class="toggle">Googly eyes <input type="checkbox" id="eyes" checked></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="flag"></i> Goal</h3>
+          <div class="seg" id="goal" style="width:100%"><button data-g="run" class="on">Run far</button><button data-g="jump">Jump the wall</button><button data-g="stairs">Climb stairs</button></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make life harder while it evolves. Watch the score drop, then climb back.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="hills"><i data-icon="map"></i> Hills <span class="tag">bumpy</span></button>
+            <button class="btn small" data-c="ice"><i data-icon="sparkles"></i> Ice <span class="tag">slippery</span></button>
+            <button class="btn small" data-c="moon"><i data-icon="moon"></i> Moon gravity <span class="tag">floaty</span></button>
+            <button class="btn small" data-c="wind"><i data-icon="wave"></i> Headwind <span class="tag">pushes back</span></button>
+            <button class="btn small" data-c="limp"><i data-icon="x"></i> Lose a muscle <span class="tag">goes floppy</span></button>
+          </div>
+          <label class="toggle">Show the babies <input type="checkbox" id="babies" checked></label>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="view"></canvas>
+          <div class="chart-head"><span><i style="background:var(--accent)"></i>Best each generation</span><span><i style="background:var(--muted)"></i>Everyone's average</span><span><i style="background:var(--bad)"></i>Challenge</span></div>
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="sparkles"></i> Evolve!</button>
+            <button class="btn" id="next"><i data-icon="step"></i> Next gen</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="3">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Generation</div><div class="v" id="st-gen">0</div></div>
+            <div class="stat"><div class="k">Best ever</div><div class="v" id="st-best">0<small> m</small></div></div>
+            <div class="stat"><div class="k">Leader now</div><div class="v" id="st-lead">0<small> m</small></div></div>
+            <div class="stat"><div class="k">Time left</div><div class="v" id="st-time">10<small> s</small></div></div>
+          </div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Evolve! to peek inside the leader's muscle brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— each generation's champion. Tap one to watch it move.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="pencil"></i></div><h3>You design the body</h3><p>Joints are like elbows, bones are stiff sticks, muscles are stretchy bands that can squeeze.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain squeezes</h3><p>Each creature has a little brain. It feels its tilt, its height, which feet touch the ground and a beat, then tells every muscle how hard to squeeze.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="dice"></i></div><h3>40 try at once</h3><p>At first the brains are random, so the creatures flop and twitch.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>The best become parents</h3><p>The ones that go furthest (or jump highest, or climb best) get copied, with small random changes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Walking appears</h3><p>Nobody tells them how to walk. Generation after generation, a way of moving that fits YOUR creature appears by itself.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>You invented a body, and evolution invented a way for that exact body to move.</li>
+        <li>Random brains made the creatures flop. Keeping the best and copying them with small changes made them better, generation after generation.</li>
+        <li>A challenge like ice or a floppy muscle knocked the score down, then the brains adapted.</li>
+        <li>Weird bodies get weird (and funny) walks. Evolution uses whatever works!</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span> of a locomotion controller for a body you design.</p>
+        <ul>
+          <li><b>Physics:</b> Verlet integration. Joints are point masses; bones are rigid distance constraints; muscles are soft distance constraints whose rest length is <code>L₀ · (1 − 0.32·s)</code>, where <code>s ∈ [−1, 1]</code> is the squeeze. Six relaxation passes per step, ground friction applied to joints in contact, gravity, optional wind.</li>
+          <li><b>Brain:</b> one fully connected tanh network per creature, <code>[15 → 10 → muscles]</code>. Inputs: body tilt (sin, cos), height above ground, horizontal and vertical speed, ground contact of up to 8 joints, and a 1.4 Hz clock (sin, cos) that makes rhythms easy to evolve. It runs every other physics step.</li>
+          <li><b>Evolution:</b> 40 creatures, a 10 s race per generation, fitness = distance (plus height bonuses for the jump and stairs goals). The top ~8% survive unchanged (elitism), the rest are mutated copies or crossovers of the top quarter, with a spread of mutation sizes. The simulation is deterministic, so with elitism the best score can only go up until a challenge changes the world.</li>
+          <li><b>Lose a muscle</b> disables the muscle the current champion uses most, so the remaining muscles must learn a new gait.</li>
+        </ul>
+        <p>Inspired by Karl Sims' <a href="https://www.karlsims.com/evolved-virtual-creatures.html" target="_blank" rel="noopener">Evolved Virtual Creatures</a> (1994) and Keiwan Donyagard's game <a href="https://keiwando.com/evolution/" target="_blank" rel="noopener">Evolution</a>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-beast-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-beast.js"></script>
+</body>
+</html>

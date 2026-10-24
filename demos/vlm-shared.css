@@ -1,0 +1,66 @@
+/* Shared look for the Vision-Language lessons (vlm-match, vlm-caption). */
+.src-tabs { margin-bottom: 10px; }
+.src-tabs button { display: inline-flex; align-items: center; gap: 6px; }
+.pic-wrap { position: relative; max-width: 440px; margin: 0 auto; }
+.pic-wrap canvas.pic { border-radius: 14px; cursor: crosshair; border: 3px solid var(--line); background: #fff; }
+.pic-overlay { position: absolute; inset: 3px; pointer-events: none; border-radius: 12px; overflow: hidden; }
+.src-panel { margin-top: 12px; display: grid; gap: 10px; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.sw { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--line); cursor: pointer; padding: 0; }
+.sw.on { border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent); }
+.sample-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.sample { border: 2px solid var(--line); background: var(--card); border-radius: 12px; padding: 4px; cursor: pointer; font-weight: 800; font-size: 0.78rem; color: var(--ink-2); display: grid; gap: 2px; justify-items: center; }
+.sample:hover { border-color: var(--accent); }
+.sample canvas { width: 100%; border-radius: 8px; }
+.small-note { font-size: 0.85rem; margin: 0; }
+.live-toggle { font-weight: 800; font-size: 0.9rem; gap: 6px; }
+
+/* model download card */
+.dl-card .dl-bar { height: 12px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; position: relative; }
+.dl-card .dl-bar > span { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: 999px; transition: width 0.2s; }
+.dl-card .dl-bar > span.indet { animation: indet 1.2s ease-in-out infinite; }
+@keyframes indet { 0% { left: -35%; } 100% { left: 100%; } }
+.dl-card .dl-txt { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+.dl-card.ready .wake { display: none; }
+.dl-card .ready-badge { display: none; align-items: center; gap: 6px; font-weight: 800; color: var(--good); }
+.dl-card.ready .ready-badge { display: inline-flex; }
+
+/* result bars */
+.bars { display: grid; gap: 8px; }
+.bar-row { display: grid; grid-template-columns: minmax(70px, 34%) 1fr 46px; gap: 8px; align-items: center; font-weight: 800; font-size: 0.92rem; }
+.bar-row .bl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-row .bt { display: block; height: 16px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+.bar-row .bf { display: block; height: 100%; width: 0; background: color-mix(in srgb, var(--accent) 55%, var(--card)); border-radius: 999px; transition: width 0.45s cubic-bezier(.2,.8,.3,1); }
+.bar-row.win .bf { background: var(--accent); }
+.bar-row.win .bl { color: var(--accent); }
+.bar-row .bp { font-family: var(--font-mono); font-size: 0.82rem; text-align: right; color: var(--ink-2); }
+
+/* pipeline: the steps the model takes, lit one after another */
+.pipe { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+@media (max-width: 760px) { .pipe { grid-template-columns: 1fr 1fr; } }
+.pstep {
+  border: 2px solid var(--line); border-radius: 14px; padding: 8px 10px; background: var(--card); font-weight: 800; font-size: 0.85rem;
+  color: var(--muted); display: flex; gap: 8px; align-items: center; transition: all 0.25s;
+}
+.pstep b { font-family: var(--font-head); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-2); flex: none; }
+.pstep.on { border-color: var(--accent); color: var(--ink); transform: translateY(-2px); }
+.pstep.on b { background: var(--accent); color: #fff; }
+.pstep.busy b { animation: pulse 0.6s infinite alternate; }
+@keyframes pulse { from { transform: scale(0.9); } to { transform: scale(1.15); } }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lchip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--accent-soft); font-weight: 800; font-size: 0.88rem; }
+.lchip button { border: 0; background: transparent; cursor: pointer; color: var(--muted); display: grid; padding: 2px; border-radius: 50%; }
+.lchip button:hover { color: var(--bad); }
+.add-row { display: flex; gap: 8px; }
+.add-row input { flex: 1; min-width: 0; }
+
+.inside-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-top: 14px; }
+@media (max-width: 860px) { .inside-grid { grid-template-columns: 1fr; } }
+.inside-grid canvas { width: 100%; background: var(--card); border-radius: 12px; border: 2px solid var(--line); }
+.mini-title { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; display: flex; gap: 6px; align-items: center; }
+.say-flow { margin-top: 14px; }
+.say-flow .flow { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; }
+.say-flow .flow > div:not(.arrow) { background: var(--card); border-radius: 12px; padding: 10px 12px; border: 2px solid var(--line); min-height: 64px; }
+@media (max-width: 760px) { .say-flow .flow { grid-template-columns: 1fr; } .say-flow .flow .arrow { transform: rotate(90deg); } }
+.ckpt .wl { color: var(--accent); }

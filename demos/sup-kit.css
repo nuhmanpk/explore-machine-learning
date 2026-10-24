@@ -1,0 +1,26 @@
+/* Shared bits for the supervised / grouping lessons (on top of shared .checkpoints/.ckpt/.inside/.recap). */
+.ckpt { font-family: var(--font-body); transition: border-color 0.15s, transform 0.15s; }
+.ckpt:hover:not(.empty) { transform: translateY(-2px); }
+.ckpt.on { box-shadow: 0 3px 0 var(--accent); }
+.ckpt.empty { opacity: 0.45; cursor: default; }
+.ckpt .cp-sub { display: block; font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem; color: var(--muted); }
+.cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cp-head h3 { margin: 0; }
+.viewing-badge {
+  display: none; align-items: center; gap: 6px; background: var(--ink); color: var(--bg); border-radius: 999px;
+  padding: 4px 12px; font-weight: 800; font-size: 0.82rem; cursor: pointer; border: 0;
+}
+.viewing-badge.show { display: inline-flex; }
+
+.inside-body { display: grid; gap: 8px; font-size: 0.93rem; }
+.inside-body .sig { display: flex; gap: 8px; align-items: flex-start; }
+.inside-body .sig .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; margin-top: 5px; }
+.inside-body .arrow { color: var(--muted); font-weight: 800; }
+.inside-body .decision { font-weight: 800; color: var(--accent); }
+.inside-body .mono { font-family: var(--font-mono); font-size: 0.85rem; }
+
+.chart-box canvas { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+.lesson-row { margin: 0 0 24px; }
+.s-emoji { color: var(--accent); }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -1px; margin-right: 4px; }
+.lesson-row > * { min-width: 0; }

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Puppy Trainer · Explore ML</title>
+  <meta name="description" content="RLHF with a puppy: you pick which trick earns a treat, a treat predictor learns your taste, and the puppy practises until it does what you like.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .stage-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .stage-steps button {
+      border: 2px solid var(--line); background: var(--card); border-radius: 14px; padding: 8px; font-weight: 800;
+      color: var(--muted); cursor: pointer; display: flex; gap: 6px; align-items: center; justify-content: center; font-size: .9rem;
+    }
+    .stage-steps button b { font-family: var(--font-head); background: var(--bg-2); border-radius: 999px; padding: 0 8px; }
+    .stage-steps button.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+    .stage-steps button.on b { background: var(--accent); color: #fff; }
+    .stage-steps button:disabled { opacity: .45; cursor: not-allowed; }
+    #pup { cursor: pointer; }
+    .mini { width: 100%; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 520px) { .two { grid-template-columns: 1fr; } .stage-steps button span { display: none; } }
+    .check { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: .92rem; cursor: pointer; }
+    .check input { width: 20px; height: 20px; accent-color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="lang" data-demo="lang-rlhf">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="heart"></i> RLHF · learning from people</span>
+      <h1>Puppy <span class="em">Trainer</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">This puppy knows lots of tricks, good and naughty. <b>Tap the puppy</b> that deserves a treat!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <div class="stage-steps" id="steps">
+          <button data-s="1" class="on"><b>1</b><span>You give treats</span></button>
+          <button data-s="2"><b>2</b><span>Treat predictor</span></button>
+          <button data-s="3"><b>3</b><span>Puppy practises</span></button>
+        </div>
+        <canvas id="pup"></canvas>
+        <div class="two" style="margin-top:12px">
+          <div><p class="view-label muted" style="font-weight:800;font-size:.78rem;margin:0 0 4px">WHAT THE PREDICTOR THINKS EARNS A TREAT</p><canvas id="bowls" class="mini"></canvas></div>
+          <div><p class="view-label muted" style="font-weight:800;font-size:.78rem;margin:0 0 4px">HOW OFTEN THE PUPPY PICKS EACH TRICK</p><canvas id="policy" class="mini"></canvas></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card" id="c1">
+          <h3><i data-icon="gift"></i> 1. You give treats</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="auto"><i data-icon="play"></i> Auto-human</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Auto-human likes…</span>
+            <select id="taste">
+              <option value="calm">Calm, good tricks</option>
+              <option value="roll">Roll-overs most of all</option>
+              <option value="silly">Silly fast tricks</option>
+            </select>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Treats given</div><div class="v" id="st-picks">0</div></div>
+            <div class="stat"><div class="k">Predictor right</div><div class="v" id="st-acc">–</div></div>
+          </div>
+        </div>
+
+        <div class="card" id="c3">
+          <h3><i data-icon="repeat"></i> 3. Puppy practises</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="practise" disabled><i data-icon="play"></i> Practise</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> New puppy</button>
+          </div>
+          <div class="field">
+            <label for="kl">Stay like its old self <span class="val" data-for="kl"></span></label>
+            <input type="range" id="kl" min="0" max="0.3" step="0.01" value="0.05">
+          </div>
+          <label class="check"><input type="checkbox" id="bug"> Buggy predictor (loves FAST)</label>
+          <div class="stats">
+            <div class="stat"><div class="k">Practice</div><div class="v" id="st-prac">0</div></div>
+            <div class="stat"><div class="k">Avg treats</div><div class="v" id="st-avg">–</div></div>
+          </div>
+          <canvas id="chart"></canvas>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside" style="min-height:120px"><span class="muted">Give a few treats first.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— tap to watch the puppy back then</span></h3>
+      <div class="checkpoints" id="ckpts"><span class="muted">Saved during practice.</span></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="gift"></i></div><h3>You judge</h3><p>Two tricks. You pick the better one.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Predictor learns</h3><p>It learns to guess which tricks you'd treat.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Puppy practises</h3><p>Lots of practice, with pretend treats from the predictor.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Your few treats taught the predictor, and the predictor then trained the puppy thousands of times.</li>
+        <li>Chatbots learn manners the same way: people pick better answers, then the bot practises.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">RLHF</span> (reinforcement learning from human feedback), the recipe used to align chat models like InstructGPT.</p>
+        <ul>
+          <li><b>Preferences:</b> each click is a pairwise comparison (A ≻ B).</li>
+          <li><b>Reward model:</b> linear over features (8 trick one-hots + "fast"), trained with the <span class="term">Bradley–Terry</span> loss <code>−log σ(r(A) − r(B))</code>. Accuracy is measured on 60 held-out pairs scored by the auto-human's hidden taste.</li>
+          <li><b>Policy:</b> softmax over 16 actions (trick × speed). Updated with <span class="term">REINFORCE</span> and a running-mean baseline: <code>θ ← θ + η (r − b) ∇log π(a)</code>.</li>
+          <li><b>KL penalty:</b> the slider pulls the logits back toward the original policy, approximating PPO's KL term. Without it, a flawed reward model gets exploited: <span class="term">reward hacking</span> (try the buggy predictor).</li>
+        </ul>
+        <p>Further reading: Ouyang et al., “Training language models to follow instructions with human feedback” (2022).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/lang-rlhf.js"></script>
+</body>
+</html>

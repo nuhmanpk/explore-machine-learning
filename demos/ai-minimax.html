@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Thinking-Ahead Game · Explore ML</title>
+  <meta name="description" content="Play tic-tac-toe against an AI that imagines every possible future. Watch its thinking tree, change how far ahead it looks, and see why a deep thinker can't be beaten.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .board-wrap { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+    @media (max-width: 1100px) { .board-wrap { grid-template-columns: 1fr; } }
+    #board { aspect-ratio: 1; max-height: none !important; width: 100% !important; cursor: pointer; }
+    .status { margin-top: 8px; font-weight: 800; text-align: center; height: 1.8em; line-height: 1.8em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .tree { background: var(--bg-2); border-radius: 16px; padding: 12px; display: grid; gap: 10px; align-content: start; height: 560px; overflow-y: auto; }
+    @media (max-width: 1100px) { .tree { height: 460px; } }
+    .tree .lvl-h { display: flex; gap: 8px; align-items: center; font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .tree .lvl-h b { color: var(--accent); }
+    .nodes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tnode { display: grid; gap: 3px; justify-items: center; padding: 5px 5px 4px; border: 2px solid var(--line); border-radius: 12px; background: var(--card); cursor: pointer; position: relative; font: inherit; color: inherit; transition: border-color .15s, transform .15s, opacity .2s; animation: pop .25s ease; }
+    .tnode:hover { border-color: var(--accent); }
+    .tnode.focus { border-color: var(--ink); }
+    .tnode.chosen { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); transform: translateY(-2px); }
+    .tnode.skipped { opacity: .4; filter: grayscale(1); cursor: default; }
+    .tnode.root { cursor: default; }
+    .mb { width: 52px; height: 52px; display: block; }
+    .mb .g { stroke: var(--line); stroke-width: 1.2; fill: none; stroke-linecap: round; }
+    .mb .x { stroke: var(--sup); stroke-width: 1.7; fill: none; stroke-linecap: round; }
+    .mb .o { stroke: var(--rl); stroke-width: 1.7; fill: none; }
+    .mb .hi { fill: var(--accent-soft); }
+    .badge { font-size: .68rem; font-weight: 800; padding: 1px 7px; border-radius: 999px; color: #fff; white-space: nowrap; }
+    .v-win { background: var(--good); } .v-draw { background: var(--warn); color: #3a2c00; } .v-lose { background: var(--bad); }
+    .v-unk { background: var(--muted); } .v-wait { background: transparent; color: var(--muted); border: 1px dashed var(--muted); } .v-skip { background: transparent; color: var(--muted); border: 1px dashed var(--muted); }
+    .tcount { font-size: .64rem; color: var(--muted); font-weight: 700; }
+    .tree-note { font-size: .85rem; color: var(--ink-2); font-weight: 600; margin: 0; }
+    .depth-name { font-family: var(--font-head); font-weight: 600; font-size: 1.05rem; color: var(--accent); }
+    .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+    .presets .btn { flex: 1; padding: 6px 8px; font-size: .82rem; }
+    .beat { font-size: .88rem; height: 5.6em; overflow: hidden; align-items: flex-start; }
+    .record { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .strip-card .checkpoints { padding-bottom: 4px; min-height: 164px; align-items: flex-start; }
+    .strip-card .ckpt { width: 118px; text-align: center; }
+    .strip-card .ckpt .mb { width: 70px; height: 70px; margin: 0 auto 4px; }
+    .strip-card .ckpt.now { border-color: var(--accent); background: var(--accent-soft); }
+    .flow .arrow { text-align: left; }
+    /* ---- Layout stability: every live-updating box has a FIXED height, so nothing below it ever moves. ---- */
+    .robo-say .bubble { flex: 1; min-width: 0; height: 112px; min-height: 0; overflow-y: auto; }
+    .stage-left { grid-template-columns: minmax(0, 1fr); } /* a wide checkpoint row must scroll, not stretch the column */
+    @media (max-width: 700px) { .robo-say .bubble { height: 168px; } }
+    #inside { height: 250px; overflow-y: auto; }
+
+  </style>
+</head>
+<body data-page="demo" data-topic="ai" data-demo="ai-minimax">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="target"></i> Artificial Intelligence · Thinking ahead</span>
+      <h1>The <span class="em">thinking-ahead</span> game</h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I'm an AI that plays tic-tac-toe by <b>imagining every possible future</b>. You're X, I'm O. Tap a square to start!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Who plays?</h3>
+          <div class="seg" id="mode"><button data-m="you" class="on">You vs AI</button><button data-m="aivai">AI vs AI</button></div>
+          <div id="first-field" class="field">
+            <span class="lbl">Who goes first?</span>
+            <div class="seg" id="first"><button data-f="me" class="on">You</button><button data-f="ai">The AI</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="eye"></i> How far ahead does it look?</h3>
+          <div class="field">
+            <label for="depth"><span class="depth-name" id="depth-name"></span> <span class="val" data-for="depth"></span></label>
+            <input type="range" id="depth" min="1" max="9" step="1" value="9">
+            <div class="hint">1 = only my own next move. 9 = all the way to the end of the game.</div>
+          </div>
+          <div class="presets" id="presets">
+            <button class="btn small" data-d="1">Baby</button><button class="btn small" data-d="2">Kid</button>
+            <button class="btn small" data-d="4">Smart</button><button class="btn small on" data-d="9">Genius</button>
+          </div>
+          <div class="field hidden" id="depthx-field">
+            <label for="depthx">The X-AI looks ahead <span class="val" data-for="depthx"></span></label>
+            <input type="range" id="depthx" min="1" max="9" step="1" value="2">
+          </div>
+          <p class="pill-note beat" id="beat"><span class="e"><i data-icon="trophy"></i></span><span></span></p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Skip useless thinking</h3>
+          <div class="seg" id="ab"><button data-a="0">Off</button><button data-a="1" class="on">Pruning on</button></div>
+          <div class="hint muted" style="font-size:.85rem">Alpha-beta pruning skips branches that can't change the answer. Same move, much less thinking.</div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <div class="board-wrap">
+            <div>
+              <canvas id="board"></canvas>
+              <div class="status" id="status"></div>
+            </div>
+            <div class="tree" id="tree" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="card strip-card">
+          <h3><i data-icon="layers"></i> Same position, different brains <span class="muted" style="font-weight:700;font-size:.9rem">— what each thinking depth would have played. Tap one to use it.</span></h3>
+          <div class="checkpoints" id="strip"><span class="muted">Make a move and the AI will show what each brain would have chosen.</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="newgame"><i data-icon="reset"></i> New game</button>
+            <button class="btn hidden" id="auto"><i data-icon="play"></i> Play</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Thinking speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="3">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k" id="k-me">You win</div><div class="v" id="st-me">0</div></div>
+            <div class="stat"><div class="k">Draws</div><div class="v" id="st-draw">0</div></div>
+            <div class="stat"><div class="k" id="k-ai">AI wins</div><div class="v" id="st-ai">0</div></div>
+          </div>
+          <div class="stat"><div class="k">Positions imagined (this move)</div><div class="v" id="st-nodes">0</div><div class="tcount" id="st-saved" style="margin-top:2px;height:3.4em;overflow:hidden"></div></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Make your first move. I'll explain what I imagined.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Imagine my moves</h3><p>For every empty square, I picture myself playing there. That's the first row of the tree.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Imagine your replies</h3><p>For each of my moves, I picture every reply you could make, then my answers, all the way to the end.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Score the endings</h3><p>An ending where I win is good, a draw is okay, and a loss is bad.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="flag"></i></div><h3>Assume you play well</h3><p>For each of my moves, I assume you'll find your best reply. That's my "worst case".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Pick the best worst-case</h3><p>I play the move whose worst case is the best. That's called <b>minimax</b>.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The AI didn't practise or learn. It <b>searched</b>: it imagined the future and picked the safest move.</li>
+        <li>Looking only 1 move ahead, it can't see your traps, so it's easy to beat. Looking all the way, it <b>never loses</b>. The best you can do is draw!</li>
+        <li>Pruning gave the same answer with far fewer positions. Smart skipping beats brute force.</li>
+        <li>This is a different kind of AI from the neural networks earlier in the course. Real game AIs often combine both.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">minimax search</span> on the full game tree of tic-tac-toe, classical (symbolic) AI. No data and no training are involved.</p>
+        <ul>
+          <li><b>Values:</b> from the AI's side, a win in <i>p</i> plies scores <code>10 − p</code>, a loss <code>p − 10</code> (so faster wins and slower losses are preferred), and a draw 0. The AI picks the move maximising the minimum guaranteed result, assuming the opponent minimises.</li>
+          <li><b>Depth limit:</b> beyond the horizon the search returns 0 ("can't tell"), the simplest <span class="term">evaluation function</span>. With depth 1 it only spots an immediate win; depth 2 also blocks immediate threats; deeper depths see forks. Exhaustive tests: depth 9 lost 0 of 569 games against every possible human line; depth 1 lost 329 of 649.</li>
+          <li><b>Alpha-beta pruning:</b> keeps a window (α, β) of results that could still matter and stops exploring a node once it can't change the parent's choice. It returns the same move as plain minimax, here with roughly 90% fewer positions (about 59,700 down to about 4,000 after a corner opening). Moves are searched in index order; better move ordering would prune even more.</li>
+          <li><b>Ties:</b> equal-valued moves are chosen at random so the AI doesn't play the same game every time. The pruning window is widened by one so tied moves still get exact values.</li>
+          <li><b>Scale:</b> tic-tac-toe has fewer than 550,000 game positions. Chess has around 10<sup>44</sup>, so real engines add strong evaluation functions, move ordering, and (in AlphaZero and Leela) a learned neural network to guide the search.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ai-minimax-core.js"></script>
+  <script src="js/ai-minimax.js"></script>
+</body>
+</html>

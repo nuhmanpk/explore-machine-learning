@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dino Runner · Explore ML</title>
+  <meta name="description" content="A herd of little dinos with tiny neural-network brains evolves to jump cacti and duck birds, then adapts when you switch on new challenges.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .run-pad { display: none; gap: 10px; justify-content: center; margin-top: 10px; }
+    .run-pad.show { display: flex; }
+    .run-pad .btn { min-width: 110px; }
+    #game { cursor: pointer; }
+    #chart { width: 100%; }
+    .meet .chip { white-space: normal; } /* long model names must wrap on phones */
+    .meet-who > div { min-width: 0; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-dino">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Game Lab · Neuroevolution</span>
+      <h1>Dino <span class="em">Runner</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Eighty baby dinos want to run through the desert. They have <b>random brains</b>, so they don't know to jump yet! Press <b>Play</b>.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn" id="you"><i data-icon="gamepad"></i> I'll run!</button>
+          <p class="muted" style="margin:0;font-size:.85rem"><kbd>Space</kbd> or <kbd>↑</kbd> to jump, <kbd>↓</kbd> to duck. Or tap the buttons under the desert.</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make the desert harder. Watch the herd stumble, then adapt.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="birds"><i data-icon="sparkles"></i> Head-height birds <span class="tag">duck!</span></button>
+            <button class="btn small" data-c="double"><i data-icon="layers"></i> Cactus clumps <span class="tag">2–3 wide</span></button>
+            <button class="btn small" data-c="heavy"><i data-icon="gift"></i> Heavy backpack <span class="tag">low jumps</span></button>
+            <button class="btn small" data-c="storm"><i data-icon="wave"></i> Sandstorm <span class="tag">gusts</span></button>
+            <button class="btn small" data-c="speed"><i data-icon="gauge"></i> Speed up <span class="tag">×1.75</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> The herd</h3>
+          <div class="field">
+            <label for="pop">How many dinos? <span class="val" data-for="pop"></span></label>
+            <input type="range" id="pop" min="20" max="150" step="10" value="80">
+            <div class="hint">Used from the next generation.</div>
+          </div>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.3">
+            <div class="hint">Small = careful copies. Big = wild new ideas.</div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="game"></canvas>
+          <div class="run-pad" id="pad">
+            <button class="btn" data-k="jump"><i data-icon="arrow-up"></i> Jump</button>
+            <button class="btn" data-k="duck"><i data-icon="arrow-down"></i> Duck</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How long they survived, generation by generation</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Best dino (% of the 60 s run)</span><span><i style="background:var(--ink)"></i>Top half average</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row" id="ctrl">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip"><i data-icon="step"></i> Next gen</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <label class="row babies-toggle" style="font-weight:800;font-size:.9rem;cursor:pointer"><input type="checkbox" checked style="width:18px;height:18px;accent-color:var(--accent)" onchange="window.__showBabies = this.checked"> Show the babies</label>
+          <div class="stats">
+            <div class="stat"><div class="k">Generation</div><div class="v" id="st-gen">1</div></div>
+            <div class="stat"><div class="k">Still running</div><div class="v" id="st-alive">0</div></div>
+            <div class="stat"><div class="k">Best now</div><div class="v" id="st-best">0<small> m</small></div></div>
+            <div class="stat"><div class="k">Record</div><div class="v" id="st-rec">0<small> m</small></div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the leading dino's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion dino from each generation. Tap to watch it run today's desert.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Look ahead</h3><p>Each dino feels 8 numbers: how close the next thing is, how tall, how high it floats, what comes after, how fast the game is, and its own jump.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>Those numbers go through a small brain with three answers: jump, duck or keep running. The biggest answer wins.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Furthest wins</h3><p>When everyone has bumped into something, the dinos that ran furthest become parents.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Babies with tweaks</h3><p>The next herd gets copies of the best brains, mixed together, with small random changes. Repeat!</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The first herd ran straight into the first cactus. Nobody told them what jumping was for.</li>
+        <li>A lucky few jumped at the right moment. Their brains were copied, and within a few generations the best dino could run the whole desert.</li>
+        <li>Each challenge broke the old trick (birds need ducking, a heavy backpack needs earlier jumps), so the line fell. Then evolution found a new trick and it climbed back.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: a population of small neural networks improved by a <span class="term">genetic algorithm</span>, with no gradients and no labels.</p>
+        <ul>
+          <li><b>Network:</b> fully connected <code>[8 → 8 → 3]</code> with tanh units (91 weights). Action = argmax of (jump, duck, run).</li>
+          <li><b>Inputs:</b> closeness of the next obstacle (1 − distance/600 px), its top height, how high it floats, its width, how soon the following one comes, the game speed, the dino's height and vertical velocity.</li>
+          <li><b>Fitness:</b> distance run. Every dino in a generation runs the same randomly generated course; a new course each generation stops them memorising one desert.</li>
+          <li><b>Genetic algorithm:</b> the top 8% are kept unchanged (elitism); the rest are children of the top quarter (30% uniform crossover) with Gaussian mutation whose size is spread from small to large.</li>
+          <li><b>Measured in Node</b> (80 dinos, champion's share of the 60 s run): the champion usually reaches 100% within 3–10 generations, occasionally 20+. Switching a challenge on at generation 30, the top-half average: heavy backpack 27–48% → 5–20% → back to 16–34% within ~20 generations; head-height birds 34–50% → 9–15% → 30–45%; cactus clumps 37–52% → 4–6% → 35–50%. Speed-up barely hurts, because faster running also clears wider gaps, and the page says so honestly.</li>
+          <li>Inspired by Chrome's offline "T-Rex runner" and classic NEAT/neuroevolution demos.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-dino-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-dino.js"></script>
+</body>
+</html>

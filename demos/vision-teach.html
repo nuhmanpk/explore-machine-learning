@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teach the Camera · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .stage > * { min-width: 0; }
+    .viewport { position: relative; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; background: var(--canvas-bg); }
+    .viewport > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .viewport video { object-fit: cover; transform: scaleX(-1); }
+    .viewport img { object-fit: contain; background: var(--canvas-bg); }
+    #pad { background: #fff; touch-action: none; cursor: crosshair; border-radius: 0; }
+    .vp-empty { display: grid; place-items: center; text-align: center; padding: 20px; gap: 10px; align-content: center; }
+    .vp-empty .e { font-size: 54px; color: var(--accent); display: grid; place-items: center; }
+    .pill-note .num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-family: var(--font-head); font-size: 0.95rem; flex: none; }
+    .vp-tools { position: absolute; inset: auto 10px 10px auto; width: auto; height: auto; display: flex; gap: 8px; }
+    .input-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .guess { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 12px 16px; background: var(--bg-2); border-radius: 16px; border: 2px solid var(--line); min-height: 76px; }
+    .guess .ge { font-size: 40px; line-height: 1; color: var(--accent); display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: var(--accent-soft); flex: none; }
+    .guess .ge svg { width: 1em; height: 1em; }
+    .guess .gt { font-family: var(--font-head); font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+    .guess .gs { color: var(--muted); font-weight: 700; font-size: 0.9rem; }
+    .bars { display: grid; gap: 8px; margin-top: 12px; }
+    .bar { display: grid; grid-template-columns: minmax(90px, 140px) 1fr 48px; gap: 10px; align-items: center; font-weight: 800; font-size: 0.92rem; }
+    .bar .bn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bar .track { height: 18px; background: var(--bg-2); border-radius: 999px; overflow: hidden; border: 2px solid var(--line); }
+    .bar .fill { height: 100%; width: 0; border-radius: 999px; transition: width 0.2s; }
+    .bar .pct { font-family: var(--font-mono); text-align: right; }
+
+    .cls { border: 3px solid var(--line); border-radius: 18px; padding: 12px; display: grid; gap: 10px; background: var(--card); transition: border-color .2s; }
+    .cls.active { border-color: var(--c); }
+    .cls-top { display: flex; gap: 8px; align-items: center; }
+    .cls-emoji { width: 44px; height: 44px; border-radius: 12px; border: 2px solid var(--line); background: color-mix(in srgb, var(--c) 18%, var(--card)); color: var(--c); font-size: 22px; cursor: pointer; flex: none; display: grid; place-items: center; padding: 0; }
+    .cls-name { flex: 1; min-width: 0; font-weight: 800 !important; }
+    .cls-count { font-family: var(--font-mono); font-weight: 800; color: var(--c); white-space: nowrap; }
+    .thumbs { display: flex; gap: 4px; overflow: hidden; height: 40px; }
+    .thumbs canvas, .thumbs .ph { width: 40px; height: 40px; flex: none; border-radius: 8px; border: 2px solid var(--line); }
+    .thumbs .ph { border-style: dashed; }
+    .cls-actions { display: flex; gap: 8px; }
+    .cls-actions .rec { flex: 1; background: var(--c); color: #fff; }
+    .cls-actions .rec.recording { animation: pulse 0.6s infinite alternate; }
+    @keyframes pulse { to { box-shadow: 0 1px 0 var(--ink), 0 0 0 6px color-mix(in srgb, var(--c) 35%, transparent); } }
+    .loading { display: flex; gap: 12px; align-items: center; }
+    .spinner { width: 28px; height: 28px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; flex: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chk { border: 2px dashed var(--line); border-radius: 14px; padding: 8px; text-align: center; font-weight: 800; font-size: 0.8rem; color: var(--muted); }
+    .chk.done { border-style: solid; border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
+    .chk .cv { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; color: var(--accent); line-height: 1.2; }
+    .chk .cbar { height: 8px; border-radius: 99px; background: var(--bg-2); overflow: hidden; margin-top: 4px; }
+    .chk .cbar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .6s; }
+    .inside { margin: 0 0 20px; }
+    .pipe { display: grid; grid-template-columns: auto auto 1.2fr auto 1.4fr auto 1fr; gap: 12px; align-items: center; margin-top: 8px; }
+    .pipe-step { display: grid; gap: 6px; justify-items: center; text-align: center; min-width: 0; }
+    .pipe-step .pk { font-weight: 800; font-size: 0.82rem; color: var(--ink-2); }
+    .pipe-arrow { color: var(--accent); font-size: 1.4rem; display: grid; }
+    #in-now { width: 80px; height: 80px; border-radius: 12px; border: 3px solid var(--line); background: var(--canvas-bg); }
+    #emb-bars { width: 100%; max-width: 200px; height: 80px; border-radius: 12px; background: var(--canvas-bg); }
+    .nbrs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .nbr { display: grid; gap: 2px; justify-items: center; font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; color: var(--ink-2); }
+    .nbr canvas { width: 44px; height: 44px; border-radius: 9px; border: 3px solid var(--c, var(--line)); background: var(--canvas-bg); }
+    .votes { font-weight: 800; display: grid; gap: 4px; font-size: 0.92rem; }
+    .votes .vr { display: flex; gap: 6px; align-items: center; justify-content: center; }
+    .votes .dotv { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .votes .win { font-family: var(--font-head); font-size: 1.15rem; color: var(--accent); }
+    @media (max-width: 860px) { .pipe { grid-template-columns: 1fr; } .pipe-arrow { transform: rotate(90deg); justify-self: center; } }
+    #map { width: 100%; border-radius: 14px; background: var(--canvas-bg); }
+    .knn-note { display: grid; gap: 10px; }
+    .dl-card { display: grid; gap: 10px; font-weight: 700; color: var(--ink-2); }
+    .dl-card .btn { justify-self: start; white-space: normal; text-align: left; max-width: 100%; }
+    .dl-bar { height: 12px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .dl-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  </style>
+</head>
+<body data-page="demo" data-topic="vision" data-demo="vision-teach">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="eye"></i> Computer Vision</span>
+      <h1>Teach the <span class="em">Camera</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">My eyes are a picture brain called MobileNet. Press <b>Download</b> to fetch it (about 15 MB), then teach me!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="input-head">
+          <div class="seg" id="mode">
+            <button data-m="cam" class="on"><i data-icon="camera"></i> Camera</button>
+            <button data-m="draw"><i data-icon="pencil"></i> Draw</button>
+            <button data-m="photo"><i data-icon="image"></i> Photos</button>
+          </div>
+          <div class="loading" id="loading"><div class="dl-card"><span>Robo's eyes aren't downloaded yet. It's the <b>MobileNet</b> vision model: about <b>15 MB</b> (1.5 MB engine + 14 MB of learned numbers). Nothing downloads until you press the button.</span><button class="btn primary" id="dl-btn"><i data-icon="arrow-down"></i> Download the picture brain (≈15 MB)</button><div class="dl-bar hidden"><span></span></div></div></div>
+        </div>
+        <div class="viewport">
+          <video id="video" playsinline muted class="hidden"></video>
+          <canvas id="pad" class="hidden"></canvas>
+          <img id="photo" class="hidden" alt="Your test photo">
+          <div class="vp-empty" id="cam-empty">
+            <div class="e"><i data-icon="camera"></i></div>
+            <div style="font-weight:800">Robo needs your camera to see.<br><span class="muted">Pictures never leave your computer.</span></div>
+            <button class="btn primary" id="cam-on">Turn on camera</button>
+          </div>
+          <div class="vp-empty hidden" id="photo-empty">
+            <div class="e"><i data-icon="image"></i></div>
+            <div style="font-weight:800">Add photos to each group on the right.<br><span class="muted">Then test Robo with a new one!</span></div>
+            <button class="btn primary" id="test-photo"><i data-icon="flask"></i> Test a photo</button>
+          </div>
+          <div class="vp-tools hidden" id="pad-tools"><button class="btn small" id="pad-clear"><i data-icon="eraser"></i> Clear</button></div>
+          <div class="vp-tools hidden" id="photo-tools"><button class="btn small" id="test-photo2"><i data-icon="flask"></i> Test another</button></div>
+        </div>
+        <div class="guess">
+          <div class="ge" id="g-emoji"><i data-icon="robot"></i></div>
+          <div><div class="gt" id="g-text">Teach me first!</div><div class="gs" id="g-sub">Add a few examples to at least two groups.</div></div>
+        </div>
+        <div class="bars" id="bars"></div>
+        <input type="file" id="test-file" accept="image/*" hidden>
+        <input type="file" id="class-file" accept="image/*" multiple hidden>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="groups"></i> Groups to learn</h3>
+          <div id="classes" style="display:grid;gap:12px"></div>
+          <div class="btn-row">
+            <button class="btn small" id="add-class"><i data-icon="plus"></i> Add group</button>
+            <button class="btn small ghost" id="clear-all"><i data-icon="reset"></i> Forget all</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="flag"></i> Checkpoints</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Robo quizzes itself on your own examples (hiding each one and guessing it from the rest). Watch it get surer as you teach more!</p>
+          <div class="checks" id="checks"></div>
+          <div class="stats">
+            <div class="stat"><div class="k">Self-quiz right</div><div class="v" id="st-acc">–</div></div>
+            <div class="stat"><div class="k">How sure</div><div class="v" id="st-conf">–</div></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card inside">
+      <h3><i data-icon="cpu"></i> What's happening inside</h3>
+      <div class="pipe" id="pipe">
+        <div class="pipe-step"><div class="pk">1 · What Robo sees</div><canvas id="in-now" width="80" height="80"></canvas></div>
+        <div class="pipe-arrow"><i data-icon="arrow-right"></i></div>
+        <div class="pipe-step"><div class="pk">2 · Turned into <span id="dims2">1,280</span> numbers</div><canvas id="emb-bars" width="200" height="80"></canvas></div>
+        <div class="pipe-arrow"><i data-icon="arrow-right"></i></div>
+        <div class="pipe-step"><div class="pk">3 · <span id="k-lbl">5</span> closest examples</div><div class="nbrs" id="nbrs"></div></div>
+        <div class="pipe-arrow"><i data-icon="arrow-right"></i></div>
+        <div class="pipe-step"><div class="pk">4 · They vote</div><div class="votes" id="votes">Teach me first!</div></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3><i data-icon="map"></i> Robo's idea map</h3>
+        <p class="muted" style="margin:0 0 10px;font-size:.9rem">Every example becomes a dot. Things that look alike to Robo land close together. The star is what Robo sees <b>right now</b>.</p>
+        <canvas id="map"></canvas>
+      </div>
+      <div class="card knn-note">
+        <h3><i data-icon="check"></i> How Robo decides</h3>
+        <div class="pill-note"><span class="e num">1</span><span>Robo already learned to see shapes and colors from a million photos. It turns any picture into a list of <b id="dims">1,280</b> numbers — its "description".</span></div>
+        <div class="pill-note"><span class="e num">2</span><span>When you record, Robo saves the description of each example. That's the learning: it takes less than a second!</span></div>
+        <div class="pill-note"><span class="e num">3</span><span>To guess, Robo finds the <b>few examples most like</b> what it sees now (up to 5), and they vote. The closest ones get the loudest votes!</span></div>
+        <div class="stats">
+          <div class="stat"><div class="k">Examples</div><div class="v" id="st-n">0</div></div>
+          <div class="stat"><div class="k">Guess speed</div><div class="v" id="st-ms">–<small> ms</small></div></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="groups"></i></div><h3>Make groups</h3><p>Name the things you want Robo to tell apart, like "thumbs up" and "just me".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="camera"></i></div><h3>Show examples</h3><p>Hold the button and wiggle around. More examples, from different angles, make Robo smarter.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="check"></i></div><h3>Closest friends vote</h3><p>Robo compares what it sees to all your examples. The most similar ones decide the answer.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Try to trick it</h3><p>Change the light, move far away, or show something new. When does Robo get confused? Teach it more!</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>You made <b>groups</b> and showed Robo examples of each one. That's called <b>training data</b>.</li>
+        <li>Robo didn't learn to see from zero: it borrowed eyes that already studied a million photos, and turned each example into a long list of numbers.</li>
+        <li>To guess, it found the <b>examples most like</b> the new picture and let them vote.</li>
+        <li>The checkpoints showed that <b>more, varied examples</b> make Robo surer — and that it can still be fooled by things it never saw.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <ul>
+          <li>This is <span class="term">transfer learning</span>, the same trick as Google's <a href="https://teachablemachine.withgoogle.com/" target="_blank" rel="noopener">Teachable Machine</a>. A <span class="term">MobileNet v2</span> CNN pretrained on ImageNet (1.28M images, 1000 classes) runs in your browser via <a href="https://www.tensorflow.org/js" target="_blank" rel="noopener">TensorFlow.js</a>.</li>
+          <li>We drop its final classification layer and use the penultimate activations (<code>mobilenet.infer(img, true)</code>) as an <span class="term">embedding</span>: a 1280-dimensional feature vector that captures visual concepts.</li>
+          <li>The classifier is a hand-written <span class="term">k-nearest neighbours</span> using <span class="term">cosine similarity</span> on L2-normalised embeddings, with k = min(5, smallest class size). Each neighbour votes with weight <code>exp(20·(sᵢ − s_max))</code>, a softmax over similarities; confidence is the normalised vote share. The "self-quiz" is leave-one-out accuracy on (up to 80 of) your own examples. No gradient descent is needed, which is why "training" is instant.</li>
+          <li>The idea map is a live <span class="term">PCA</span> (top two principal components, found by power iteration with deflation) of all stored embeddings. Clusters that separate in 2D are usually easy for KNN; overlapping ones are where it gets confused.</li>
+          <li>Failure modes worth exploring: background/lighting shortcuts (the model may learn "dark room" rather than "hand"), class imbalance, and too few varied examples. All images stay on your device.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/vision-teach.js"></script>
+</body>
+</html>

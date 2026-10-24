@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meet One Neuron · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .in-row { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 2px dashed var(--line); }
+    .in-row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .in-row .toggle { justify-content: flex-start; }
+    .in-row .toggle .state { margin-left: auto; font-size: 0.78rem; opacity: 0.8; }
+    .days { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+    .day {
+      position: relative; border: 3px solid var(--line); border-radius: 16px; padding: 10px 10px 12px; background: var(--bg-2);
+      cursor: pointer; text-align: center; transition: transform 0.15s, border-color 0.2s, background 0.2s; font: inherit; color: inherit;
+    }
+    .day:hover { transform: translateY(-3px); }
+    .day .dname { font-weight: 800; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .day .demo { font-size: 1.5rem; min-height: 2.2rem; display: flex; gap: 4px; justify-content: center; align-items: center; color: var(--accent); }
+    .day .ans { display: flex; gap: 4px; justify-content: center; align-items: center; }
+    .bubble .ic { color: var(--accent); vertical-align: -0.2em; }
+    .day .ans { font-weight: 800; font-size: 0.9rem; }
+    .day .guess { position: absolute; top: -10px; right: -8px; font-size: 0.75rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; color: #fff; }
+    .day.right .guess { background: var(--good); }
+    .day.wrong .guess { background: var(--bad); }
+    .day.wrong { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); }
+    .day.current { border-color: var(--accent); background: var(--accent-soft); transform: scale(1.05); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+    .teach-head { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; }
+    .steps { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+    .lines { display: grid; gap: 4px; font-size: 0.9rem; }
+    .lines .ln { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 10px; background: var(--bg-2); }
+    .lines .ln.off { opacity: 0.45; }
+    .lines .ln .ic { color: var(--accent); flex: none; }
+    .lines .ln .eq { margin-left: auto; font-family: var(--font-mono); font-weight: 700; white-space: nowrap; }
+    .lines .pos { color: var(--good); } .lines .neg { color: var(--bad); }
+    .lines .total { background: var(--accent-soft); font-weight: 800; }
+    .cp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 20px 0 10px; flex-wrap: wrap; }
+    .checkpoints { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; }
+    .ckpt { flex: none; width: 128px; border: 3px solid var(--line); border-radius: 14px; background: var(--card); padding: 8px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+    .ckpt:hover { border-color: var(--accent); }
+    .ckpt.on { border-color: var(--accent); background: var(--accent-soft); }
+    .ckpt .t { font-weight: 800; font-size: 0.8rem; }
+    .ckpt .m { font-size: 0.78rem; color: var(--muted); font-weight: 700; }
+    .ckpt .bars { display: flex; align-items: center; gap: 4px; height: 40px; margin: 6px 0; }
+    .ckpt .bars span { flex: 1; position: relative; height: 100%; }
+    .ckpt .bars span::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--line); }
+    .ckpt .bars b { position: absolute; left: 0; right: 0; border-radius: 3px; }
+    .cp-empty { margin: 0; font-size: 0.9rem; }
+    .mistake-dots { display: flex; gap: 4px; flex-wrap: wrap; }
+    .mistake-dots i { width: 14px; height: 14px; border-radius: 50%; background: var(--bad); display: inline-block; transition: transform .3s; }
+    .mistake-dots i.ok { background: var(--good); }
+  </style>
+</head>
+<body data-page="demo" data-topic="nn" data-demo="nn-neuron">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="zap"></i> Neural Networks</span>
+      <h1>Meet <span class="em">one neuron</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">This is one tiny brain cell. It has one job: decide <b>should we go play outside?</b> Flip the switches on the right and watch it think!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv"></canvas>
+        <div class="legend" style="margin-top:10px">
+          <span><i style="background:var(--good)"></i>Green wire = pushes toward YES</span>
+          <span><i style="background:var(--bad)"></i>Red wire = pushes toward NO</span>
+          <span>Thicker wire = cares more</span>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="sun"></i> Today is…</h3>
+          <div id="inputs"></div>
+        </div>
+        <div class="card">
+          <div class="field">
+            <label for="bias">Starting mood <span class="val" data-for="bias"></span></label>
+            <input type="range" id="bias" min="-3" max="3" step="0.1" value="-1">
+            <div class="hint">lazy ← → eager (grown-ups call this the <b>bias</b>)</div>
+          </div>
+          <div class="field">
+            <span class="lbl">How it decides</span>
+            <div class="seg" id="act">
+              <button data-a="step" class="on"><i data-icon="check"></i> Yes / No</button>
+              <button data-a="sigmoid"><i data-icon="gauge"></i> How sure?</button>
+            </div>
+          </div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="lines" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="teacher"></i> Teach it with examples</h2>
+    <div class="card">
+      <div class="teach-head">
+        <div>
+          <p style="margin:0">Here are 8 days and what a <b>real kid</b> decided. Can Robo's neuron learn to agree with all of them?</p>
+          <p class="muted" style="margin:0;font-size:.9rem">Tap a day to load it into the neuron. Press <b>Learn!</b> to let it fix its own knobs.</p>
+        </div>
+        <div class="stats" style="min-width:240px">
+          <div class="stat"><div class="k">Mistakes</div><div class="v" id="mistakes">0<small>/8</small></div></div>
+          <div class="stat"><div class="k">Lessons</div><div class="v" id="lessons">0</div></div>
+        </div>
+      </div>
+      <div class="days" id="days"></div>
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn primary" id="learn-auto"><i data-icon="play"></i> Learn!</button>
+        <button class="btn" id="learn-one"><i data-icon="step"></i> One lesson</button>
+        <button class="btn ghost" id="scramble"><i data-icon="dice"></i> Scramble knobs</button>
+      </div>
+      <div class="cp-head">
+        <h3 style="margin:0"><i data-icon="flag"></i> Snapshots while learning</h3>
+        <button class="btn small hidden" id="live"><i data-icon="arrow-left"></i> Back to live</button>
+      </div>
+      <div class="checkpoints" id="cps"><p class="muted cp-empty">Press <b>Learn!</b> — snapshots appear after lesson 1, 5, 10 and when it's done. Tap one to travel back in time.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="bulb"></i></div><h3>Signals come in</h3><p>Each switch is a signal: on (1) or off (0). Sunny? Raining? Friends coming?</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gauge"></i></div><h3>Each one has a knob</h3><p>The knob says how much the neuron cares. Rain gets a big red knob because rain ruins everything!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="plus"></i></div><h3>Add it all up</h3><p>The neuron adds up every signal × its knob, plus its starting mood.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="flag"></i></div><h3>Decide</h3><p>Total bigger than zero? YES! Smaller? NO. That's it — that's one neuron.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Learn from oopsies</h3><p>When it's wrong, it turns the knobs of the switches that were on a tiny bit — toward the right answer.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>One neuron looked at four switches and gave each one a <b>knob</b> for how much it cares.</li>
+      <li>It added everything up. Bigger than zero meant <b>YES</b>, otherwise <b>NO</b>.</li>
+      <li>When it got a day wrong, it turned the knobs of the switches that were on — a tiny bit toward the right answer.</li>
+      <li>After enough lessons it agreed with the kid on <b>every</b> day — nobody told it the rule!</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a <span class="term">perceptron</span>, the 1958 model by Frank Rosenblatt and the building block of every neural network.</p>
+        <ul>
+          <li><b>Weighted sum:</b> <code>z = w₁x₁ + w₂x₂ + w₃x₃ + w₄x₄ + b</code>. The knobs are the <span class="term">weights</span> <code>w</code>; the starting mood is the <span class="term">bias</span> <code>b</code>.</li>
+          <li><b>Activation:</b> "Yes / No" is the <span class="term">step function</span> <code>y = z &gt; 0 ? 1 : 0</code>. "How sure?" is the <span class="term">sigmoid</span> <code>σ(z) = 1 / (1 + e^(−z))</code>, which gives a smooth probability. Modern networks use smooth activations (sigmoid, tanh, ReLU) because they can be trained with gradients.</li>
+          <li><b>Learning rule:</b> for each example, if the prediction <code>ŷ</code> is wrong, update <code>wᵢ ← wᵢ + η(y − ŷ)xᵢ</code> and <code>b ← b + η(y − ŷ)</code> with learning rate <code>η = 0.5</code>. Only weights for active inputs change (because <code>xᵢ = 0</code> otherwise).</li>
+          <li><b>Guarantee:</b> the <span class="term">perceptron convergence theorem</span> says this rule finds a perfect answer in a finite number of steps whenever the data is <span class="term">linearly separable</span> — i.e. one straight cut (a hyperplane) can split YES days from NO days. These 8 days are. Problems like XOR are not, which is why we stack many neurons into layers (see <a href="nn-playground.html">Brain Painter</a>).</li>
+          <li>Further reading: <a href="https://poloclub.github.io/" target="_blank" rel="noopener">Polo Club interactive explainers</a> · <a href="https://playground.tensorflow.org" target="_blank" rel="noopener">TensorFlow Playground</a>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/nn-neuron.js"></script>
+</body>
+</html>

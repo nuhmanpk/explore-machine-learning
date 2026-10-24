@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Balance the Pole · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    /* In Robo mode the only left card (your turn) is hidden: drop the empty column. */
+    @media (min-width: 961px) {
+      .stage.three:not(:has(.panel.left > .card:not(.hidden))) { grid-template-columns: minmax(0, 1fr) 320px; }
+      .stage.three:not(:has(.panel.left > .card:not(.hidden))) > .panel.left { display: none; }
+    }
+    .mode-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 2px 12px; }
+    .s-emoji { color: var(--accent); }
+    .sub-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 800; font-size: .92rem; margin: 16px 2px 6px; flex-wrap: wrap; }
+    .sub-h .muted { font-weight: 700; font-size: .82rem; }
+    #chart { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .ckpt small { display: block; color: var(--muted); font-weight: 700; }
+    .ckpt.playing { border-color: var(--accent); background: var(--accent-soft); }
+    .checkpoints .empty { color: var(--muted); font-weight: 700; font-size: .9rem; padding: 6px 2px; }
+    .push-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .push-row .btn { padding: 16px 10px; font-size: 1.05rem; }
+    .inside-state { display: grid; gap: 6px; font-weight: 700; font-size: .92rem; }
+    .inside-state div { display: flex; gap: 8px; align-items: center; }
+    .inside-state .lbl { color: var(--muted); min-width: 4.6em; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 800; }
+    .qbars { display: grid; gap: 6px; }
+    .qbar { display: grid; grid-template-columns: 5.4em 1fr 3.4em; gap: 8px; align-items: center; font-weight: 800; font-size: .88rem; }
+    .qbar .track { height: 14px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .qbar .fill { height: 100%; border-radius: 999px; transition: width .12s; }
+    .qbar .num { font-family: var(--font-mono); text-align: right; }
+    .qbar.win { color: var(--ink); }
+    .qbar:not(.win) { color: var(--muted); }
+    .decision { background: var(--card); border-radius: 12px; padding: 10px 12px; font-weight: 800; font-size: .92rem; }
+    #heat { width: 100%; max-width: 280px; margin: 0 auto; background: var(--bg-2); border-radius: 10px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="rl" data-demo="rl-balance">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Reinforcement Learning</span>
+      <h1>Balance the <span class="em">Pole</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Can you balance a broom on your hand? Let's try with a little cart! Press <b>←</b> and <b>→</b> (or the push buttons) to keep the pole standing up. Then let me learn it myself!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card" id="you-card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <div class="push-row">
+            <button class="btn" id="push-l"><i data-icon="arrow-left"></i> Push</button>
+            <button class="btn" id="push-r">Push <i data-icon="arrow-right"></i></button>
+          </div>
+          <div class="hint muted" style="font-size:.85rem">Hold a button, or use the <kbd>←</kbd> <kbd>→</kbd> keys. The try starts on your first push. Press <kbd>W</kbd> for a wind gust!</div>
+          <button class="btn small ghost" id="slowmo"><i data-icon="clock"></i> Slow motion: off</button>
+          <div class="stats">
+            <div class="stat"><div class="k">This try</div><div class="v" id="h-now">0.0<small>s</small></div></div>
+            <div class="stat"><div class="k">Your best</div><div class="v" id="h-best">0.0<small>s</small></div></div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+        <div class="mode-row">
+          <div class="seg" id="mode">
+            <button data-mode="you" class="on"><i data-icon="gamepad"></i> You try</button>
+            <button data-mode="robo"><i data-icon="robot"></i> Robo learns</button>
+          </div>
+          <span class="chip" id="mode-chip">Goal: balance for 10 seconds</span>
+        </div>
+        <canvas id="scene"></canvas>
+        <div class="overlay-msg" id="overlay"></div>
+
+        <div class="sub-h"><span>How long it balanced, each try</span><span class="muted">dashed line = 10 s goal · dark line = average</span></div>
+        <canvas id="chart"></canvas>
+
+        <div class="sub-h"><span>Checkpoints: tap one to replay that brain</span><span class="muted">same robot, different amounts of practice</span></div>
+        <div class="checkpoints" id="ckpts"><div class="empty">Checkpoints appear here as Robo practises.</div></div>
+      </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card hidden" id="robo-card">
+          <h3><i data-icon="robot"></i> Robo's practice</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Practise</button>
+            <button class="btn" id="wind"><i data-icon="zap"></i> Wind gust</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <label for="speed">Speed <span class="val" data-for="speed"></span></label>
+            <input type="range" id="speed" min="0" max="4" step="1" value="3">
+            <div class="hint">"Super fast" learns in about a minute. "Turbo" in a blink.</div>
+          </div>
+          <div class="field">
+            <label for="eps">Curiosity <span class="val" data-for="eps"></span></label>
+            <input type="range" id="eps" min="0" max="0.5" step="0.01" value="0.1">
+            <div class="hint">How often I push a random way. "Auto" = very curious at first, calmer later.</div>
+          </div>
+          <button class="btn small on" id="auto"><i data-icon="wand"></i> Auto curiosity: on</button>
+          <div class="stats">
+            <div class="stat"><div class="k">Tries</div><div class="v" id="s-ep">0</div></div>
+            <div class="stat"><div class="k">This try</div><div class="v" id="s-now">0.0<small>s</small></div></div>
+            <div class="stat"><div class="k">Best</div><div class="v" id="s-best">0.0<small>s</small></div></div>
+            <div class="stat"><div class="k">Avg (last 20)</div><div class="v" id="s-avg">0.0<small>s</small></div></div>
+          </div>
+        </div>
+
+        <div class="card inside hidden" id="inside-card">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="inside-state">
+            <div><span class="lbl">Pole</span><span id="i-lean">standing straight</span></div>
+            <div><span class="lbl">Falling</span><span id="i-fall">not at all</span></div>
+            <div><span class="lbl">Cart</span><span id="i-cart">still</span></div>
+          </div>
+          <div class="qbars">
+            <div class="qbar" id="q-l"><span>Push left</span><div class="track"><div class="fill" style="background:var(--sup)"></div></div><span class="num">0.0</span></div>
+            <div class="qbar" id="q-r"><span>Push right</span><div class="track"><div class="fill" style="background:var(--rl)"></div></div><span class="num">0.0</span></div>
+          </div>
+          <div class="decision" id="i-decide">My table is empty. I'll guess!</div>
+          <div class="sub-h" style="margin-top:4px"><span>My cheat-sheet</span><span class="muted">dot = right now</span></div>
+          <canvas id="heat"></canvas>
+          <div class="legend" style="justify-content:center">
+            <span><i style="background:var(--sup)"></i>push left</span>
+            <span><i style="background:var(--rl)"></i>push right</span>
+            <span><i style="background:var(--line)"></i>never seen</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Look</h3><p>Robo checks four things: which way the pole leans, how fast it's falling, and how fast the cart is rolling.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="book"></i></div><h3>Check the cheat-sheet</h3><p>For each kind of wobble, Robo's table has a score for "push left" and "push right". Bigger score = better idea.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gift"></i></div><h3>Treat for every moment</h3><p>Robo gets a tiny treat for every moment the pole stays up. When it falls, the treats stop.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="pencil"></i></div><h3>Fix the scores</h3><p>After each push, Robo updates the score: "that led to more treats" goes up, "that led to a fall" goes down.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Balancing is <b>hard</b> — you probably felt it! Tiny pushes at the right moment matter.</li>
+        <li>Robo started with an empty cheat-sheet and fell over almost instantly.</li>
+        <li>Nobody told Robo the rules. It only got a treat for every moment the pole stayed up.</li>
+        <li>After a few hundred falls, the scores in its table pointed the right way and it could balance for the full 10 seconds.</li>
+        <li>The checkpoints show the <b>same robot</b> at different moments of practice. Practice is what made it good.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is the classic <span class="term">CartPole</span> control task (Barto, Sutton &amp; Anderson, 1983; the same dynamics as Gymnasium's <code>CartPole-v1</code>), solved with <span class="term">tabular Q-learning</span>.</p>
+        <ul>
+          <li><b>Physics</b>: cart mass 1 kg, pole mass 0.1 kg, pole half-length 0.5 m, push force ±10 N, Euler integration at 50 Hz (<code>τ = 0.02 s</code>). An episode fails if the pole tilts past ±12° or the cart leaves ±2.4 m; it succeeds at 500 steps (10 s). In "You try" mode you can also choose not to push.</li>
+          <li><b>State</b>: the continuous state <code>(x, ẋ, θ, θ̇)</code> is bucketed into <code>1 × 4 × 8 × 10 = 320</code> discrete cells (cart position is ignored; the velocity, angle and angular velocity buckets span ±2 m/s, ±12°, ±2.5 rad/s).</li>
+          <li><b>Reward</b>: +1 per step alive, 0 on failure. Update: <code>Q(s,a) ← Q(s,a) + α [r + γ maxₐ' Q(s',a') − Q(s,a)]</code>, with <code>γ = 0.99</code>.</li>
+          <li><b>Schedules</b>: with auto curiosity, <code>ε = α = max(min, 1 − log₁₀((episode+1)/25))</code>, where the floor is 0.01 for ε and 0.1 for α. You can switch auto off and set ε yourself.</li>
+          <li>When tuned offline over 8 random seeds, this setup reaches a 20-episode average of ≥ 475 steps after <b>212–305 episodes</b> (roughly 100k simulation steps). Tabular methods can still forget after solving; deep RL (DQN, policy gradients) replaces the table with a neural network that generalises between buckets.</li>
+          <li>The heatmap is a slice of the Q-table: angle × angular velocity at the cart's current velocity bucket. The colour shows <code>argmax</code>, and the strength shows <code>|Q(right) − Q(left)|</code>.</li>
+        </ul>
+        <p>Further reading: Sutton &amp; Barto, <i>Reinforcement Learning: An Introduction</i>, ch. 6 &amp; 9; Gymnasium CartPole docs.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/rl-balance.js"></script>
+</body>
+</html>

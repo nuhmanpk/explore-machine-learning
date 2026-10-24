@@ -1,0 +1,40 @@
+/* Shared look for the rl-flappy and rl-snake lessons (same layout as rl-balance). */
+.mode-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 2px 12px; }
+.s-emoji { color: var(--accent); }
+.sub-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 800; font-size: .92rem; margin: 16px 2px 6px; flex-wrap: wrap; }
+.sub-h .muted { font-weight: 700; font-size: .82rem; }
+#scene { max-width: 520px; margin: 0 auto; cursor: pointer; }
+#chart { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+.ckpt small { display: block; color: var(--muted); font-weight: 700; }
+.ckpt.playing { border-color: var(--accent); background: var(--accent-soft); }
+.checkpoints .empty { color: var(--muted); font-weight: 700; font-size: .9rem; padding: 6px 2px; }
+.inside-state { display: grid; gap: 6px; font-weight: 700; font-size: .92rem; }
+.inside-state div { display: flex; gap: 8px; align-items: center; }
+.inside-state .lbl { color: var(--muted); min-width: 4.6em; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 800; }
+.qbars { display: grid; gap: 6px; }
+.qbar { display: grid; grid-template-columns: 5.4em 1fr 3.4em; gap: 8px; align-items: center; font-weight: 800; font-size: .88rem; }
+.qbar .track { height: 14px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+.qbar .fill { height: 100%; border-radius: 999px; transition: width .12s; }
+.qbar .num { font-family: var(--font-mono); text-align: right; }
+.qbar.win { color: var(--ink); }
+.qbar:not(.win) { color: var(--muted); }
+.decision { background: var(--card); border-radius: 12px; padding: 10px 12px; font-weight: 800; font-size: .92rem; }
+#heat { width: 100%; max-width: 280px; margin: 0 auto; background: var(--bg-2); border-radius: 10px; }
+.sensors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sensor { border: 2px solid var(--line); border-radius: 10px; padding: 6px 4px; text-align: center; font-weight: 800; font-size: .78rem; color: var(--muted); background: var(--card); }
+.sensor.on { border-color: var(--bad); color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--card)); }
+.sensor.food.on { border-color: var(--good); color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--card)); }
+.pad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: 48px 48px; gap: 6px; justify-content: center; }
+.pad .btn { padding: 0; }
+.pad .up { grid-column: 2; grid-row: 1; }
+.pad .left { grid-column: 1; grid-row: 2; }
+.pad .down { grid-column: 2; grid-row: 2; }
+.pad .right { grid-column: 3; grid-row: 2; }
+/* challenge toggles (Bird + Snake) */
+.challenge-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.challenge-toggles .btn { justify-content: flex-start; padding: 10px 12px; font-size: .9rem; }
+.challenge-toggles .btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* three-column game layout: the middle column */
+.stage-left { display: grid; gap: 20px; min-width: 0; }
+.stage.three .canvas-box #chart { max-height: 140px; }
+.stage.three .panel.left .challenge-toggles { grid-template-columns: 1fr; }

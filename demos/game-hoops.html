@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Basketball Shooter · Explore ML</title>
+  <meta name="description" content="Robo throws, misses, and fixes its aim from every miss until it sinks almost every shot, then adapts to wind, a moving hoop, a heavy ball and more.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    #court { cursor: crosshair; }
+    .wbars { display: grid; gap: 6px; }
+    .wbar { display: grid; grid-template-columns: 110px 1fr 44px; gap: 6px; align-items: center; font-size: .8rem; font-weight: 800; }
+    .wbar .track { height: 10px; border-radius: 999px; background: var(--bg-2); position: relative; border: 2px solid var(--line); }
+    .wbar .track::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--muted); }
+    .wbar .fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; transition: all .3s; }
+    .wbar .num { font-family: var(--font-mono); font-size: .75rem; text-align: right; color: var(--ink-2); }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-hoops">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Game Lab · Learning from mistakes</span>
+      <h1>Basketball <span class="em">shooter</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I've never thrown a ball before! Every time I miss, I'll fix my throw a little. Press <b>Play</b> and watch my aim get better.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Who shoots?</h3>
+          <div class="seg" id="mode" style="width:100%"><button data-m="robo" class="on" style="flex:1"><i data-icon="robot"></i> Robo learns</button><button data-m="you" style="flex:1"><i data-icon="gamepad"></i> You try</button></div>
+          <p class="muted" id="mode-hint" style="margin:0;font-size:.85rem">Robo throws from a new spot every time.</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make it harder. Robo's aim breaks, then it fixes itself.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="wind"><i data-icon="sparkles"></i> Wind <span class="tag">blows back</span></button>
+            <button class="btn small" data-c="moving"><i data-icon="shuffle"></i> Moving hoop <span class="tag">slides</span></button>
+            <button class="btn small" data-c="heavy"><i data-icon="target"></i> Heavy ball <span class="tag">−10% speed</span></button>
+            <button class="btn small" data-c="high"><i data-icon="arrow-up"></i> Higher hoop <span class="tag">+0.8 m</span></button>
+            <button class="btn small" data-c="spots"><i data-icon="map"></i> Anywhere on court <span class="tag">2–9 m</span></button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="court"></canvas>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Shots that went in, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Baskets per 10 shots (%)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="step"><i data-icon="step"></i> One shot</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="3">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Shots</div><div class="v" id="st-shots">0</div></div>
+            <div class="stat"><div class="k">This round</div><div class="v" id="st-round">0<small>/0</small></div></div>
+            <div class="stat"><div class="k">Last 5 rounds</div><div class="v" id="st-avg">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to see how Robo picks its throw.</span></div>
+          <div class="wbars" id="wbars"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— Robo's aim saved along the way. Tap one to watch it shoot on today's court.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Look</h3><p>Robo checks how far away the hoop is, how high it is, the wind, and whether the hoop is sliding.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>Pick a throw</h3><p>It multiplies each of those by a "how much it matters" number and adds them up to choose how hard to throw.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Measure the miss</h3><p>Too short? Too long? By how much? That tells Robo exactly which way it was wrong.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Fix it a little</h3><p>It nudges its numbers so that, from that spot, it would throw a bit harder or softer next time.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Robo's first throws flew everywhere. Every miss told it "harder" or "softer", and the faded arcs crept closer to the hoop.</li>
+        <li>Each challenge broke its old aim. The chart dipped, then climbed back as Robo learned the new rule.</li>
+        <li>Some challenges, like a sliding hoop, are much harder: Robo has to aim where the hoop <b>will be</b>, not where it is.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Robo is an <span class="term">online linear regression</span> trained with the <span class="term">normalised LMS</span> rule, a close cousin of stochastic gradient descent, from one shot at a time.</p>
+        <ul>
+          <li><b>Physics:</b> projectile motion with gravity 9.8 m/s², optional constant horizontal wind acceleration, release at 2 m, fixed 55° launch angle, integrated at 120 Hz. A shot counts as made if the ball comes down through rim height within the rim (radius 0.23 m, minus a bit for the ball).</li>
+          <li><b>Features</b> <code>x</code>: 1, distance d, d², 1/d, hoop raised?, wind, hoop sliding speed, and the products d·wind, d·slide, raised·d (distances scaled by 1/5). <b>Output:</b> launch speed <code>v = w·x</code>.</li>
+          <li><b>Learning signal:</b> the signed miss <code>e</code> (metres long or short) becomes a corrected target <code>v* = v − 0.55·e</code>; then <code>w ← w + η (v* − w·x) x / (1 + |x|²)</code>. There is no simulator inside the learner; it only sees its own misses.</li>
+          <li><b>Adaptation:</b> each challenge is a <span class="term">distribution shift</span>. Wind, heavy ball and the higher hoop are mostly captured by re-tuning existing weights. The sliding hoop needs a learned "lead" (aim ahead), so recovery is slower and less complete. Measured in Node (3 runs, 10 shots/round): learning ≈ 20% → 95–99%; wind 60–75% → 92–97%; heavy 65% → 91–92%; higher hoop 10–35% → 99–100%; moving hoop 20–35% → 66–78%; anywhere on court 40–65% → 83–86% (after 80 more rounds).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-hoops-core.js"></script>
+  <script src="js/game-hoops.js"></script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bird Learns to Fly · Explore ML</title>
+  <meta name="description" content="Try a flappy-bird game yourself, then watch a robot bird learn to fly through pipes with Q-learning, try after try.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="rl-games.css">
+</head>
+<body data-page="demo" data-topic="rl" data-demo="rl-flappy">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Reinforcement Learning</span>
+      <h1>Bird learns to <span class="em">fly</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Help the bird fly through the gaps! Tap the picture (or press <b>Space</b>) to flap. Then switch to <b>Robo learns</b> and watch a bird teach itself.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card" id="you-card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn primary" id="flap-btn"><i data-icon="arrow-up"></i> Flap!</button>
+          <div class="hint muted" style="font-size:.85rem">Tap the picture, press this button, or use <kbd>Space</kbd> / <kbd>↑</kbd>. The game starts on your first flap.</div>
+          <div class="stats">
+            <div class="stat"><div class="k">This try</div><div class="v" id="h-now">0</div></div>
+            <div class="stat"><div class="k">Your best</div><div class="v" id="h-best">0</div></div>
+          </div>
+        </div>
+        <div class="card hidden" id="challenge-card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make the sky harder while Robo is flying. Watch its score drop, then climb back as it adapts.</p>
+          <div class="challenge-toggles">
+            <button class="btn" id="ch-wind" data-ch="wind"><i data-icon="wave"></i> Wind gusts</button>
+            <button class="btn" id="ch-bob" data-ch="bob"><i data-icon="arrow-up"></i> Moving pipes</button>
+            <button class="btn" id="ch-small" data-ch="small"><i data-icon="minus"></i> Smaller gaps</button>
+          </div>
+          <div class="hint muted" style="font-size:.82rem" id="ch-status">Tip: let Robo get good first, then switch one on.</div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+      <div class="canvas-box">
+          <div class="mode-row">
+            <div class="seg" id="mode">
+              <button data-mode="you" class="on"><i data-icon="gamepad"></i> You try</button>
+              <button data-mode="robo"><i data-icon="robot"></i> Robo learns</button>
+            </div>
+            <span class="chip" id="mode-chip">Tap or Space to flap</span>
+          </div>
+          <canvas id="scene"></canvas>
+          <div class="overlay-msg" id="overlay"></div>
+          <div class="sub-h"><span>Pipes passed, each try</span><span class="muted">bars = each try · dark line = average of last 20</span></div>
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card hidden" id="robo-card">
+          <h3><i data-icon="robot"></i> Robo's practice</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Practise</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <label for="speed">Speed <span class="val" data-for="speed"></span></label>
+            <input type="range" id="speed" min="0" max="4" step="1" value="2">
+            <div class="hint">At "Fast" you can watch it go from flop to flying in about a minute.</div>
+          </div>
+          <div class="field">
+            <label for="eps">Curiosity <span class="val" data-for="eps"></span></label>
+            <input type="range" id="eps" min="0" max="0.2" step="0.01" value="0">
+            <div class="hint">How often I flap or wait at random, just to see what happens.</div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Tries</div><div class="v" id="s-ep">0</div></div>
+            <div class="stat"><div class="k">This try</div><div class="v" id="s-now">0</div></div>
+            <div class="stat"><div class="k">Best</div><div class="v" id="s-best">0</div></div>
+            <div class="stat"><div class="k">Avg (last 20)</div><div class="v" id="s-avg">0</div></div>
+          </div>
+        </div>
+
+        <div class="card inside hidden" id="inside-card">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="inside-state">
+            <div><span class="lbl">Gap</span><span id="i-gap">–</span></div>
+            <div><span class="lbl">Pipe</span><span id="i-pipe">–</span></div>
+            <div><span class="lbl">Moving</span><span id="i-move">–</span></div>
+            <div id="i-wind-row" class="hidden"><span class="lbl">Wind</span><span id="i-wind">–</span></div>
+          </div>
+          <div class="qbars">
+            <div class="qbar" id="q-0"><span>Wait</span><div class="track"><div class="fill" style="background:var(--sup)"></div></div><span class="num">0.0</span></div>
+            <div class="qbar" id="q-1"><span>Flap</span><div class="track"><div class="fill" style="background:var(--rl)"></div></div><span class="num">0.0</span></div>
+          </div>
+          <div class="decision" id="i-decide">My table is empty. I'll just wait…</div>
+          <div class="sub-h" style="margin-top:4px"><span>My cheat-sheet</span><span class="muted">dot = right now</span></div>
+          <canvas id="heat"></canvas>
+          <div class="legend" style="justify-content:center">
+            <span><i style="background:var(--sup)"></i>wait</span>
+            <span><i style="background:var(--rl)"></i>flap</span>
+            <span><i style="background:var(--line)"></i>never seen</span>
+          </div>
+          <div class="hint muted" style="font-size:.8rem;text-align:center">Across: how far the pipe is. Up/down: where the gap is.</div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+        <div class="sub-h" style="margin-top:0"><span>Checkpoints: tap one to replay that brain</span><span class="muted">same bird, different amounts of practice</span></div>
+        <div class="checkpoints" id="ckpts"><div class="empty">Checkpoints appear here as Robo practises.</div></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Look</h3><p>The bird checks three things: how far the next pipe is, is the gap above or below me, and am I going up or falling.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="book"></i></div><h3>Check the cheat-sheet</h3><p>For every situation, its table has two scores: "wait" and "flap". It picks the bigger one.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gift"></i></div><h3>Treats and ouches</h3><p>A little treat for every moment alive, a bigger one for each pipe passed. A crash is a big ouch.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="pencil"></i></div><h3>Fix the scores</h3><p>After every flap or wait, it nudges that score toward what really happened next.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first the bird's table was empty, so it never flapped and dropped straight down.</li>
+        <li>Every crash taught it "that was a bad idea right there". Every pipe passed taught it "do more of that".</li>
+        <li>Nobody told it how to fly. After a few hundred tries, it zips through pipe after pipe.</li>
+        <li>The cheat-sheet picture shows its rule taking shape: <b>flap when the gap is above you</b>, wait when it's below.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">tabular Q-learning</span> on a Flappy-Bird clone, the same algorithm as the maze and pole lessons.</p>
+        <ul>
+          <li><b>State</b>: horizontal distance to the end of the next pipe (3 zones: near / mid / far), vertical offset of the gap centre (17 bins of 15 px), and vertical velocity (5 bins): just 255 cells. A deliberately coarse table generalises across similar situations, so it fills up fast: about 25 tries to average 10 pipes, versus about 120 with fine 20 px distance bins.</li>
+          <li><b>Actions</b>: wait or flap. <b>Reward</b>: +1 per frame alive, +5 per pipe passed, −100 on a crash. <code>α = 0.6</code>, <code>γ = 0.95</code>, Q initialised to 0 and ties broken toward "wait".</li>
+          <li><b>Exploration</b>: because Q starts at 0 and crashes are very negative, optimistic initialisation already explores well, so curiosity (ε) defaults to 0. Turn it up to see random flaps make it worse in the short term.</li>
+          <li>Offline in Node, the 100-try average reached 25–60 pipes after ~300 tries (well under a second of compute), and individual tries hit the 80+ pipe cap. Results vary between runs; tabular agents can also "forget" a little as they keep updating.</li>
+          <li>Deep RL replaces the table with a neural network that reads the raw pixels (as in DeepMind's Atari DQN, 2015).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/rl-games.js"></script>
+  <script src="js/rl-flappy-core.js"></script>
+  <script src="js/rl-flappy.js"></script>
+</body>
+</html>

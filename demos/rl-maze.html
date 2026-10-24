@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mouse Finds Cheese · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    #maze { cursor: crosshair; }
+    .tools button { font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; }
+    .tool-ic { width: 18px; height: 18px; display: inline-block; }
+    .tool-ic canvas { width: 18px; height: 18px; }
+    .s-emoji { color: var(--accent); }
+    .chart-wrap canvas { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .stage .legend { margin-top: 10px; }
+    .reward-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  </style>
+</head>
+<body data-page="demo" data-topic="rl" data-demo="rl-maze">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Reinforcement Learning</span>
+      <h1>Mouse Finds <span class="em">Cheese</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I'm a hungry little mouse, but I don't know the maze! <b>Cheese</b> is yummy, <b>traps</b> go ouch. Press <b>Play</b> and watch me learn by trying.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Mouse brain knobs</h3>
+          <div class="field">
+            <label for="eps">Curiosity <span class="val" data-for="eps"></span></label>
+            <input type="range" id="eps" min="0" max="1" step="0.05" value="0.2">
+            <div class="hint">How often I try a random way instead of my favorite.</div>
+          </div>
+          <div class="field">
+            <label for="gamma">Patience <span class="val" data-for="gamma"></span></label>
+            <input type="range" id="gamma" min="0.5" max="0.99" step="0.01" value="0.9">
+            <div class="hint">High = I care about cheese far away, not just right now.</div>
+          </div>
+          <div class="field">
+            <label for="alpha">Learning speed <span class="val" data-for="alpha"></span></label>
+            <input type="range" id="alpha" min="0.05" max="1" step="0.05" value="0.5">
+            <div class="hint">How much one new try changes my mind.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Build the maze</h3>
+          <div class="seg tools" id="tools">
+            <button data-tool="wall" class="on"><span class="tool-ic" data-draw="wall"></span>Wall</button>
+            <button data-tool="trap"><span class="tool-ic" data-draw="trap"></span>Trap</button>
+            <button data-tool="cheese"><span class="tool-ic" data-draw="cheese"></span>Cheese</button>
+            <button data-tool="start"><span class="tool-ic" data-draw="start"></span>Start</button>
+            <button data-tool="erase"><i data-icon="eraser"></i> Erase</button>
+          </div>
+          <div class="hint muted" style="font-size:.85rem">Tap or drag on the maze to draw.</div>
+          <div class="btn-row">
+            <button class="btn small" data-preset="tricky"><i data-icon="maze"></i> Tricky</button>
+            <button class="btn small" data-preset="cliff"><i data-icon="flag"></i> Cliff</button>
+            <button class="btn small" data-preset="open"><i data-icon="map"></i> Open</button>
+            <button class="btn small" data-preset="empty"><i data-icon="pencil"></i> Empty</button>
+          </div>
+          <button class="btn small ghost" id="nums"><i data-icon="info"></i> Show brain numbers</button>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+        <canvas id="maze"></canvas>
+        <div class="overlay-msg" id="overlay"></div>
+        <div class="sub-h" style="display:flex;justify-content:space-between;font-weight:800;font-size:.92rem;margin:14px 2px 6px;flex-wrap:wrap;gap:6px"><span>Checkpoints: tap to see the brain back then</span><span class="muted" style="font-size:.82rem">tap again to go back to live</span></div>
+        <div class="checkpoints" id="ckpts"><div class="muted" style="font-weight:700;font-size:.9rem;padding:6px 2px">Snapshots appear as the mouse practises.</div></div>
+        <div class="legend">
+          <span><i style="background:var(--good)"></i>Good spot (close to cheese)</span>
+          <span><i style="background:var(--bad)"></i>Bad spot (near traps)</span>
+          <span><i style="background:var(--rl)"></i>Best arrow = mouse's favorite move</span>
+          <span><i style="background:var(--ink-2);border-radius:50%"></i>Footsteps this try</span>
+        </div>
+      </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How's it going?</h3>
+          <div class="stats">
+            <div class="stat"><div class="k">Tries</div><div class="v" id="s-ep">0</div></div>
+            <div class="stat"><div class="k">Steps now</div><div class="v" id="s-steps">0</div></div>
+            <div class="stat"><div class="k">Cheese</div><div class="v" id="s-cheese">0</div></div>
+            <div class="stat"><div class="k">Traps hit</div><div class="v" id="s-trap">0</div></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="field"><span class="lbl">Steps needed each try <span class="muted" style="font-weight:700">(lower = smarter)</span></span></div>
+            <canvas id="chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Controls</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="step"><i data-icon="step"></i> One step</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <label for="speed">Speed <span class="val" data-for="speed"></span></label>
+            <input type="range" id="speed" min="0" max="4" step="1" value="1">
+            <div class="hint">Turbo lets the mouse practise thousands of times super fast.</div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="dice"></i></div><h3>Try stuff</h3><p>At first the mouse knows nothing, so it wanders around randomly. Bonk! Wall. Bonk!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gift"></i></div><h3>Treats &amp; ouches</h3><p>Cheese gives a big treat (+10). A trap gives a big ouch (−10). Every step costs a tiny bit, so slow is bad too.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="map"></i></div><h3>Remember</h3><p>Each square keeps a score for each arrow: "going this way usually ends well". Green squares are good places to be.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="flag"></i></div><h3>Follow the best arrows</h3><p>The good news spreads backwards from the cheese, square by square, until there's a path of arrows from home all the way to cheese.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The mouse started knowing <b>nothing</b> and wandered randomly.</li>
+        <li>Cheese gave a treat, traps gave an ouch — nobody told it where to go.</li>
+        <li>Each square remembered a score for each arrow, and good news spread backwards from the cheese.</li>
+        <li>The checkpoints show the same mouse brain after 1, 10, 50… tries: more practice, more green, better arrows.</li>
+        <li>Change the maze and the old memories go wrong — it has to learn again.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">tabular Q-learning</span> (Watkins, 1989) on a small grid-world <span class="term">Markov Decision Process</span>. Nothing is faked: every step you see is one real update.</p>
+        <ul>
+          <li><b>State</b> = which square the mouse is on (64 states). <b>Actions</b> = up / right / down / left. Walls and edges make the mouse stay put.</li>
+          <li><b>Rewards</b>: cheese <code>+10</code> (episode ends), trap <code>−10</code> (episode ends), each step <code>−0.1</code>, bumping into a wall <code>−0.3</code>. Episodes also end after 150 steps.</li>
+          <li><b>Update rule</b>: <code>Q(s,a) ← Q(s,a) + α · [ r + γ · maxₐ' Q(s',a') − Q(s,a) ]</code>. "Learning speed" is α, "Patience" is the discount factor γ.</li>
+          <li><b>Policy</b>: <span class="term">ε-greedy</span>. With probability ε ("Curiosity") take a random action, otherwise the action with the highest Q (ties broken randomly). This is the classic <span class="term">exploration vs exploitation</span> trade-off.</li>
+          <li>The square colour is <code>V(s) = maxₐ Q(s,a)</code>; arrow length is each action's Q relative to the others in that square. The dashed line is the greedy policy rolled out from the start.</li>
+          <li>Try the <b>Cliff</b> preset with high curiosity: Q-learning is <span class="term">off-policy</span>, so it learns the risky shortest path along the edge even though exploring there keeps causing accidents. (SARSA, an on-policy cousin, would learn a safer detour.)</li>
+        </ul>
+        <p>Further reading: Sutton &amp; Barto, <i>Reinforcement Learning: An Introduction</i> (2nd ed.), chapter 6 — free online.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/rl-maze.js"></script>
+</body>
+</html>

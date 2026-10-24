@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pizza Shop Planner · Explore ML</title>
+  <meta name="description" content="Place pizza shops in a little town with k-means clustering and watch delivery trips get shorter each round.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .stage canvas#cv { cursor: crosshair; }
+    .step-btns { display: grid; gap: 10px; }
+    .step-btns .btn { justify-content: flex-start; white-space: normal; text-align: left; }
+    #elbow { width: 100%; }
+  </style>
+</head>
+<body data-page="demo" data-topic="unsup" data-demo="unsup-kmeans">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Finding Groups</span>
+      <h1>Pizza Shop <span class="em">Planner</span></h1>
+      <p class="hero-sub">You're opening pizza shops in a little town. Where should they go so every pizza arrives hot? Nobody tells the robot where the neighbourhoods are — it has to find them by itself.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Every little house wants pizza! I dropped my shops in random spots. Let's move them so delivery trips get <b>shorter</b>. Press <b>Step 1</b> to start.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv"></canvas>
+        <div class="overlay-msg" id="ov"></div>
+        <div class="row" style="margin-top:10px">
+          <div class="btn-row">
+            <button class="btn small" id="p-blobs"><i data-icon="groups"></i> Villages</button>
+            <button class="btn small" id="p-random"><i data-icon="dice"></i> Spread out</button>
+            <button class="btn small" id="p-ring"><i data-icon="target"></i> Lake town</button>
+            <button class="btn small" id="p-moons"><i data-icon="wave"></i> River town</button>
+            <button class="btn small ghost" id="p-clear"><i data-icon="eraser"></i> Empty town</button>
+          </div>
+        </div>
+        <p class="muted" style="margin:8px 4px 0; font-size:.88rem; font-weight:700">Drag on empty land to build houses · drag a pizza shop to move it somewhere silly</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="k">How many pizza shops <span class="val" data-for="k"></span></label>
+            <input type="range" id="k" min="2" max="6" step="1" value="3">
+            <div class="hint">How many groups should I look for?</div>
+          </div>
+          <div class="step-btns">
+            <button class="btn primary" id="b-assign"><i data-icon="map"></i> Step 1: every house picks its nearest shop</button>
+            <button class="btn" id="b-move"><i data-icon="target"></i> Step 2: each shop moves to the middle of its houses</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="b-auto"><i data-icon="play"></i> Auto</button>
+            <button class="btn ghost" id="b-drop"><i data-icon="shuffle"></i> New random spots</button>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Avg trip</div><div class="v" id="s-mess">–</div></div>
+            <div class="stat"><div class="k">Rounds</div><div class="v" id="s-round">0</div></div>
+          </div>
+          <div class="chart-box"><canvas id="spark"></canvas></div>
+          <div class="hint muted" style="font-size:.85rem">Average trip = how many blocks a scooter drives from a shop to a house. Each step makes it shorter (or keeps it the same).</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid-2 lesson-row">
+      <div class="card">
+        <div class="cp-head">
+          <h3><i data-icon="clock"></i> Snapshots each round</h3>
+          <button class="viewing-badge" id="viewing"></button>
+        </div>
+        <p class="muted" style="margin:6px 0 4px; font-size:.9rem; font-weight:700">A photo of the town after each round. Tap one to look back.</p>
+        <div class="checkpoints" id="cps"></div>
+      </div>
+      <div class="card">
+        <h3><i data-icon="trend"></i> How many shops is worth it?</h3>
+        <canvas id="elbow"></canvas>
+        <button class="btn small" id="b-elbow"><i data-icon="gauge"></i> Try 1 to 8 shops</button>
+        <div class="hint muted" style="font-size:.85rem" id="elbow-note">More shops always means shorter trips… but each shop costs money. Look for the "elbow" where adding one more stops helping much.</div>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="dice"></i></div><h3>Drop the shops</h3><p>Put the shops anywhere to start. One shop for each group we want.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="map"></i></div><h3>Houses pick a shop</h3><p>Every house orders from the shop that is closest to it.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Shops move to the middle</h3><p>Each shop moves to the very middle of all the houses that ordered from it.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Repeat until calm</h3><p>When no house wants to switch shops any more, the neighbourhoods are found!</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Nobody told the robot where the neighbourhoods were — there were no answers at all.</li>
+      <li>It just repeated two simple steps: pick nearest shop, move shop to the middle.</li>
+      <li>Every round the average trip got shorter, until nothing changed.</li>
+      <li>The groups it found are the neighbourhoods. That's <b>finding groups</b> (clustering)!</li>
+      <li>Bad starting spots can get stuck in a so-so answer — try again with new spots.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">k-means clustering</span> (Lloyd's algorithm), the classic <span class="term">unsupervised learning</span> method. Houses are unlabeled 2-D points; shops are <span class="term">centroids</span>.</p>
+        <ul>
+          <li><b>Assignment step:</b> each point joins the nearest centroid (Euclidean distance). The tinted regions are the resulting <span class="term">Voronoi cells</span>.</li>
+          <li><b>Update step:</b> each centroid moves to the <span class="term">mean</span> of its points.</li>
+          <li>k-means minimises <span class="term">inertia</span> <code>Σ ‖xᵢ − μ_c(i)‖²</code> (squared distances). The "average trip" shown is the plain mean distance, which is easier to read; it falls along with inertia in practice. Both steps never increase inertia, so the algorithm converges — but only to a <span class="term">local minimum</span>; drag a shop to a silly spot to see one.</li>
+          <li>The "1 to 8 shops" chart uses <span class="term">k-means++</span> initialisation with restarts per <code>k</code>; the highlighted bar is the <span class="term">elbow</span> (farthest point from the chord), a heuristic for choosing <code>k</code>.</li>
+          <li>River town shows k-means' assumption of round-ish blobs; density-based methods like <span class="term">DBSCAN</span> follow curved shapes better. (Real facility-location problems also weigh roads and costs.)</li>
+        </ul>
+        <p>Further reading: Naftali Harris, "Visualizing K-Means Clustering" · scikit-learn "Clustering" user guide.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/sup-kit.js"></script>
+  <script src="js/unsup-kmeans.js"></script>
+</body>
+</html>

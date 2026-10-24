@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Snake Learns to Eat · Explore ML</title>
+  <meta name="description" content="Play snake yourself, then watch a robot snake learn to find apples and avoid its own tail with Q-learning.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="rl-games.css">
+</head>
+<body data-page="demo" data-topic="rl" data-demo="rl-snake">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="trophy"></i> Reinforcement Learning</span>
+      <h1>Snake learns to <span class="em">eat</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Steer the snake to the apples with the <b>arrow keys</b>. Don't bump the walls or your own tail! Then let a robot snake learn it from scratch.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card" id="you-card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <div class="pad">
+            <button class="btn up" data-d="0" aria-label="Up"><i data-icon="arrow-up"></i></button>
+            <button class="btn left" data-d="3" aria-label="Left"><i data-icon="arrow-left"></i></button>
+            <button class="btn down" data-d="2" aria-label="Down"><i data-icon="arrow-down"></i></button>
+            <button class="btn right" data-d="1" aria-label="Right"><i data-icon="arrow-right"></i></button>
+          </div>
+          <div class="hint muted" style="font-size:.85rem">Arrow keys or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. The game starts when you first steer.</div>
+          <div class="stats">
+            <div class="stat"><div class="k">Apples</div><div class="v" id="h-now">0</div></div>
+            <div class="stat"><div class="k">Your best</div><div class="v" id="h-best">0</div></div>
+          </div>
+        </div>
+        <div class="card hidden" id="challenge-card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Change the garden while Robo is playing. Watch its score drop, then climb back as it adapts.</p>
+          <div class="challenge-toggles">
+            <button class="btn" data-ch="rocks"><i data-icon="target"></i> Rocks</button>
+            <button class="btn" data-ch="big"><i data-icon="plus"></i> Bigger garden</button>
+            <button class="btn" data-ch="hop"><i data-icon="shuffle"></i> Jumpy apples</button>
+            <button class="btn" data-ch="wrap"><i data-icon="repeat"></i> Walls wrap around</button>
+          </div>
+          <div class="hint muted" style="font-size:.82rem" id="ch-status">Tip: let Robo get good first, then switch one on.</div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+      <div class="canvas-box">
+          <div class="mode-row">
+            <div class="seg" id="mode">
+              <button data-mode="you" class="on"><i data-icon="gamepad"></i> You try</button>
+              <button data-mode="robo"><i data-icon="robot"></i> Robo learns</button>
+            </div>
+            <span class="chip" id="mode-chip">Arrow keys or buttons</span>
+          </div>
+          <canvas id="scene"></canvas>
+          <div class="overlay-msg" id="overlay"></div>
+          <div class="sub-h"><span>Apples eaten, each try</span><span class="muted">bars = each try · dark line = average of last 20</span></div>
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card hidden" id="robo-card">
+          <h3><i data-icon="robot"></i> Robo's practice</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Practise</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <label for="speed">Speed <span class="val" data-for="speed"></span></label>
+            <input type="range" id="speed" min="0" max="4" step="1" value="2">
+            <div class="hint">"Super fast" learns in under a minute. "Turbo" in a blink.</div>
+          </div>
+          <div class="field">
+            <label for="eps">Curiosity <span class="val" data-for="eps"></span></label>
+            <input type="range" id="eps" min="0" max="0.3" step="0.01" value="0.1">
+            <div class="hint">How often I turn a random way, just to see.</div>
+          </div>
+          <button class="btn small on" id="auto"><i data-icon="wand"></i> Auto curiosity: on</button>
+          <div class="stats">
+            <div class="stat"><div class="k">Tries</div><div class="v" id="s-ep">0</div></div>
+            <div class="stat"><div class="k">Apples now</div><div class="v" id="s-now">0</div></div>
+            <div class="stat"><div class="k">Best</div><div class="v" id="s-best">0</div></div>
+            <div class="stat"><div class="k">Avg (last 20)</div><div class="v" id="s-avg">0</div></div>
+          </div>
+        </div>
+
+        <div class="card inside hidden" id="inside-card">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="sub-h" style="margin:0"><span>Danger feelers</span><span class="muted">red = I'd bump something</span></div>
+          <div class="sensors">
+            <div class="sensor" id="d-left">Left</div><div class="sensor" id="d-straight">Ahead</div><div class="sensor" id="d-right">Right</div>
+          </div>
+          <div class="sub-h" style="margin:0"><span>Apple smell</span><span class="muted">green = the apple is that way</span></div>
+          <div class="sensors" style="grid-template-columns:repeat(4,1fr)">
+            <div class="sensor food" id="f-up">Up</div><div class="sensor food" id="f-down">Down</div><div class="sensor food" id="f-left">Left</div><div class="sensor food" id="f-right">Right</div>
+          </div>
+          <div class="qbars">
+            <div class="qbar" id="q-0"><span>Go straight</span><div class="track"><div class="fill" style="background:var(--sup)"></div></div><span class="num">0.0</span></div>
+            <div class="qbar" id="q-2"><span>Turn left</span><div class="track"><div class="fill" style="background:var(--nn)"></div></div><span class="num">0.0</span></div>
+            <div class="qbar" id="q-1"><span>Turn right</span><div class="track"><div class="fill" style="background:var(--rl)"></div></div><span class="num">0.0</span></div>
+          </div>
+          <div class="decision" id="i-decide">My table is empty. I'll go straight…</div>
+          <div class="hint muted" style="font-size:.82rem">These 7 yes/no feelings (plus which way I'm facing) are <b>all</b> the snake knows. It can't see the whole board!</div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+        <div class="sub-h" style="margin-top:0"><span>Checkpoints: tap one to replay that brain</span><span class="muted">same snake, different amounts of practice</span></div>
+        <div class="checkpoints" id="ckpts"><div class="empty">Checkpoints appear here as Robo practises.</div></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Feel</h3><p>The snake only feels a few things: is there danger ahead, left or right, and which way the apple is.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="book"></i></div><h3>Check the cheat-sheet</h3><p>For each mix of feelings, its table has scores for "straight", "left" and "right". It picks the biggest.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="apple"></i></div><h3>Treats and ouches</h3><p>An apple is a big treat. Bumping a wall or its tail is a big ouch. Wandering costs a tiny bit.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="pencil"></i></div><h3>Fix the scores</h3><p>After every move it nudges that score toward what really happened next. Hundreds of games later, it hunts apples.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The first snakes crashed into walls almost right away. Their tables were empty.</li>
+        <li>Each crash lowered the score for "that move, when I felt that". Each apple raised the score for the moves that led there.</li>
+        <li>After a few hundred games, the robot snake eats 15–20 apples a game, all learned from treats and ouches.</li>
+        <li>It still sometimes traps itself in its own tail. With only 7 feelings it can't plan far ahead. Smarter feelings (or a neural network) would help.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Another <span class="term">tabular Q-learning</span> agent, this time with a hand-designed, <span class="term">relative</span> state.</p>
+        <ul>
+          <li><b>State</b> (11 bits → at most 2,048 cells): danger straight / right / left (relative to heading), heading (4 values), and food up / down / left / right.</li>
+          <li><b>Actions</b>: straight, turn right, turn left. Relative actions mean the snake can never reverse into itself.</li>
+          <li><b>Reward</b>: +10 per apple, −10 for dying, −0.01 per step. A game also ends if the snake wanders too long without eating. <code>α = 0.3</code>, <code>γ = 0.9</code>.</li>
+          <li><b>Exploration</b>: with auto curiosity, ε decays from 0.1 to 0.005 over the first 300 games.</li>
+          <li>Offline in Node over 3 runs: 50-game average ≈ 3 apples after 100 games, ≈ 8 after 200, ≈ 18 after 400. The greedy policy then averages 17–19 apples. Long snakes still die by coiling into themselves, because the state can't see the body beyond one cell.</li>
+          <li>Deep RL versions (DQN) feed the whole grid into a neural network and can learn longer-range planning.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/rl-games.js"></script>
+  <script src="js/rl-snake-core.js"></script>
+  <script src="js/rl-snake.js"></script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Line Fitter · Explore ML</title>
+  <meta name="description" content="Watch a computer fit a straight line to ice-cream sales, one gradient-descent step at a time.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .meter { height: 22px; border-radius: 999px; background: var(--bg-2); border: 3px solid var(--line); overflow: hidden; position: relative; }
+    .meter i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--good), var(--warn), var(--bad)); background-size: 300px 100%; transition: width 0.15s; }
+    .meter .mark { position: absolute; top: -3px; bottom: -3px; width: 4px; background: var(--ink); border-radius: 2px; transition: left 0.2s; }
+    .meter-row { display: flex; justify-content: space-between; font-weight: 800; font-size: 0.8rem; color: var(--muted); }
+    .big-num { font-family: var(--font-head); font-size: 2.2rem; font-weight: 600; line-height: 1; }
+    #land { cursor: pointer; width: 100%; border-radius: 10px; }
+    .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stage canvas#cv { cursor: crosshair; }
+  </style>
+</head>
+<body data-page="demo" data-topic="sup" data-demo="sup-line">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="teacher"></i> Supervised Learning</span>
+      <h1>Line <span class="em">Fitter</span></h1>
+      <p class="hero-sub">On hot days the ice-cream shop sells more cones. Find the one straight line that best follows the dots — then watch the robot learn it, one tiny step at a time.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Each dot is one day: how hot it was and how many cones we sold. Try dragging the <b>two round handles</b> on the line to make it fit the dots. Then press <b>Robot, learn!</b></p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv"></canvas>
+        <div class="overlay-msg" id="ov"></div>
+        <div class="row" style="margin-top:10px; justify-content:space-between">
+          <div class="btn-row">
+            <button class="btn primary" id="learn"><i data-icon="play"></i> Robot, learn!</button>
+            <button class="btn" id="step"><i data-icon="step"></i> One step</button>
+            <button class="btn ghost" id="rand"><i data-icon="dice"></i> Random line</button>
+          </div>
+          <div class="legend">
+            <span><i style="background:var(--bad)"></i>oopsie springs</span>
+            <span><i style="background:var(--accent)"></i>the line</span>
+          </div>
+        </div>
+        <p class="muted" style="margin:8px 4px 0; font-size:.88rem; font-weight:700">Tap empty space to add a day · drag a dot to move it · tap a dot to remove it · drag the round handles to move the line</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Total oopsie</h3>
+          <div class="row" style="justify-content:space-between; align-items:flex-end">
+            <div class="big-num" id="mse">0</div>
+            <div class="muted" style="font-weight:800; font-size:.85rem; text-align:right">smaller = better fit<br><span id="steps-lbl">0 steps</span></div>
+          </div>
+          <div class="meter"><i id="meter-fill"></i><span class="mark" id="best-mark" title="best ever" style="left:-10px"></span></div>
+          <div class="meter-row"><span>perfect</span><span>way off</span></div>
+          <div class="chart-box"><canvas id="loss"></canvas></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+
+        <div class="card">
+          <div class="field">
+            <label for="lr">Step size <span class="val" data-for="lr"></span></label>
+            <input type="range" id="lr" min="0" max="100" step="1" value="45">
+            <div class="hint">Tiny steps are slow · giant steps jump right over the valley!</div>
+          </div>
+          <div class="btn-row">
+            <button class="btn small" data-lr="12">Tiny</button>
+            <button class="btn small" data-lr="45">Just right</button>
+            <button class="btn small" data-lr="88">Too big</button>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <div class="cp-head">
+        <h3><i data-icon="clock"></i> Snapshots while learning</h3>
+        <button class="viewing-badge" id="viewing"></button>
+      </div>
+      <p class="muted" style="margin:6px 0 4px; font-size:.9rem; font-weight:700">Every time the robot reaches a step below, it takes a photo of its line. Tap a photo to look back in time.</p>
+      <div class="checkpoints" id="cps"></div>
+    </section>
+
+    <section class="grid-2 lesson-row">
+      <div class="card">
+        <h3><i data-icon="map"></i> Oopsie hills</h3>
+        <canvas id="land"></canvas>
+        <div class="hint muted" style="font-size:.85rem">Every spot on this map is a different line. Darker = smaller oopsie. The ball is our line rolling downhill; the flag is the very bottom. Tap the map to jump!</div>
+      </div>
+      <div class="card">
+        <h3><i data-icon="trophy"></i> You vs Robot</h3>
+        <div class="vs">
+          <div class="stat"><div class="k">Your best</div><div class="v" id="you">–</div></div>
+          <div class="stat"><div class="k">Robot</div><div class="v" id="bot">–</div></div>
+        </div>
+        <p class="muted" style="font-size:.9rem; font-weight:700; margin:0">Drag the handles first to set your best score, then let the robot try.</p>
+        <div class="btn-row">
+          <button class="btn small" id="p-sunny"><i data-icon="sun"></i> New days</button>
+          <button class="btn small" id="p-messy"><i data-icon="shuffle"></i> Messy</button>
+          <button class="btn small" id="p-weird"><i data-icon="zap"></i> Weird day</button>
+        </div>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Guess a line</h3><p>The robot starts with a totally random line. Probably a bad one!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gauge"></i></div><h3>Measure the oopsies</h3><p>Each dot has a red spring pulling on the line. Long springs mean big mistakes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="arrow-down"></i></div><h3>Roll downhill</h3><p>The springs tell the robot which way to nudge the line. It takes one small step that way.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Again and again</h3><p>Step after step the springs shrink, until the line can't get any better.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>We showed the robot examples with answers: temperature → cones sold.</li>
+      <li>It started with a wrong line and measured how wrong it was (the oopsie).</li>
+      <li>Each step it nudged the line in the direction that makes the oopsie smaller.</li>
+      <li>Too-big steps make it bounce around; tiny steps make it slow.</li>
+      <li>Now the line can predict cones for a temperature it never saw!</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">simple linear regression</span>: the model is <code>ŷ = w·x + b</code>, fit by minimising the <span class="term">mean squared error</span> <code>MSE = (1/n) Σ (ŷᵢ − yᵢ)²</code>. The red springs are the <span class="term">residuals</span> <code>ŷᵢ − yᵢ</code>; the "oopsie" number is MSE in cones².</p>
+        <ul>
+          <li>The robot uses <span class="term">gradient descent</span>: <code>w ← w − η·∂MSE/∂w</code>, <code>b ← b − η·∂MSE/∂b</code>, with <code>∂MSE/∂w = (2/n) Σ (ŷᵢ−yᵢ)xᵢ</code> and <code>∂MSE/∂b = (2/n) Σ (ŷᵢ−yᵢ)</code>. Inputs are centred and scaled internally, which makes the loss bowl round and training fast.</li>
+          <li>"Oopsie hills" is the <span class="term">loss landscape</span> over <code>(w, b)</code>. For MSE it is a convex bowl, so gradient descent always finds the bottom if the <span class="term">learning rate</span> <code>η</code> is small enough; above <code>2/λ_max</code> of the Hessian it oscillates and <span class="term">diverges</span>.</li>
+          <li>The checkpoint strip is the same idea as saving model checkpoints during training: snapshots of the parameters at chosen steps.</li>
+          <li>Linear regression also has an exact closed-form answer (<span class="term">ordinary least squares</span>, the flag). Gradient descent matters because the same loop trains neural networks with millions of weights, where no formula exists.</li>
+          <li>The weird day shows squared error is sensitive to <span class="term">outliers</span>.</li>
+        </ul>
+        <p>Further reading: 3Blue1Brown, "Gradient descent, how neural networks learn" · <i>An Introduction to Statistical Learning</i>, ch. 3.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/sup-kit.js"></script>
+  <script src="js/sup-line.js"></script>
+</body>
+</html>

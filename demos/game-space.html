@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Space Dodger · Explore ML</title>
+  <meta name="description" content="A fleet of little spaceships with tiny brains learns to dodge asteroids and collect stars, then adapts to meteor showers, black holes and heavy ships.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .fly-pad { display: none; grid-template-columns: repeat(3, 52px); grid-template-rows: 48px; gap: 8px; justify-content: center; margin-top: 10px; }
+    .fly-pad.show { display: grid; }
+    .fly-pad .btn { padding: 0; font-size: 20px; }
+    #arena { background: #0f1230; }
+    #babies { width: 100%; flex-wrap: nowrap; }
+    #babies button { flex: 1; white-space: nowrap; font-size: .85rem; padding: 7px 6px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-space">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="rocket"></i> Game Lab · Neuroevolution</span>
+      <h1>Space <span class="em">Dodger</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Sixty baby spaceships, sixty random brains. Rocks are floating everywhere and golden stars are waiting. Press <b>Play</b>!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn" id="fly"><i data-icon="gamepad"></i> I'll fly a ship</button>
+          <p class="muted" style="margin:0;font-size:.85rem">← → to turn, ↑ to fire the engine (or the buttons under space). Dodge rocks, grab stars!</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make space harder. Watch the fleet struggle, then adapt.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="shower"><i data-icon="sparkles"></i> Meteor shower <span class="tag">more, faster</span></button>
+            <button class="btn small" data-c="gravity"><i data-icon="target"></i> Black hole <span class="tag">pulls ships</span></button>
+            <button class="btn small" data-c="heavy"><i data-icon="layers"></i> Heavy ship <span class="tag">slow to steer</span></button>
+            <button class="btn small" data-c="walls"><i data-icon="x"></i> Deadly walls <span class="tag">no wrap-around</span></button>
+            <button class="btn small" data-c="shy"><i data-icon="star"></i> Shy stars <span class="tag">they flee</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> The fleet</h3>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.25">
+            <div class="hint">Small = careful copies. Big = wild new ideas.</div>
+          </div>
+          <div class="seg" id="babies"><button data-v="1" class="on">Show the babies</button><button data-v="0">Leader only</button></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="arena"></canvas>
+          <div class="fly-pad" id="pad">
+            <button class="btn" data-k="left" aria-label="Turn left"><i data-icon="arrow-left"></i></button>
+            <button class="btn" data-k="up" aria-label="Engine"><i data-icon="arrow-up"></i></button>
+            <button class="btn" data-k="right" aria-label="Turn right"><i data-icon="arrow-right"></i></button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the best half did, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Still flying at the end (%)</span><span><i style="background:var(--lang)"></i>Stars per ship (×10)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip"><i data-icon="step"></i> Next round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-round">1</div></div>
+            <div class="stat"><div class="k">Flying now</div><div class="v" id="st-alive">60</div></div>
+            <div class="stat"><div class="k">Leader's stars</div><div class="v" id="st-stars">0</div></div>
+            <div class="stat"><div class="k">Best half</div><div class="v" id="st-top">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the leading ship's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion ship from each round. Tap to watch it fly in today's space.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Radar all around</h3><p>Each ship sends out 8 radar beams. A beam glows when a rock is close in that direction. It also feels the nearest rock's movement and where its star is.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>Those numbers go into a small brain that decides two things: turn left or right, and fire the engine or not.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Best pilots win</h3><p>Flying longer and grabbing stars both score points. The best ships become parents of the next round.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Copy with changes</h3><p>Babies get their parents' brains with small random changes. Some changes help. Those babies win next time.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Change space</h3><p>Turn on a challenge. Old tricks stop working, scores drop, and the fleet has to find new tricks.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In round 1 the ships flew randomly and bumped into rocks. Nobody told them how to dodge.</li>
+        <li>Round after round, the ships that happened to steer away from rocks and toward stars had more babies, so the whole fleet got better.</li>
+        <li>Challenges changed the rules. Scores fell, then climbed again as the fleet found new tricks. That is <b>adapting</b>.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: a population of 60 small feed-forward networks <code>[16 → 12 → 2]</code> (tanh) improved by a genetic algorithm, with no gradients and no labelled data.</p>
+        <ul>
+          <li><b>Inputs:</b> 8 radar rays at 45° steps around the heading (1 − distance/150 to the nearest rock, black hole or wall), the nearest rock's offset and relative velocity in the ship's frame (ahead/side), the sine and cosine of the angle to the ship's star, the star distance, and the ship's speed.</li>
+          <li><b>Outputs:</b> turn rate and thrust (fire if &gt; 0). Asteroids-style inertia with light drag; the arena wraps around unless "Deadly walls" is on.</li>
+          <li><b>Fitness:</b> seconds survived + 8 × stars, summed over two different asteroid fields per round (one shown, one scored in the background) to reduce luck.</li>
+          <li><b>Genetic algorithm:</b> the top 8% are kept unchanged (elitism); the rest are children of the top quarter (30% uniform crossover) with Gaussian mutation whose size is spread from small to large.</li>
+          <li><b>Measured in Node</b> (best half, one run each, challenge switched on at round 31): no challenge, survival 63% in round 1 → about 85–90% and stars 0.1 → 3–5 by round 40–50. Black hole: survival 69% → 30% → 68%. Meteor shower, heavy ship and shy stars only partly recover (e.g. shy stars: 3.3 → 1.2 → 2.0 stars after 50 rounds), because they make the game genuinely harder.</li>
+          <li>Each round uses new random asteroid fields, so a brain must learn a <span class="term">general</span> dodging rule, not memorise one map.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-space-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-space.js"></script>
+</body>
+</html>

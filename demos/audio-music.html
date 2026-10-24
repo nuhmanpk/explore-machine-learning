@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tune Finisher · Explore ML</title>
+  <meta name="description" content="Teach Robo some songs, then play a few notes and watch it guess what comes next, note by note.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .view-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px 4px; display: flex; align-items: center; gap: 6px; }
+    .piano { position: relative; height: 150px; user-select: none; -webkit-user-select: none; touch-action: none; margin-top: 12px; }
+    .piano .key { position: absolute; top: 0; border: 2px solid var(--ink); border-radius: 0 0 10px 10px; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; font-weight: 800; font-size: 0.72rem; }
+    .piano .white { background: #fff; color: #8a8cab; height: 100%; z-index: 1; }
+    .piano .black { background: #1f2140; color: #c5c3e6; height: 60%; z-index: 2; border-radius: 0 0 7px 7px; font-size: 0.6rem; }
+    .piano .key.down.white { background: color-mix(in srgb, var(--accent) 35%, #fff); }
+    .piano .key.down.black { background: var(--accent); }
+    .piano .key.robo.white { background: color-mix(in srgb, var(--accent) 60%, #fff); }
+    .piano .key.robo.black { background: var(--accent); }
+    .piano .kb { position: absolute; top: 6px; left: 0; right: 0; text-align: center; font-family: var(--font-mono); font-size: 0.62rem; opacity: 0.6; }
+    @media (max-width: 600px) { .piano .kb { display: none; } .piano { height: 120px; } }
+    .cands { display: grid; gap: 6px; }
+    .cand { display: grid; grid-template-columns: 56px 1fr 44px; gap: 8px; align-items: center; font-weight: 800; font-size: 0.88rem; }
+    .cand .bar { height: 16px; background: var(--bg-2); border-radius: 999px; overflow: hidden; border: 2px solid var(--line); }
+    .cand .bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.25s; }
+    .cand.pick { color: var(--accent); }
+    .cand .pct { font-family: var(--font-mono); font-size: 0.8rem; text-align: right; }
+    .songs { display: grid; gap: 6px; }
+    .song { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; border: 2px solid var(--line); font-weight: 700; font-size: 0.9rem; }
+    .song.learned { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); background: var(--accent-soft); }
+    .song.now { border-color: var(--accent); }
+    .song .tick { color: var(--accent); display: grid; width: 20px; }
+    .song .grow { flex: 1; }
+    .song button { border: 0; background: transparent; cursor: pointer; color: var(--ink-2); display: grid; padding: 4px; border-radius: 8px; }
+    .song button:hover { background: var(--bg-2); }
+    .twin { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .twin { grid-template-columns: 1fr; } }
+    .inside-text { font-weight: 700; font-size: 0.92rem; margin: 0; }
+    .s-emoji { color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="audio" data-demo="audio-music">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="music"></i> Sound &amp; music</span>
+      <h1>The <span class="em">Tune Finisher</span></h1>
+      <p class="hero-sub">Music is a string of notes. Robo learns which note likes to come after which, then makes up new tunes, one note at a time.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I don't know any songs yet! Press <b>Teach me a song</b>, and I'll listen and remember which notes follow which.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="overlay-msg" id="overlay"></div>
+        <p class="view-label"><i data-icon="music"></i> Piano roll <span class="muted" style="text-transform:none;letter-spacing:0;margin-left:auto"><span style="color:var(--ink)">●</span> you · <span style="color:var(--accent)">●</span> Robo · <span style="color:var(--muted)">●</span> songs</span></p>
+        <canvas id="roll"></canvas>
+        <div class="piano" id="piano"></div>
+        <div class="twin" style="margin-top:14px">
+          <div>
+            <p class="view-label"><i data-icon="network"></i> Robo's note map <span class="muted" style="text-transform:none;letter-spacing:0;margin-left:auto">thick line = heard a lot</span></p>
+            <canvas id="graph"></canvas>
+          </div>
+          <div>
+            <p class="view-label"><i data-icon="dice"></i> Next note: Robo's bets</p>
+            <div class="cands" id="cands"><p class="muted" style="margin:0">Bets appear when Robo composes.</p></div>
+          </div>
+        </div>
+        <p class="view-label" style="margin-top:14px"><i data-icon="flag"></i> Checkpoints: tap to hear what Robo composed back then</p>
+        <div class="checkpoints" id="ckpts"><p class="muted" style="margin:0;font-size:.9rem">A checkpoint is saved after each song Robo learns.</p></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="book"></i> Robo's song book</h3>
+          <div class="songs" id="songs"></div>
+          <div class="btn-row">
+            <button class="btn primary" id="teach"><i data-icon="play"></i> Teach me a song</button>
+            <button class="btn small" id="teach-all"><i data-icon="step"></i> All of them</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="wand"></i> Robo, finish my tune!</h3>
+          <p class="muted" style="margin:0;font-size:.9rem">Play a few notes on the piano (or keys <kbd>A</kbd>–<kbd>;</kbd>), then:</p>
+          <div class="btn-row">
+            <button class="btn primary" id="compose"><i data-icon="sparkles"></i> Continue it</button>
+            <button class="btn small" id="learn-mine"><i data-icon="plus"></i> Learn my tune</button>
+            <button class="btn small ghost" id="clear"><i data-icon="eraser"></i> Clear</button>
+          </div>
+          <div class="field">
+            <label for="order">Notes Robo remembers <span class="val" data-for="order"></span></label>
+            <input type="range" id="order" min="1" max="3" step="1" value="2">
+            <div class="hint">1 = only the last note. 3 = the last three (more like the real songs).</div>
+          </div>
+          <div class="field">
+            <label for="temp">Silliness <span class="val" data-for="temp"></span></label>
+            <input type="range" id="temp" min="0.2" max="2" step="0.1" value="1">
+            <div class="hint">Low = safe, usual notes. High = surprising notes.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Songs learned</div><div class="v" id="st-songs">0</div></div>
+            <div class="stat"><div class="k">Notes heard</div><div class="v" id="st-notes">0</div></div>
+            <div class="stat"><div class="k">Patterns known</div><div class="v" id="st-pat">0</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <p class="inside-text" id="inside">When Robo learns or composes, I'll show you exactly what it's thinking.</p>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="music"></i></div><h3>Notes are words</h3><p>To Robo, a song is a list of notes, like a sentence is a list of words.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="book"></i></div><h3>Listen and count</h3><p>For every note, Robo writes down what came right before it. The lines on the note map grow thicker.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="dice"></i></div><h3>Bet on the next note</h3><p>To continue a tune, Robo looks at the last notes and bets on what usually comes next.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>One note at a time</h3><p>It picks a note, adds it to the tune, then bets again. Note by note, a new song appears!</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Before any songs, Robo had nothing to go on, so it could only play random notes.</li>
+        <li>Each song it heard added more "this note comes after that note" counts. You saw the note map fill up.</li>
+        <li>The checkpoints show its tunes getting more song-like as it learned more songs.</li>
+        <li>Remembering more notes makes it sound more like the real songs. Remember too many and it just copies them!</li>
+        <li>Big music AIs play this same guess-the-next-piece game, with far more music and much bigger brains.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a <span class="term">Markov chain</span> / <span class="term">n-gram language model</span> over musical tokens, trained by counting.</p>
+        <ul>
+          <li><b>Tokens:</b> each note is a token <code>pitch:duration</code> (e.g. <code>E4:1</code>, <code>G4:2</code>). The songs are traditional, public-domain melodies, simplified.</li>
+          <li><b>Model:</b> for context length k (the “notes Robo remembers” slider), it stores counts <code>c(context → next)</code>. Prediction is <code>P(next | last k) = c / Σc</code>, with <span class="term">backoff</span> to shorter contexts when a context was never seen.</li>
+          <li><b>Sampling:</b> probabilities are reshaped with a <span class="term">temperature</span> T: <code>p<sub>i</sub> ∝ p<sub>i</sub><sup>1/T</sup></code>. Low T → greedy and repetitive; high T → random.</li>
+          <li><b>Memorisation vs generalisation:</b> with k = 3 most contexts appear in only one song, so the model reproduces that song verbatim. With k = 1 it mixes songs freely but loses structure.</li>
+        </ul>
+        <p><b>Real music models</b> use the same next-token idea at scale. <a href="https://arxiv.org/abs/2306.05284" target="_blank" rel="noopener">MusicGen</a> (Meta) and <a href="https://arxiv.org/abs/2301.11325" target="_blank" rel="noopener">MusicLM</a> (Google) compress raw audio into discrete tokens with a neural audio codec (EnCodec / SoundStream), then a <span class="term">transformer</span> predicts the next audio token, conditioned on a text description. Instead of counting, a transformer learns smooth, long-range patterns (rhythm, harmony, repetition), so it generalises far beyond the songs it heard.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/audio-music.js"></script>
+</body>
+</html>

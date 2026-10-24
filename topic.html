@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Topic · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .topic-hero { padding: 40px 0 10px; }
+    .big-emoji { width: 96px; height: 96px; border-radius: 28px; display: grid; place-items: center; font-size: 52px; color: var(--accent); background: var(--accent-soft); border: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+    .analogy { display: flex; gap: 12px; align-items: center; background: var(--accent-soft); padding: 14px 18px; border-radius: 18px; font-weight: 800; font-size: 1.05rem; }
+    .chapter-no { font-family: var(--font-head); font-weight: 700; color: var(--accent); font-size: 1.05rem; margin-top: 14px; }
+    .intro-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 22px; align-items: center; }
+    .intro-grid p { font-size: 1.1rem; color: var(--ink-2); }
+    .rings { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1 / 1; margin: 0 auto; }
+    .ring { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); border-radius: 50%; display: flex; justify-content: center; border: 3px solid; text-align: center; padding-top: 10px; }
+    .ring b { font-family: var(--font-head); font-size: .95rem; line-height: 1.1; }
+    .ring small { display: block; font-weight: 700; font-size: .72rem; opacity: .85; }
+    .kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 8px; }
+    .kind { --k: var(--accent); background: var(--card); border: 3px solid var(--line); border-top: 8px solid var(--k); border-radius: 20px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+    .kind h3 { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--k); }
+    .kind .who { font-weight: 800; }
+    .kind p { margin: 0; color: var(--ink-2); }
+    .kind .ex { font-size: .9rem; background: var(--bg-2); border-radius: 12px; padding: 8px 10px; font-weight: 600; }
+    .kind a { color: var(--k); font-weight: 800; text-decoration: none; }
+    .compare-wrap { overflow-x: auto; margin-top: 16px; }
+    table.compare { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--card); border: 3px solid var(--line); border-radius: 18px; overflow: hidden; min-width: 560px; }
+    table.compare th, table.compare td { padding: 10px 14px; text-align: left; border-bottom: 2px solid var(--line); font-weight: 600; vertical-align: top; }
+    table.compare th { background: var(--bg-2); font-family: var(--font-head); }
+    table.compare td:first-child { font-weight: 800; color: var(--ink); width: 26%; }
+    table.compare tr:last-child td { border-bottom: 0; }
+    @media (max-width: 760px) { .intro-grid { grid-template-columns: 1fr; } }
+    .words { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .word { background: var(--card); border: 3px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+    .word b { font-family: var(--font-head); font-size: 1.1rem; color: var(--accent); display: block; }
+    .word span { color: var(--ink-2); font-weight: 600; }
+    .path { display: grid; gap: 14px; position: relative; }
+    .path-item {
+      display: grid; grid-template-columns: 64px 1fr auto; gap: 16px; align-items: center; text-decoration: none;
+      background: var(--card); border: 3px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-sm);
+      transition: transform .15s, border-color .15s;
+    }
+    .path-item:hover { transform: translateX(4px); border-color: var(--accent); }
+    .path-item .num { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 30px; position: relative; }
+    .path-item .num b { position: absolute; top: -10px; left: -10px; background: var(--accent); color: #fff; font-family: var(--font-head); font-size: .8rem; padding: 2px 8px; border-radius: 999px; border: 3px solid var(--card); }
+    .path-item h3 { margin: 0 0 2px; }
+    .path-item p { margin: 0; color: var(--ink-2); }
+    .path-item .go { color: var(--accent); font-size: 1.4rem; }
+    @media (max-width: 560px) { .path-item { grid-template-columns: 48px 1fr; } .path-item .num { width: 48px; height: 48px; font-size: 22px; } .path-item .go { display: none; } }
+  </style>
+</head>
+<body data-page="topic">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="topic-hero hero-split">
+      <div>
+        <div class="big-emoji" id="t-emoji"></div>
+        <div class="chapter-no" id="t-no"></div>
+        <h1 id="t-name"></h1>
+        <p class="hero-sub" id="t-tag"></p>
+        <div class="analogy"><span style="font-size:1.6rem;color:var(--accent);display:grid"><i data-icon="bulb"></i></span><span id="t-analogy"></span></div>
+      </div>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say"></p>
+      </div>
+    </section>
+
+    <div id="intro" class="hidden"></div>
+
+    <h2 class="section-title"><i data-icon="book"></i> Words to know</h2>
+    <div class="words" id="words"></div>
+
+    <h2 class="section-title"><i data-icon="gamepad"></i> Lessons, in order</h2>
+    <div class="path" id="demo-tiles"></div>
+
+    <div id="also" class="hidden">
+      <h2 class="section-title"><i data-icon="trophy"></i> More learning games from earlier chapters</h2>
+      <div class="path" id="also-tiles"></div>
+    </div>
+
+    <div id="chapter-nav"></div>
+  </main>
+
+  <script src="js/catalog.js"></script>
+  <script>
+    // Set the accent before common.js draws the mascot.
+    const t = findTopic(new URLSearchParams(location.search).get("t")) || CATALOG[0];
+    document.body.dataset.topic = t.id;
+    document.title = `${t.name} · Explore ML`;
+  </script>
+  <script src="js/common.js"></script>
+  <script>
+    const ti = CATALOG.indexOf(t);
+    if (t.intro) {
+      const I = t.intro, host = document.getElementById("intro");
+      host.classList.remove("hidden");
+      const R = I.rings.length;
+      const rings = I.rings.map((r, i) => {
+        const size = 100 - i * (62 / (R - 1));
+        return `<div class="ring" style="width:${size}%;aspect-ratio:1;background:color-mix(in srgb, ${r.color} ${10 + i * 6}%, var(--card));border-color:${r.color};color:${r.color}"><div><b>${r.name}</b><small>${r.note}</small></div></div>`;
+      }).join("");
+      host.innerHTML = `<h2 class="section-title"><i data-icon="bulb"></i> ${I.title}</h2>
+        <div class="intro-grid"><div><p>${I.text}</p></div><div class="rings">${rings}</div></div>
+        <h2 class="section-title"><i data-icon="layers"></i> Three ways to make a machine smart</h2>
+        <div class="kinds">${I.kinds.map((k) => `<div class="kind" style="--k:${k.color}"><h3>${ML.icon(k.icon)} ${k.name}</h3><div class="who">${k.who}</div><p>${k.how}</p><div class="ex">${k.example}</div><a href="demos/${k.link}.html">${ML.icon("arrow-right")} See it in a lesson</a></div>`).join("")}</div>
+        <div class="compare-wrap"><table class="compare"><thead><tr>${I.compare.head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${I.compare.rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    }
+    document.getElementById("t-emoji").innerHTML = ML.icon(t.icon);
+    document.getElementById("t-no").textContent = ti === 0 ? "Start here" : `Chapter ${ti} of ${CATALOG.length - 1}`;
+    document.getElementById("words").innerHTML = (t.words || []).map(([w, d]) => `<div class="word"><b>${w}</b><span>${d}</span></div>`).join("");
+    document.getElementById("t-name").textContent = t.name;
+    document.getElementById("t-tag").textContent = t.tagline;
+    document.getElementById("t-analogy").textContent = t.analogy;
+    document.getElementById("say").textContent = t.kid;
+    document.getElementById("demo-tiles").innerHTML = t.demos.map((d, i) => `
+      <a class="path-item" href="demos/${d.id}.html">
+        <div class="num"><b>${ti}.${i + 1}</b>${ML.icon(d.icon)}</div>
+        <div><h3>${d.name}</h3><p>${d.kid}</p>
+          <div class="t-meta" style="margin-top:8px"><span class="chip">${ML.icon("clock")} ${d.time}</span>${d.star ? '<span class="chip accent">Most fun</span>' : ""}</div></div>
+        <span class="go">${ML.icon("arrow-right")}</span>
+      </a>`).join("");
+    if (t.alsoPlay) {
+      document.getElementById("also").classList.remove("hidden");
+      document.getElementById("also-tiles").innerHTML = t.alsoPlay.map((id) => {
+        const f = findDemo(id);
+        return `<a class="path-item" href="demos/${id}.html">
+          <div class="num"><b>${f.chapter}.${f.index + 1}</b>${ML.icon(f.demo.icon)}</div>
+          <div><h3>${f.demo.name}</h3><p>${f.demo.kid}</p></div>
+          <span class="go">${ML.icon("arrow-right")}</span></a>`;
+      }).join("");
+    }
+    const prev = CATALOG[ti - 1], next = CATALOG[ti + 1];
+    const nav = document.getElementById("chapter-nav");
+    nav.className = "next-nav";
+    nav.innerHTML = (prev
+        ? `<a href="topic.html?t=${prev.id}"><span class="ne">${ML.icon(prev.icon)}</span><span><small>Previous chapter</small>${prev.name}</span></a>`
+        : `<a href="index.html#course"><span class="ne">${ML.icon("map")}</span><span><small>Back to</small>The course map</span></a>`) +
+      `<a class="right" href="demos/${t.demos[0].id}.html"><span><small>Start lesson ${ti}.1</small>${t.demos[0].name}</span><span class="ne">${ML.icon("play")}</span></a>`;
+  </script>
+</body>
+</html>

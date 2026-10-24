@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ants Find the Best Path · Explore ML</title>
+  <meta name="description" content="Watch an ant colony find the shortest route to food using smell trails, then throw challenges at it and watch it adapt.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .s-emoji { color: var(--accent); }
+    .sub-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 800; font-size: .92rem; margin: 14px 2px 6px; flex-wrap: wrap; }
+    .sub-h .muted { font-weight: 700; font-size: .82rem; }
+    #map { cursor: pointer; }
+    #chart { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .chart-key { display: flex; gap: 14px; flex-wrap: wrap; font-size: .8rem; font-weight: 800; color: var(--ink-2); margin: 6px 2px 0; }
+    .chart-key i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+    .stage-left { display: grid; gap: 20px; min-width: 0; }
+    .canvas-box { position: relative; }
+    #chart { max-height: 150px !important; }
+    .challenges { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .challenges .btn { justify-content: flex-start; padding: 10px 12px; font-size: .9rem; white-space: normal; text-align: left; }
+    
+    .ckpt small { display: block; color: var(--muted); font-weight: 700; }
+    .checkpoints .empty { color: var(--muted); font-weight: 700; font-size: .9rem; padding: 6px 2px; }
+    .choice-bars { display: grid; gap: 6px; }
+    .choice-bar { display: grid; grid-template-columns: 1fr 3.2em; gap: 8px; align-items: center; font-weight: 800; font-size: .86rem; }
+    .choice-bar .track { height: 14px; border-radius: 999px; background: var(--card); border: 2px solid var(--line); overflow: hidden; }
+    .choice-bar .fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width .15s; }
+    .choice-bar.picked .fill { background: var(--good); }
+    .choice-bar .num { font-family: var(--font-mono); text-align: right; }
+    .choice-lbl { font-size: .8rem; color: var(--ink-2); font-weight: 700; }
+    .decision { background: var(--card); border-radius: 12px; padding: 10px 12px; font-weight: 800; font-size: .92rem; }
+    .viewing { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); background: var(--ink); color: var(--bg); border-radius: 999px; padding: 6px 14px; font-weight: 800; font-size: .85rem; display: none; gap: 8px; align-items: center; z-index: 4; white-space: nowrap; }
+    .viewing.show { display: flex; }
+    .viewing button { border: 0; background: var(--accent); color: #fff; border-radius: 999px; padding: 3px 10px; font-weight: 800; cursor: pointer; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-ants">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="map"></i> Ant colony optimisation</span>
+      <h1>Ants find the <span class="em">best path</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">No ant knows the way. Each one just follows its nose. Press <b>Play</b> and watch the whole colony find the shortest path together!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="map"></i> Map</h3>
+          <div class="seg" id="mapsel"><button data-v="meadow" class="on">Meadow</button><button data-v="river">River</button><button data-v="new">New map</button></div>
+          <div class="hint muted" style="font-size:.82rem">Tap a path on the map to close or open it.</div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.85rem">Change the world while they learn. Can the colony adapt?</p>
+          <div class="challenges">
+            <button class="btn" id="ch-block"><i data-icon="x"></i> Block the busiest path</button>
+            <button class="btn" id="ch-food"><i data-icon="shuffle"></i> Move the food</button>
+            <button class="btn" id="ch-short"><i data-icon="sparkles"></i> Open a shortcut</button>
+            <button class="btn" id="ch-food2"><i data-icon="plus"></i> Add more food</button>
+            <button class="btn" id="ch-rain"><i data-icon="wave"></i> Rain (washes smell away)</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Tune the colony</h3>
+          <div class="field">
+            <label for="evap">How fast smells fade <span class="val" data-for="evap"></span></label>
+            <input type="range" id="evap" min="0.001" max="0.02" step="0.001" value="0.005">
+            <div class="hint">Fast fading = forget old paths quickly. Too fast = no path lasts.</div>
+          </div>
+          <div class="field">
+            <label for="cur">Curiosity <span class="val" data-for="cur"></span></label>
+            <input type="range" id="cur" min="0" max="0.4" step="0.01" value="0.05">
+            <div class="hint">How often an ant ignores the smell and explores.</div>
+          </div>
+          <div class="field">
+            <label for="ants">Number of ants <span class="val" data-for="ants"></span></label>
+            <input type="range" id="ants" min="10" max="400" step="10" value="150">
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="viewing" id="viewing"><span id="viewing-txt"></span><button id="back-live">Back to live</button></div>
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="map"></canvas>
+          <div class="sub-h"><span><i data-icon="trend"></i> How long is the colony's favourite path?</span></div>
+          <canvas id="chart"></canvas>
+          <div class="chart-key">
+            <span><i style="background:var(--accent)"></i>Favourite path</span>
+            <span><i style="background:var(--muted);opacity:.6"></i>Average ant trip</span>
+            <span><i style="background:var(--good)"></i>Best possible</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Wipe smell</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">Slow</button><button data-v="3" class="on">Normal</button><button data-v="10">Fast</button><button data-v="0">Turbo</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Trips home</div><div class="v" id="st-trips">0</div></div>
+            <div class="stat"><div class="k">Carrying food</div><div class="v" id="st-carry">0</div></div>
+            <div class="stat"><div class="k">Favourite path</div><div class="v" id="st-fav">–</div></div>
+            <div class="stat"><div class="k">Best possible</div><div class="v" id="st-best">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="choice-lbl" id="in-head">The ant with the ring is choosing which path to take…</div>
+          <div class="choice-bars" id="in-bars"></div>
+          <div class="decision" id="in-decision">Press Play.</div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the smell map saved along the way. Tap one to look back.</span></h3>
+      <div class="checkpoints" id="ckpts"><div class="empty">Smell maps get saved here as the colony learns.</div></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Wander</h3><p>Ants leave the nest and pick a path at every crossing, a bit at random. They like short paths and smelly paths.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Find food</h3><p>An ant that finds food remembers the way it came, and forgets any loops it walked.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Leave a smell</h3><p>On the way home it drops smell on every path. A short trip means more smell.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Follow and fade</h3><p>Other ants follow strong smells. Old smells fade, so the colony keeps only the paths that are still good.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>No single ant knew the way, and no ant was clever. The <b>colony</b> found the shortest path together.</li>
+        <li>Short paths get more smell, so more ants use them, so they get even more smell. Long paths fade away.</li>
+        <li>When you changed the world, the green line jumped, the old smell faded, and the ants found a new best path.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">Ant Colony Optimisation</span> (Dorigo, 1992), a swarm-intelligence method for shortest-path problems.</p>
+        <ul>
+          <li><b>Choice rule:</b> at a node an ant picks edge <code>e</code> with probability ∝ <code>τ(e)^α · (1/len(e))^β</code>, with α = β = 1.5. Pheromone τ is the shared memory; 1/len is a local "visibility" heuristic. With probability ε (Curiosity) it picks uniformly.</li>
+          <li><b>Memory:</b> each ant keeps its route as a node list and cuts out loops when it revisits a node.</li>
+          <li><b>Deposit:</b> on the way back, each edge gets <code>Δτ ∝ (L*/L)²</code>, where L is the trip length and L* the current optimum, so shorter trips leave much more smell.</li>
+          <li><b>Evaporation:</b> every tick <code>τ ← (1−ρ)·τ</code>, the "how fast smells fade" slider.</li>
+          <li><b>Max–Min Ant System:</b> τ is clamped to [0.3, 8]. Without the cap, an old trail gets so strong that a newly opened shortcut can never compete (premature convergence). The cap keeps the colony adaptable.</li>
+          <li><b>Elitism:</b> the shortest recent trip gets a small extra deposit, forgotten if the world changes.</li>
+          <li>The green "best possible" line is computed with <span class="term">Dijkstra's algorithm</span> for comparison; the ants never see it. In Node tests the favourite path reached exactly the optimum within about 1,000–1,500 ticks, and re-found it after every challenge.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-ants-core.js"></script>
+  <script src="js/game-ants.js"></script>
+</body>
+</html>
