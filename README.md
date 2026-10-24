@@ -1,8 +1,10 @@
 <div align="center">
 
-# Explore Machine Learning
+# [Explore Machine Learning](https://nuhmanpk.github.io/explore-machine-learning/)
 
 ### How do machine learning models *actually* learn?
+
+https://nuhmanpk.github.io/explore-machine-learning/
 
 A hands-on, kid-friendly course you can **watch happen** in your browser.
 Cars learn to drive, a mouse learns a maze, a rocket learns to land, and you can open up every model to see what it learned.
