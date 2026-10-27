@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Swarm of Searchers · Explore ML</title>
+  <meta name="description" content="Particle swarm optimisation on a bumpy landscape: tune inertia, memory and herd pull and watch the swarm find peaks or get trapped.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .pair { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .pair figure { margin: 0; text-align: center; font-weight: 800; font-size: .9rem; }
+    .pair canvas, .cv { width: 100%; max-width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+    .three > *, .four > * { min-width: 0; }
+    .four { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .ctl { display: grid; gap: 4px; margin-bottom: 10px; }
+    .ctl label { font-weight: 800; font-size: .9rem; display: flex; justify-content: space-between; gap: 8px; }
+    .ctl input[type=range] { width: 100%; }
+    .ctl .hint { font-size: .82rem; color: var(--muted); font-weight: 700; }
+    .note { font-weight: 700; font-size: .9rem; color: var(--muted); margin: 6px 0 0; }
+    .tbl { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .tbl th, .tbl td { text-align: left; padding: 4px 6px; border-bottom: 2px solid var(--line); font-weight: 700; }
+    .tbl td.n { font-family: var(--font-mono); }
+    input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+    button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="optim" data-demo="opt-swarm">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="target"></i> Optimisation &amp; Search</span>
+      <h1>Swarm of <span class="em">Searchers</span></h1>
+      <p class="hero-sub">A flock of little searchers hunts for the highest hill. Each one remembers its own best spot and listens to the flock.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Brighter spots are higher. Press <b>Run</b>! Each searcher is pulled to its own best spot and to the flock's best spot.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="map"></i> The landscape <span class="muted" id="iter"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="run"><i data-icon="play"></i> Run</button>
+            <button class="btn small" id="step"><i data-icon="step"></i> Step</button>
+            <button class="btn small" id="again"><i data-icon="reset"></i> New swarm</button>
+            <button class="btn ghost small" id="newl"><i data-icon="shuffle"></i> New landscape</button>
+          </div>
+        </div>
+        <canvas id="land" class="cv" aria-label="Landscape heatmap with moving particles"></canvas>
+        <label class="note" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="showtop"> Show where the true top is</label>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Swarm knobs</h3>
+          <div class="ctl"><label for="w">Inertia (keep going) <b data-for="w">0.70</b></label><input id="w" type="range" min="0" max="1" step="0.01" value="0.7" aria-label="Inertia"></div>
+          <div class="ctl"><label for="c1">Own memory pull <b data-for="c1">1.5</b></label><input id="c1" type="range" min="0" max="3" step="0.1" value="1.5" aria-label="Own memory pull"></div>
+          <div class="ctl"><label for="c2">Flock pull <b data-for="c2">1.5</b></label><input id="c2" type="range" min="0" max="3" step="0.1" value="1.5" aria-label="Flock pull"></div>
+          <div class="ctl"><label for="n">Swarm size <b data-for="n">30</b></label><input id="n" type="range" min="5" max="80" step="1" value="30" aria-label="Swarm size"></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Progress</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Best found</div><div class="v" id="sbest">0%</div></div>
+            <div class="stat"><div class="k">Spread</div><div class="v" id="sspread">0</div></div>
+            <div class="stat"><div class="k">Step</div><div class="v" id="sit">0</div></div>
+          </div>
+          <div class="chart-box" style="margin-top:8px"><canvas id="chart" class="cv" aria-label="Best height found over time"></canvas></div>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>best height found (100% = the true top)</span></div>
+          <p class="note" id="state"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-good"><span class="tick"></span><span>Good hill: find a spot that is 90% as high as the true top.</span></div>
+      <div class="chal" id="c-trap"><span class="tick"></span><span>Trapped: watch the whole swarm huddle together on a hill lower than 97% of the top.</span></div>
+      <div class="chal" id="c-top"><span class="tick"></span><span>The real top: find a spot 98% as high (bigger swarm or New landscape helps).</span></div>
+      <div class="chal" id="c-lone"><span class="tick"></span><span>Lone wolves: set Flock pull to 0 and run 60 steps. The swarm never gathers.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Each searcher knows only its own height. It remembers its own best spot and hears about the flock's best spot.</li>
+      <li>Every step it mixes three pulls: keep going (inertia), go back to my best, go to the flock's best.</li>
+      <li>With a strong flock pull the group huddles fast, often on the first decent hill. With a weak one it explores but never agrees.</li>
+      <li>The narrow tall peak is easy to miss, so a small swarm gets trapped on a lower hill. A bigger swarm usually does better.</li>
+      <li>No guarantee: it is a clever guess, not a proof.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li><b>Scatter</b> searchers at random on the map.</li>
+      <li><b>Remember</b> the highest spot each one has visited, and the highest spot the whole flock has seen.</li>
+      <li><b>Update speed</b>: <code>inertia × old speed + pull to own best + pull to flock best</code>, each pull with a random strength.</li>
+      <li><b>Move</b>, then measure the new height.</li>
+      <li><b>Repeat</b> until the flock has settled.</li>
+    </ol></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p><span class="term">Particle swarm optimisation</span> (Kennedy and Eberhart, 1995) is a population method. Update for particle <code>i</code>: <code>v ← w·v + c₁·r₁·(pbest − x) + c₂·r₂·(gbest − x)</code>, <code>x ← x + v</code>, where <code>r₁, r₂</code> are fresh uniform random numbers.</p>
+        <ul>
+          <li><code>w</code> is the <span class="term">inertia</span>; <code>c₁</code> the <span class="term">cognitive</span> coefficient (own memory); <code>c₂</code> the <span class="term">social</span> coefficient (global best). Speed here is capped, and particles stop at the walls.</li>
+          <li>Too little exploration gives <span class="term">premature convergence</span>: all particles collapse onto the same local peak. High inertia and weak social pull keep exploring but slow convergence.</li>
+          <li>The landscape is the maximum of 14 Gaussian bumps plus small ripples, with one tall narrow bump as the global optimum. It is a <span class="term">multimodal</span> function, hard for gradient methods because gradients only point to the nearest bump.</li>
+          <li>PSO needs only function values, no gradients, so it also works on non-differentiable problems, for example tuning model settings.</li>
+        </ul>
+        <p>Further reading: Kennedy and Eberhart, <i>Particle Swarm Optimization</i> (1995) · Clerc and Kennedy (2002) on stability.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/opt-swarm-core.js"></script>
+  <script src="js/opt-swarm.js"></script>
+</body>
+</html>

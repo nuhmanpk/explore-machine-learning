@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spot the Seasons · Explore ML</title>
+  <meta name="description" content="Sales rise and fall in a repeating pattern. Tell the robot how long the pattern is and watch it split the line into trend, season and left-over noise.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.plot { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.15rem; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .seg { display: inline-flex; border: 2px solid var(--line); border-radius: 999px; overflow: hidden; }
+    .seg button { font: inherit; font-weight: 800; font-size: .82rem; border: 0; background: var(--card); color: var(--ink); padding: 6px 12px; min-height: 36px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    .seg button:focus-visible, .chk input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .chk { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: .9rem; min-height: 32px; }
+    .chk input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .field input[type=range] { width: 100%; }
+    .note { margin: 8px 4px 0; font-size: .88rem; font-weight: 700; }
+    .meter { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; margin-top: 4px; }
+    .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+    @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="time" data-demo="time-season">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="clock"></i> Time Series &amp; Forecasting</span>
+      <h1>Spot the <span class="em">Seasons</span></h1>
+      <p class="hero-sub">Sales have three things mixed together: a slow climb, a pattern that repeats, and random noise. Find the repeat length and the robot will pull them apart.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Try to guess how many steps it takes before the pattern starts over. Slide <b>Pattern length</b> and watch the <b>Season fit</b> meter.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="sun"></i> One line, three ingredients</h3>
+          <div class="seg" role="group" aria-label="Which shop"><button type="button" id="m-week" aria-pressed="true">Daily sales</button><button type="button" id="m-year" aria-pressed="false">Monthly sales</button></div>
+        </div>
+        <div class="chart-box"><canvas class="plot" id="chart" role="img" aria-label="Sales split into trend, season and left-over noise"></canvas></div>
+        <p class="muted note">Top: your sales and the slow trend. Middle: the repeating pattern the robot found. Bottom: what is left over (noise).</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="per">Pattern length <span class="val" id="per-v">2</span></label>
+            <input type="range" id="per" min="2" max="30" step="1" value="2">
+            <div class="hint" id="per-hint"></div>
+          </div>
+          <div class="row" style="margin-top:10px"><b>Season fit</b><b id="fit" style="margin-left:auto">0%</b></div>
+          <div class="meter"><i id="fit-bar"></i></div>
+          <div class="btn-row" style="margin-top:8px"><button class="btn small" id="auto"><i data-icon="target"></i> Find it for me</button><label class="chk"><input type="checkbox" id="t-truth"> Show the real pattern</label></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="search"></i> Fit for every length</h3>
+          <canvas class="plot" id="scan" role="img" aria-label="Season fit for each pattern length"></canvas>
+          <p class="muted note">Tall bars mean the pattern really repeats at that length. Your choice is the dark bar.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-week"><span class="tick"></span><span>Find the weekly beat: in Daily sales, get the Season fit to 70% or more.</span></div>
+      <div class="chal" id="c-wrong"><span class="tick"></span><span>Wrong guess: pick a length where the fit drops below 10%. A wrong ruler finds nothing.</span></div>
+      <div class="chal" id="c-echo"><span class="tick"></span><span>Echo: pick double the real length. Why does it still fit well?</span></div>
+      <div class="chal" id="c-year"><span class="tick"></span><span>Switch to Monthly sales and find its yearly repeat of 12 months.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The slow trend comes from averaging exactly one full season, so the ups and downs of the season cancel out.</li>
+      <li>Take the trend away and line up the pieces. Averaging every Monday, every Tuesday and so on gives the typical shape of the season.</li>
+      <li>What is left after removing trend and season is the noise. The better your length, the smaller that left-over looks.</li>
+      <li>Wrong lengths smear the pattern together so it averages to nothing. Double the real length also fits, because the pattern repeats twice.</li>
+    
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a <span class="term">classical additive decomposition</span>, the idea behind <span class="term">STL</span>: <code>y<sub>t</sub> = trend<sub>t</sub> + season<sub>t mod p</sub> + remainder<sub>t</sub></code>.</p>
+        <ul>
+          <li>Trend: a centered moving average of length <code>p</code> (a 2×p average when p is even). Ends of the series, where the window does not fit, are held flat.</li>
+          <li>Season: for each position in the cycle, average the detrended values, then subtract their mean so the season sums to zero.</li>
+          <li><b>Season fit</b> is the <span class="term">strength of seasonality</span> <code>max(0, 1 − Var(remainder) / Var(detrended))</code>. It peaks at the true period and at its multiples. This scan is a crude cousin of the <span class="term">autocorrelation function</span> and the periodogram.</li>
+          <li>Real STL uses LOESS smoothing so the seasonal shape can change slowly over time. Multiplicative seasonality (swings that grow with the level) is handled by taking logs first.</li>
+          <li>Seasonal structure is the main reason naive forecasts fail, which the next lesson tackles.</li>
+        </ul>
+        <p>Further reading: Cleveland et al. (1990), <i>STL: A Seasonal-Trend Decomposition Procedure Based on Loess</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/time-season-core.js"></script>
+  <script src="js/time-season.js"></script>
+</body>
+</html>

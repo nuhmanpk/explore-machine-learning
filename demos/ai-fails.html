@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Where AI Fails · Explore ML</title>
+  <meta name="description" content="Four tiny AIs, trained live, go wrong in four different ways: strange new things, shortcuts, tiny nudges and made-up facts. Spot the mistakes and learn when to double-check.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .tabs-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 4px 0 14px; }
+    .score-chip { font-weight: 800; padding: 6px 14px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+    .pane { display: none; } .pane.on { display: grid; }
+    .stage-left { grid-template-columns: minmax(0, 1fr); }
+    .sub-h { font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+    .pane canvas.big { width: 100%; background: var(--canvas-bg); border-radius: 14px; touch-action: none; display: block; }
+    .chart { width: 100%; background: var(--canvas-bg); border-radius: 12px; display: block; }
+    .legend-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: .82rem; font-weight: 700; color: var(--ink-2); margin-top: 8px; }
+    .legend-row span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-row i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .readout { min-height: 3.2em; font-weight: 700; color: var(--ink-2); margin-top: 8px; }
+    .readout b { color: var(--ink); }
+    .bad-t { color: var(--bad); } .good-t { color: var(--good); }
+    .pred-q { font-weight: 800; min-height: 3.4em; }
+    .pred-res { min-height: 5.2em; font-weight: 700; font-size: .92rem; color: var(--ink-2); }
+    .row2 { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row2 .btn { flex: 1; min-width: 130px; justify-content: center; white-space: normal; }
+    .chal { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .chal li { display: flex; gap: 10px; align-items: flex-start; font-weight: 700; font-size: .92rem; color: var(--ink-2); padding: 8px 10px; border: 2px solid var(--line); border-radius: 12px; background: var(--bg-2); }
+    .chal li .ck { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; background: var(--card); }
+    .chal li .ck svg { width: 14px; height: 14px; opacity: 0; }
+    .chal li.done { border-color: var(--good); color: var(--ink); }
+    .chal li.done .ck { background: var(--good); border-color: var(--good); color: #fff; }
+    .chal li.done .ck svg { opacity: 1; }
+    .inside-box { min-height: 150px; display: grid; gap: 6px; font-weight: 600; font-size: .92rem; color: var(--ink-2); }
+    .inside-box b { color: var(--ink); }
+    .tiles2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tile3 { background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+    .tile3 .k { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); height: 2.4em; overflow: hidden; }
+    .tile3 .v { font-family: var(--font-head); font-size: 1.6rem; font-weight: 600; }
+    .words { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-end; font-family: var(--font-head); font-size: 1.15rem; font-weight: 600; margin-top: 6px; }
+    .words .w { display: inline-flex; flex-direction: column; align-items: center; padding: 4px 10px; border-radius: 10px; background: var(--bg-2); border: 2px solid var(--line); }
+    .words .w small { font-family: var(--font-body); font-size: .68rem; font-weight: 800; color: var(--muted); }
+    .words .w.gen { background: color-mix(in srgb, var(--warn) 22%, var(--card)); }
+    .words .w.prompt { background: transparent; border-color: transparent; padding: 4px 2px; color: var(--ink-2); }
+    .book { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; font-size: .84rem; font-weight: 700; color: var(--ink-2); max-height: 170px; overflow-y: auto; }
+    .book span { opacity: .3; transition: opacity .2s; } .book span.read { opacity: 1; }
+    .txt-in { font: inherit; font-weight: 700; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); min-width: 0; flex: 1; }
+    .habits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .habit { border: 2px solid var(--line); border-radius: 14px; padding: 12px; background: var(--bg-2); display: grid; gap: 4px; font-weight: 600; font-size: .9rem; color: var(--ink-2); }
+    .habit h4 { margin: 0; display: flex; gap: 8px; align-items: center; color: var(--ink); }
+    .habit.done { border-color: var(--good); background: color-mix(in srgb, var(--good) 10%, var(--card)); }
+    .robo-say .bubble { flex: 1; min-width: 0; height: 112px; min-height: 0; overflow-y: auto; }
+    @media (max-width: 700px) { .robo-say .bubble { height: 168px; } }
+    .inside-box { height: 190px; overflow-y: auto; }
+  </style>
+</head>
+<body data-page="demo" data-topic="ai" data-demo="ai-fails">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="question"></i> Artificial Intelligence · Trust</span>
+      <h1>Where <span class="em">AI</span> fails</h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">AI can be right a lot and still be <b>confidently wrong</b>. Here are four tiny AIs. Train each one, guess whether it will get things right, then find out!</p>
+      </div>
+    </section>
+
+    <div class="tabs-row">
+      <div class="seg" id="tabs">
+        <button data-s="0" class="on">1 · Strange land</button><button data-s="1">2 · Shortcut</button><button data-s="2">3 · Tiny nudge</button><button data-s="3">4 · Made-up facts</button>
+      </div>
+      <span class="score-chip" id="score">Your guesses: 0 of 0 right</span>
+    </div>
+
+    <div id="panes"></div>
+
+    <h2 class="section-title"><i data-icon="check"></i> When should I trust it?</h2>
+    <div class="card">
+      <p class="muted" style="margin:0 0 12px">Each habit lights up when you finish a challenge in that stage.</p>
+      <div class="habits" id="habits">
+        <div class="habit" id="h0"><h4><i data-icon="map"></i> Is this like its practice?</h4>Ask: has the AI seen things like this before? Far from home, it is just guessing, however sure it sounds.</div>
+        <div class="habit" id="h1"><h4><i data-icon="search"></i> What is it really looking at?</h4>Check it works when the background or the extra clues change. It may have found a shortcut.</div>
+        <div class="habit" id="h2"><h4><i data-icon="wand"></i> Does it survive a wiggle?</h4>Try small changes. If a tiny nudge flips the answer, do not lean on it for big decisions.</div>
+        <div class="habit" id="h3"><h4><i data-icon="book"></i> Can I double-check it?</h4>Fluent does not mean true. Look facts up in a real source before you share them.</div>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="book"></i></div><h3>Learn from examples</h3><p>Each AI only knows the examples it was shown. Nothing else.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Score well on the test</h3><p>A test made of the same kind of examples says "great!". That is the easy test.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Meet something different</h3><p>A new kind of input, a changed background, a tiny nudge, or a question about something unread.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Always an answer</h3><p>The AI has to say something. It has no built-in "I don't know", so it sounds just as sure.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="check"></i></div><h3>Check, then trust</h3><p>Test the strange cases, look for shortcuts, and ask a person or a book to double-check.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>Every AI scored <b>high on its normal test</b> and still failed once the situation changed. A high score only tells you about the kind of examples it was tested on.</li>
+        <li>Far from its practice, the first AI stayed <b>very sure</b>. Being sure is not the same as being right.</li>
+        <li>The second AI found a <b>shortcut</b> (snow) instead of the real clue (the shape), so it fell apart when the snow moved.</li>
+        <li>A <b>tiny, carefully aimed nudge</b> flipped the third AI's answer, but a random nudge of the same size did not.</li>
+        <li>The fourth AI wrote a smooth sentence with a <b>made-up fact</b>. Always double-check.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>All four models are small and trained live in your browser: two <span class="term">logistic regressions</span> on 2 and 64 features (full-batch gradient descent), a third on bar pictures, and a word-level <span class="term">trigram model with back-off to bigram</span>. They are transparent stand-ins for failure modes seen in real systems, not claims about any specific product.</p>
+        <ul>
+          <li><b>Distribution shift / out-of-distribution inputs:</b> the linear model is trained on animals clustered around two points. Test accuracy on the same distribution is about 100%. Outside it, the output depends only on which side of the line a point falls, and confidence grows with distance from the boundary, so far-away points get near-100% confidence. This is a <span class="term">calibration</span> failure: softmax and sigmoid outputs are not honest uncertainty about novel inputs.</li>
+          <li><b>Shortcut learning / spurious correlation:</b> in training, a 4-pixel "snow" patch perfectly predicts the label while the real shape is noisy. The model leans on the patch: about 100% accuracy when the cue matches, about 0% when it is flipped (seeds 1 to 3). Training with the cue randomised gives about 95% in both cases. Known real examples include classifiers using backgrounds or watermarks.</li>
+          <li><b>Adversarial examples:</b> the nudge is the fast gradient sign method: each pixel moves by epsilon in the direction of the sign of the weight that lowers the current class. In 64 dimensions many tiny changes add up (the margin shrinks by epsilon times the sum of absolute weights). Median flip size is about 0.07 of the pixel range, and at epsilon 0.1 about 85% of pictures flip, against about 0 to 4% for random signs of the same size.</li>
+          <li><b>Hallucination:</b> a language model is trained to produce a plausible next token, not a true one. Here, for an unseen country, back-off to the previous word's statistics produces a fluent, wrong city. Probabilities are shown honestly (about 13% for the first word) but the output sentence carries no marker of that uncertainty.</li>
+          <li><b>Mitigation:</b> test on shifted and adversarial data, not just held-out data from the same distribution; use uncertainty and out-of-distribution detection (a novelty alarm like the one in stage 1), calibration, data augmentation that breaks shortcuts, retrieval or citation checks for facts, and human review for high-stakes decisions.</li>
+          <li>Further reading: <i>Shortcut Learning in Deep Neural Networks</i> (Geirhos et al.), <i>Explaining and Harnessing Adversarial Examples</i> (Goodfellow et al.), <i>On Calibration of Modern Neural Networks</i> (Guo et al.).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ai-fails-core.js"></script>
+  <script src="js/ai-fails.js"></script>
+</body>
+</html>

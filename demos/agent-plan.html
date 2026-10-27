@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plan Before You Go · Explore ML</title>
+  <meta name="description" content="Compare an agent that grabs the cheapest next step with one that plans first, and see what happens when a step fails.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    @media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cp-head h3 { margin: 0; }
+    .toy { font-size: .8rem; font-weight: 800; color: var(--muted); background: var(--bg-2); border: 2px dashed var(--line); border-radius: 10px; padding: 4px 8px; margin: 8px 0 0; }
+    .opt { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 10px; min-height: 34px; cursor: pointer; }
+    .opt:focus-visible, .sel:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .opt.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sel { font: inherit; font-weight: 700; padding: 6px 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); max-width: 100%; }
+    .txt { width: 100%; font: inherit; font-weight: 700; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+    .mono { font-family: var(--font-mono); }
+    .pill { display: inline-block; font-family: var(--font-mono); font-weight: 700; font-size: .82rem; background: var(--bg-2); border: 2px solid var(--line); border-radius: 8px; padding: 1px 6px; overflow-wrap: anywhere; }
+    .pill.bad { border-color: var(--bad); color: var(--bad); } .pill.good { border-color: var(--good); color: var(--good); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+    .cols { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
+    .col { border: 2px solid var(--line); border-radius: 14px; padding: 8px; background: var(--card); min-width: 0; }
+    .col h4 { margin: 0 0 6px; display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; font-family: var(--font-head); }
+    .badge { font-size: .76rem; font-weight: 800; border-radius: 999px; padding: 2px 10px; background: var(--bg-2); border: 2px solid var(--line); }
+    .badge.done { background: var(--good); border-color: var(--good); color: #fff; } .badge.stuck { background: var(--bad); border-color: var(--bad); color: #fff; } .badge.replan { background: var(--warn); border-color: var(--warn); color: #000; }
+    .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: .86rem; font-weight: 700; min-height: 60px; }
+    .log li { padding: 3px 8px; border-radius: 8px; background: var(--bg-2); } .log li.fail { background: color-mix(in srgb, var(--bad) 18%, var(--card)); } .log li.stuck { background: var(--bad); color: #fff; } .log li.done { background: var(--good); color: #fff; } .log li.replan { background: color-mix(in srgb, var(--warn) 30%, var(--card)); }
+    .planline { font-size: .8rem; font-weight: 700; color: var(--muted); margin: 0 0 6px; overflow-wrap: anywhere; }
+    .planline b { color: var(--ink); } .planline s { opacity: .6; }
+    .ttl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="agents" data-demo="agent-plan">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="robot"></i> Agents &amp; Tools</span>
+      <h1>Plan Before <span class="em">You Go</span></h1>
+      <p class="hero-sub">Taking the cheapest next step feels smart, until you hit a dead end. Watch a greedy robot race a planning robot, then break a step.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Press <b>Step both</b>. The greedy robot grabs the cheapest next step. The planner searches first. These robots are plain code, not a language model.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="map"></i> <span id="tname"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="step"><i data-icon="step"></i> Step both</button>
+            <button class="btn small" id="run"><i data-icon="play"></i> Run both</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Restart</button>
+          </div>
+        </div>
+        <div class="ttl" id="tasks" role="group" aria-label="Pick a job"></div>
+        <div class="cols">
+          <div class="col"><h4><span><i data-icon="zap"></i> Greedy</span><span class="badge" id="b-g">ready</span></h4><ol class="log" id="l-g" aria-live="polite"></ol></div>
+          <div class="col"><h4><span><i data-icon="map"></i> Planner</span><span class="badge" id="b-p">ready</span></h4><p class="planline" id="plan"></p><ol class="log" id="l-p" aria-live="polite"></ol></div>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Cost so far</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Greedy</div><div class="v" id="c-g">0</div></div>
+            <div class="stat"><div class="k">Planner</div><div class="v" id="c-p">0</div></div>
+            <div class="stat"><div class="k">Best possible</div><div class="v" id="c-b" style="color:var(--good)">0</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Make a step fail</h3>
+          <select class="sel" id="brk" aria-label="Step to break"></select>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn small" id="break"><i data-icon="bug"></i> Break it</button>
+            <button class="btn small" id="breaknext"><i data-icon="bug"></i> Break planner's next step</button>
+          </div>
+          <p class="muted" id="broken" style="margin:8px 0;font-weight:700;font-size:.88rem"></p>
+          <button class="btn primary small" id="replan"><i data-icon="repeat"></i> Re-plan</button>
+          <label style="display:block;margin-top:8px;font-weight:700;font-size:.9rem"><input type="checkbox" id="auto"> Re-plan automatically</label>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-trap"><span class="tick"></span><span>Watch the greedy robot get stuck (try the sandwich).</span></div>
+      <div class="chal" id="c-cheaper"><span class="tick"></span><span>Make both robots finish the parcel job and see the planner pay less.</span></div>
+      <div class="chal" id="c-break"><span class="tick"></span><span>Break a step the planner is about to use and watch it fail.</span></div>
+      <div class="chal" id="c-replan"><span class="tick"></span><span>Re-plan after a failure and finish the job.</span></div>
+      <div class="chal" id="c-both"><span class="tick"></span><span>Break a step, then finish with both robots. Compare their costs.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The greedy robot only looks at the next step, so it grabbed cheap steps that did not help, or one that used up something it needed.</li>
+      <li>The planner thinks ahead: it searches all the ways to reach the goal and picks the cheapest list of steps.</li>
+      <li>Steps depend on each other (you cannot butter bread you have not got), so the plan puts them in a working order.</li>
+      <li>When a step failed, the old plan was no use. Re-planning from where it stood found a new way.</li>
+      <li>The planning here is a plain search. A real agent may let a language model propose the plan and then check it the same way.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Each action has <span class="term">preconditions</span>, <span class="term">add effects</span>, <span class="term">delete effects</span> and a cost, as in <span class="term">STRIPS</span> planning. A state is a set of true facts.</p>
+        <ul>
+          <li><b>Greedy</b>: pick the cheapest applicable action that adds a new fact, not tried before. It never looks ahead, so it can wander or use up a resource (the bread) that has no replacement: a <span class="term">dead end</span>.</li>
+          <li><b>Planner</b>: <span class="term">uniform-cost search</span> (Dijkstra) over states finds the lowest-cost action sequence, so it is optimal for the actions it knows about. The search size is shown. State spaces grow exponentially, so real planners add <span class="term">heuristics</span> (A*).</li>
+          <li><b>Topological order</b>: from the plan we build a dependency graph (action A makes a fact action B needs) and sort it with Kahn's algorithm. Any such order is valid.</li>
+          <li><b>Failure and re-planning</b>: a failed action pays its cost and is marked unavailable; the planner searches again from the current state without it (<span class="term">replanning</span>). This is why agents re-check the world after each step.</li>
+          <li>No language model here: this is classical planning code. LLM agents often generate a plan in text, then execute and re-plan in the same way.</li>
+        </ul>
+        <p>Further reading: Russell and Norvig, <i>AI: A Modern Approach</i>, ch. 10-11 · Fikes and Nilsson, <i>STRIPS</i> (1971).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/agent-plan-core.js"></script>
+  <script src="js/agent-plan.js"></script>
+</body>
+</html>

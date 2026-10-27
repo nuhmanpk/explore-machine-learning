@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask Your Neighbours · Explore ML</title>
+  <meta name="description" content="Guess what type each dot is when only a few are labelled. Letting dots ask their neighbours beats looking at each dot alone.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #net { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    #chart { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+    .seg button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .ctl { display: grid; gap: 4px; margin: 8px 0 0; font-weight: 800; font-size: .9rem; }
+    .ctl input[type=range] { width: 100%; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+  </style>
+</head>
+<body data-page="demo" data-topic="graphs" data-demo="graph-gnn">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="network"></i> Graphs, Ranking &amp; Search</span>
+      <h1>Ask Your <span class="em">Neighbours</span></h1>
+      <p class="hero-sub">Only a few dots come with a name tag. Can a robot guess the rest by looking at who they are connected to?</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Dots of the same kind tend to be friends. Switch between the two robots and see who guesses better.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="network"></i> Who is who?</h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="train"><i data-icon="play"></i> Train from scratch</button>
+            <button class="btn ghost small" id="newg"><i data-icon="shuffle"></i> New graph</button>
+          </div>
+        </div>
+        <div class="seg" id="view" role="group" aria-label="What to show">
+          <button class="btn small" type="button" data-v="truth" aria-pressed="false">The truth</button>
+          <button class="btn small" type="button" data-v="mlp" aria-pressed="false">Robot A: looks at each dot alone</button>
+          <button class="btn small" type="button" data-v="gnn" aria-pressed="true">Robot B: asks the neighbours</button>
+        </div>
+        <div class="chart-box" style="margin-top:8px"><canvas id="net" role="img" aria-label="Graph of 45 dots in three kinds. Thick-ringed dots are the labelled ones."></canvas></div>
+        <div class="legend" style="margin-top:6px" id="legend"></div>
+        <p class="muted" style="margin:6px 4px 0; font-size:.88rem; font-weight:700">Thick ring = has a name tag. A dark cross on a dot means the robot guessed it wrong.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Right guesses on the untagged dots</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Robot A (alone)</div><div class="v" id="a-mlp">-</div></div>
+            <div class="stat"><div class="k">Robot B (graph)</div><div class="v" id="a-gnn" style="color:var(--accent)">-</div></div>
+            <div class="stat"><div class="k">Class gap</div><div class="v" id="gap">-</div></div>
+          </div>
+          <div class="ctl">
+            <label for="lab">Name tags per kind: <b data-for="lab"></b></label>
+            <input type="range" id="lab" min="1" max="4" step="1" value="2">
+            <label for="hops">Rounds of asking neighbours (hops): <b data-for="hops"></b></label>
+            <input type="range" id="hops" min="1" max="6" step="1" value="2">
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Accuracy for each number of hops</h3>
+          <div class="chart-box"><canvas id="chart" role="img" aria-label="Chart of accuracy against hops"></canvas></div>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>accuracy (0 hops = Robot A)</span><span><i style="background:var(--warn)"></i>class gap</span></div>
+          <div class="btn-row" style="margin-top:8px"><button class="btn small" id="sweep"><i data-icon="search"></i> Try every number of hops</button></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-train"><span class="tick"></span><span>Watch it learn: press "Train from scratch" and let both robots finish.</span></div>
+      <div class="chal" id="c-beat"><span class="tick"></span><span>Neighbours win: with 2 or fewer name tags per kind, get Robot B at least 10 points above Robot A.</span></div>
+      <div class="chal" id="c-sweep"><span class="tick"></span><span>Hunt for the sweet spot: try every number of hops, then set the hops slider to the best one.</span></div>
+      <div class="chal" id="c-smooth"><span class="tick"></span><span>Over-smoothing: push the hops to 6 and watch the class gap fall below 60%.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Robot A only sees each dot's own noisy numbers, so with few name tags it is often wrong.</li>
+      <li>Robot B lets every dot average its numbers with its friends' numbers. Friends are usually the same kind, so the noise cancels out.</li>
+      <li>More hops means a dot hears from friends of friends of friends. A little of this helps a lot.</li>
+      <li>Too many hops and everybody ends up averaging with almost everybody. Dots start to look alike and the kinds blur together. This is called over-smoothing.</li>
+      <li>This only works because friends tend to be alike. If links were random, asking the neighbours would not help.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">semi-supervised node classification</span> with a <span class="term">Graph Convolutional Network</span> (Kipf and Welling, 2017), written from scratch with manual backpropagation and the Adam optimiser. Each layer computes <code>H' = ReLU(Â H W + b)</code> where <code>Â = D<sup>−1</sup>(A + I)</code> is a <span class="term">mean aggregation</span> over a node and its neighbours (the paper uses a symmetric normalisation).</p>
+        <ul>
+          <li>The <span class="term">message passing</span> is the multiplication by <code>Â</code>. Stacking <code>L</code> layers gives every node a <span class="term">receptive field</span> of <code>L</code> hops.</li>
+          <li>Loss is cross-entropy on the <em>labelled nodes only</em>. The unlabelled nodes still take part through the graph structure, which is what makes it semi-supervised. Accuracy is measured on the unlabelled nodes.</li>
+          <li>Robot A is the same network with <code>Â = I</code> (a plain two-layer MLP), so the only difference is the graph.</li>
+          <li><span class="term">Homophily</span>: here 20% of same-kind pairs but 2.5% of different-kind pairs are linked. GNNs rely on this; on <span class="term">heterophilous</span> graphs they can do worse than an MLP.</li>
+          <li><span class="term">Over-smoothing</span>: repeated averaging drives node representations towards the graph's stationary distribution, so they become indistinguishable. The class gap number measures how far apart the three class averages of <code>Â<sup>L</sup>X</code> are, relative to <code>L = 0</code>. Deeper GNNs are also harder to train with so few labels, so accuracy often falls for both reasons. Residual connections, normalisation and sampling are common remedies.</li>
+          <li>Accuracy in the chart is an average over 2 random initialisations on a single 45-node graph, so small differences are noise. It is a toy, not a benchmark.</li>
+        </ul>
+        <p>Further reading: Kipf and Welling, <i>Semi-supervised classification with graph convolutional networks</i> · Li, Han and Wu, <i>Deeper insights into GCNs for semi-supervised learning</i> (2018).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/graph-gnn-core.js"></script>
+  <script src="js/graph-gnn.js"></script>
+</body>
+</html>

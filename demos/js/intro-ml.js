@@ -1,8 +1,12 @@
-// What is ML? — Robo learns a hidden rule about monsters with logistic regression,
-// one example at a time, while the look → guess → check → tweak loop lights up.
+// What is ML? — a crowd of 24 monsters. Robo learns a hidden rule with logistic regression, one tapped example at a time,
+// and after every lesson the WHOLE crowd changes its mind in a ripple. The look → guess → check → tweak loop lights up.
 (function () {
-  const W = 640, H = 340;
-  const cv = ML.setupCanvas(document.getElementById("cv"), W, H);
+  const core = window.IntroMLCore;
+  const { RULES, RULE_TEXT, makeMonster, TEST, vec, sigmoid } = core;
+  const W = 640, H = 390;
+  const COLS = 8, ROWS = 3, CW = W / COLS, CH = 100, TOP = 14, SCALE = 0.34;
+  const cvEl = document.getElementById("cv");
+  const cv = ML.setupCanvas(cvEl, W, H);
   const ctx = cv.ctx;
 
   const FEATURES = [
@@ -11,33 +15,6 @@
     { key: "spiky", name: "Spiky", icon: "star" },
     { key: "eyes", name: "Many eyes", icon: "eye" },
   ];
-  const RULES = {
-    big: (m) => m.size > 0.5,
-    blue: (m) => m.blue > 0.5,
-    spiky: (m) => m.spiky < 0.25,
-    bigblue: (m) => m.size > 0.5 && m.blue > 0.5,
-  };
-  const RULE_TEXT = {
-    big: "big monsters are friendly",
-    blue: "blue monsters are friendly",
-    spiky: "spiky monsters are grumpy",
-    bigblue: "big AND blue monsters are friendly",
-  };
-
-  const rnd = ML.seeded(7);
-  function makeMonster(r = Math.random) {
-    return {
-      size: r(),
-      blue: r(),
-      spiky: Math.floor(r() * 5) / 4, // 0, .25, .5, .75, 1 → 0–4 spikes
-      eyes: Math.floor(r() * 3) / 2, // 1–3 eyes
-      seed: Math.floor(r() * 1e6),
-    };
-  }
-  const TEST = Array.from({ length: 60 }, () => makeMonster(rnd));
-  const vec = (m) => [m.size, m.blue, m.spiky, m.eyes];
-  const sigmoid = (z) => 1 / (1 + Math.exp(-z));
-
   const state = {
     rule: "big",
     w: [0, 0, 0, 0],
@@ -46,6 +23,11 @@
     n: 0,
     history: [],
     monster: null,
+    crowd: [],
+    selected: null,
+    hover: -1,
+    dance: 0,
+    flipped: 0,
     guess: null, // probability friendly
     truth: null,
     stage: null,
@@ -57,14 +39,8 @@
   };
   const CKPT_AT = [1, 3, 10, 25, 50, 100];
 
-  const predict = (m, w = state.w, b = state.b) => sigmoid(vec(m).reduce((s, x, i) => s + x * w[i], b));
-  function testScore(w = state.w, b = state.b) {
-    if (state.rule === "me") return null;
-    const rule = RULES[state.rule];
-    let ok = 0;
-    for (const m of TEST) if ((predict(m, w, b) > 0.5) === rule(m)) ok++;
-    return Math.round((ok / TEST.length) * 100);
-  }
+  const predict = (m, w = state.w, b = state.b) => core.predict(m, w, b);
+  const testScore = (w = state.w, b = state.b) => core.testScore(state.rule, w, b);
 
   // ---------- drawing ----------
   function monsterColor(m) {
@@ -144,55 +120,119 @@
     c.restore();
   }
 
-  let pop = 1;
+  // ---------- the crowd ----------
+  const now = () => performance.now();
+  const cellPos = (i) => [(i % COLS) * CW + CW / 2, TOP + Math.floor(i / COLS) * CH + CH / 2 + 4];
+  function newCrowd() {
+    const rule = RULES[state.rule];
+    let crowd;
+    for (let tries = 0; tries < 50; tries++) {
+      crowd = Array.from({ length: COLS * ROWS }, () => makeMonster());
+      if (!rule) break;
+      const yes = crowd.filter(rule).length; // keep the crowd mixed so the rule is visible
+      if (yes >= 8 && yes <= 16) break;
+    }
+    const t = now();
+    crowd.forEach((m, i) => { m.shown = 0.5; m.target = 0.5; m.flipAt = 0; m.flash = 0; m.born = t + i * 28; m.taught = false; m.label = null; });
+    return crowd;
+  }
+  // final = count by where each guess is heading (for the number boxes); otherwise by the face on screen right now
+  const crowdRight = (final) => {
+    if (state.rule === "me") return null;
+    const rule = RULES[state.rule];
+    return state.crowd.filter((m) => { const p = final ? m.target : m.shown; return (p > 0.5) === rule(m) && Math.abs(p - 0.5) > 0.02; }).length;
+  };
+  const moodOf = (p) => (p > 0.56 ? "friendly" : p < 0.44 ? "grumpy" : null);
+  // after a lesson: every monster gets a new guess, rippling outward from the one that was tapped
+  function refreshCrowd(fromIdx) {
+    const [fx, fy] = cellPos(fromIdx), t = now();
+    let changed = 0;
+    state.crowd.forEach((m, i) => {
+      const old = moodOf(m.shown);
+      m.target = predict(m);
+      const [x, y] = cellPos(i);
+      m.flipAt = t + Math.hypot(x - fx, y - fy) * 1.6;
+      if (moodOf(m.target) !== old && moodOf(m.target)) { changed++; m.flash = m.flipAt; }
+    });
+    return changed;
+  }
+
   function draw() {
     ctx.clearRect(0, 0, W, H);
-    const m = state.monster;
-    // floor
+    const t = now();
+    // stage floor
     ctx.fillStyle = ML.cssVar("--bg-2");
-    ctx.fillRect(0, H - 60, W, 60);
-    if (!m) {
-      ctx.fillStyle = ML.cssVar("--muted");
-      ctx.font = "700 20px Nunito, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Press “Next monster” to start", W / 2, H / 2);
-      return;
-    }
-    pop = Math.min(1, pop + 0.08);
-    const mood = state.stage === "check" || state.stage === "tweak" || state.stage === "done" ? (state.truth ? "friendly" : "grumpy") : null;
-    const s = 0.6 + 0.4 * (1 - Math.pow(1 - pop, 3));
-    drawMonster(ctx, m, 210, H - 140, s, mood);
+    ctx.beginPath(); ctx.roundRect(0, TOP - 8, W, ROWS * CH + 16, 18); ctx.fill();
+    const good = ML.cssVar("--good"), bad = ML.cssVar("--bad"), acc = ML.cssVar("--accent");
+    const rule = RULES[state.rule];
+    state.crowd.forEach((m, i) => {
+      // glide the shown guess toward the target once the ripple reaches this monster
+      if (t >= m.flipAt) m.shown += (m.target - m.shown) * 0.22;
+      const [x, y] = cellPos(i);
+      const age = Math.max(0, Math.min(1, (t - m.born) / 450));
+      if (age <= 0) return;
+      const pop = age < 1 ? 1 + 0.12 * Math.sin(age * Math.PI) - (1 - age) * 0.9 : 1;
+      const dance = state.dance && t - state.dance < 3200 ? Math.abs(Math.sin((t - state.dance) / 170 + i * 0.6)) * 16 : 0;
+      const hov = state.hover === i && !state.busy ? 1.14 : 1;
+      const mood = moodOf(m.shown);
+      const conf = Math.abs(m.shown - 0.5) * 2;
+      // glow under the monster: green = friendly guess, red = grumpy guess
+      if (mood) {
+        const g = ctx.createRadialGradient(x, y, 4, x, y, 48);
+        const c = mood === "friendly" ? good : bad;
+        g.addColorStop(0, c + "55");
+        g.addColorStop(1, c + "00");
+        ctx.globalAlpha = 0.35 + 0.65 * conf;
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 48, 0, 7); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      // little burst when the monster changes its mind
+      if (m.flash && t - m.flash < 500 && t >= m.flash) {
+        const k = (t - m.flash) / 500;
+        ctx.strokeStyle = (moodOf(m.target) === "friendly" ? good : bad); ctx.lineWidth = 4 * (1 - k); ctx.globalAlpha = 1 - k;
+        ctx.beginPath(); ctx.arc(x, y, 18 + k * 34, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      ctx.save();
+      ctx.translate(0, -dance);
+      drawMonster(ctx, m, x, y, SCALE * pop * hov, mood);
+      ctx.restore();
+      if (m.taught) { // a star for every monster Robo was shown, coloured by the answer
+        ctx.font = "900 15px Nunito, sans-serif"; ctx.textAlign = "center";
+        ctx.fillStyle = m.label ? good : bad; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+        ctx.strokeText("★", x + 24, y - 30); ctx.fillText("★", x + 24, y - 30);
+      }
+      if (state.selected === m) {
+        ctx.save(); ctx.setLineDash([6, 5]); ctx.lineDashOffset = -t / 60; ctx.strokeStyle = acc; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.roundRect(x - CW / 2 + 5, y - 52, CW - 10, 104, 14); ctx.stroke(); ctx.restore();
+      }
+      if (state.hover === i && !state.busy && !m.taught) {
+        ctx.fillStyle = acc; ctx.font = "800 11px Nunito, sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(state.rule === "me" ? "tap to teach" : "tap to ask", x, y + 50);
+      }
+    });
 
-    // Robo's guess bubble
-    if (state.guess !== null && state.stage !== "look") {
-      const p = state.guess;
-      const sure = Math.round(Math.max(p, 1 - p) * 100);
-      const word = p > 0.5 ? "friendly" : "grumpy";
-      const txt = state.n === 0 && Math.abs(p - 0.5) < 0.02 ? "I have no idea!\nCoin flip…" : `I think it's ${word}\n(${sure}% sure)`;
-      bubble(ctx, 380, 40, 230, 74, txt);
-      // probability bar
-      const bx = 380, by = 130, bw = 230;
-      ctx.fillStyle = ML.cssVar("--bad"); ctx.beginPath(); ctx.roundRect(bx, by, bw, 16, 8); ctx.fill();
-      ctx.fillStyle = ML.cssVar("--good"); ctx.beginPath(); ctx.roundRect(bx, by, bw * p, 16, 8); ctx.fill();
-      ctx.fillStyle = ML.cssVar("--muted"); ctx.font = "800 12px Nunito, sans-serif";
-      ctx.textAlign = "left"; ctx.fillText("FRIENDLY", bx, by + 32);
-      ctx.textAlign = "right"; ctx.fillText("GRUMPY", bx + bw, by + 32);
+    // bottom strip: how many does Robo get right?
+    const sy = TOP + ROWS * CH + 22;
+    const right = crowdRight();
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+    ctx.fillStyle = ML.cssVar("--ink");
+    ctx.font = "800 17px Nunito, sans-serif";
+    if (!state.n) ctx.fillText("I don't know anything yet. Tap a monster to teach me!", 8, sy);
+    else if (right === null) ctx.fillText(`I've seen ${state.n} example${state.n > 1 ? "s" : ""}. Faces show my guesses!`, 8, sy);
+    else ctx.fillText(`Robo gets ${right} of ${state.crowd.length} right`, 8, sy);
+    if (right !== null) {
+      const bx = 8, by = sy + 10, bw = W - 16;
+      ctx.fillStyle = ML.cssVar("--bg-2"); ctx.beginPath(); ctx.roundRect(bx, by, bw, 14, 7); ctx.fill();
+      ctx.fillStyle = right >= state.crowd.length * 0.9 ? good : acc;
+      ctx.beginPath(); ctx.roundRect(bx, by, Math.max(14, bw * right / state.crowd.length), 14, 7); ctx.fill();
     }
-    if (mood) {
-      const right = (state.guess > 0.5) === state.truth;
-      ctx.font = "700 26px Fredoka, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillStyle = right ? ML.cssVar("--good") : ML.cssVar("--bad");
-      ctx.fillText(right ? "Robo got it right!" : "Oops, Robo was wrong", 495, 210);
-      ctx.font = "700 15px Nunito, sans-serif";
-      ctx.fillStyle = ML.cssVar("--ink-2");
-      ctx.fillText(`The answer: ${state.truth ? "friendly" : "grumpy"}`, 495, 238);
+    if (state.celebrated && rule) {
+      ctx.textAlign = "right"; ctx.fillStyle = good; ctx.font = "800 15px Nunito, sans-serif";
+      ctx.fillText(`Secret rule: ${RULE_TEXT[state.rule]}`, W - 8, sy);
     }
     if (state.viewing) {
-      ctx.fillStyle = ML.cssVar("--accent");
-      ctx.font = "800 13px Nunito, sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(`Looking back at checkpoint: after ${state.viewing.n} example${state.viewing.n > 1 ? "s" : ""}`, 14, 22);
+      ctx.fillStyle = acc; ctx.font = "800 13px Nunito, sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`Brain shown on the right: after ${state.viewing.n} example${state.viewing.n > 1 ? "s" : ""}`, 8, sy + 44);
     }
   }
 
@@ -222,8 +262,8 @@
   }
   function renderStats() {
     document.getElementById("st-n").textContent = state.n;
-    const last = state.history.slice(-10);
-    document.getElementById("st-last").innerHTML = last.length ? `${last.filter(Boolean).length}<small>/${last.length}</small>` : "–";
+    const cr = crowdRight(true);
+    document.getElementById("st-last").innerHTML = !state.n || cr === null ? "–" : `${cr}<small>/${state.crowd.length}</small>`;
     const t = testScore();
     document.getElementById("st-test").innerHTML = t === null ? "<small>n/a</small>" : `${t}<small>%</small>`;
     document.getElementById("history").innerHTML = state.history.slice(-60).map((ok) => `<i class="${ok ? "ok" : "no"}"></i>`).join("");
@@ -276,71 +316,76 @@
 
   // ---------- one round of the loop ----------
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  let teacherResolve = null;
-  async function round() {
+  async function lesson(m, forced) {
     if (state.busy) return;
     state.busy = true;
     state.viewing = null;
+    state.selected = null;
+    document.getElementById("teach").classList.remove("show");
     const fast = state.auto && state.n > 6;
     const T = fast ? 0.35 : 1;
-    const m = makeMonster();
+    const idx = state.crowd.indexOf(m);
     state.monster = m;
     state.guess = predict(m);
     state.truth = null;
-    pop = 0;
     setStage("look");
     renderInside();
     renderCheckpoints();
-    await sleep(600 * T);
+    await sleep(350 * T);
 
     setStage("guess");
-    if (!fast) ML.say(state.n === 0 ? `My brain is empty, so this first guess is a <b>coin flip</b>.` : `I'm guessing <b>${state.guess > 0.5 ? "friendly" : "grumpy"}</b>. Let's see if I'm right…`);
-    await sleep(800 * T);
+    if (!fast) ML.say(state.n === 0 ? `My brain is empty, so my guess for this one is a <b>coin flip</b>.` : `For this one I guess <b>${state.guess > 0.5 ? "friendly" : "grumpy"}</b> (${Math.round(Math.max(state.guess, 1 - state.guess) * 100)}% sure)…`);
+    await sleep(450 * T);
 
-    if (state.rule === "me") {
-      state.waitingTeacher = true;
-      document.getElementById("teach").classList.add("show");
-      ML.say(`You're the teacher! Is this monster <b>friendly</b> or <b>grumpy</b>?`);
-      state.truth = await new Promise((r) => (teacherResolve = r));
-      document.getElementById("teach").classList.remove("show");
-      state.waitingTeacher = false;
-    } else {
-      state.truth = RULES[state.rule](m);
-    }
+    state.truth = forced !== undefined ? forced : RULES[state.rule](m);
+    m.taught = true; m.label = state.truth;
     setStage("check");
     const right = (state.guess > 0.5) === state.truth;
     state.history.push(right);
-    if (!fast) ML.say(right ? `Yes! I was right.` : `Oops! It was <b>${state.truth ? "friendly" : "grumpy"}</b>. I'll fix my brain a little.`);
-    await sleep(800 * T);
+    if (!fast) ML.say(right ? `Yes! I was right.` : `Oops! It was <b>${state.truth ? "friendly" : "grumpy"}</b>. Time to fix my brain.`);
+    await sleep(550 * T);
 
     setStage("tweak");
     // one step of gradient descent on cross-entropy
-    const err = state.guess - (state.truth ? 1 : 0);
-    const x = vec(m);
-    for (let i = 0; i < 4; i++) state.w[i] -= state.lr * err * x[i];
-    state.b -= state.lr * err;
+    state.b = core.sgdStep(state.w, state.b, m, state.guess, state.truth, state.lr);
     state.n++;
+    const changed = refreshCrowd(idx);
     renderWeights();
     renderInside();
-    renderStats();
     addCheckpoint();
     if (!fast) {
       const big = FEATURES.map((f, i) => [f.name, state.w[i]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
-      if (state.n >= 3) ML.say(`I nudged my numbers. So far I've noticed <b>${big[0].toLowerCase()}</b> matters most (${big[1] > 0 ? "friendlier" : "grumpier"}).`);
+      ML.say(changed > 0 ? `Look at the crowd! After that <b>one</b> example, <b>${changed}</b> monster${changed > 1 ? "s" : ""} changed their face. I haven't seen them, but my brain changed, so my guesses changed too. ${state.n >= 3 ? `Now I think <b>${big[0].toLowerCase()}</b> matters most.` : ""}` : `My brain moved a little, but no faces changed yet.`);
     }
-    await sleep(500 * T);
+    await sleep(700 * T);
+    renderStats();
     setStage("done");
     state.busy = false;
 
     const t = testScore();
     if (t !== null && t >= (state.rule === "bigblue" ? 88 : 95) && !state.celebrated) {
       state.celebrated = true;
+      state.dance = now();
       stopAuto();
       ML.confetti();
-      ML.say(`I scored <b>${t}%</b> on monsters I've never seen! I learned the rule "<b>${RULE_TEXT[state.rule]}</b>" from just <b>${state.n}</b> examples. Nobody told me!`);
+      ML.say(`The whole crowd is right! I scored <b>${t}%</b> on monsters I've never seen, after just <b>${state.n}</b> examples. The secret rule was "<b>${RULE_TEXT[state.rule]}</b>". Nobody told me!`);
       return;
     }
-    if (state.auto) setTimeout(round, fast ? 80 : 400);
+    if (state.auto) setTimeout(teachRandom, fast ? 80 : 400);
+  }
+  // pick a monster Robo hasn't been shown yet
+  function teachRandom() {
+    if (state.busy) return;
+    const left = state.crowd.filter((m) => !m.taught);
+    if (!left.length) { state.crowd = newCrowd(); return teachRandom(); }
+    const m = left[Math.floor(Math.random() * left.length)];
+    if (state.rule === "me") return pickForTeacher(m);
+    lesson(m);
+  }
+  function pickForTeacher(m) {
+    state.selected = m;
+    document.getElementById("teach").classList.add("show");
+    ML.say(`You're the teacher! Is this monster <b>friendly</b> or <b>grumpy</b>? Think of your own rule and answer honestly.`);
   }
 
   function stopAuto() {
@@ -356,35 +401,55 @@
     state.checkpoints = [];
     state.viewing = null;
     state.monster = null;
+    state.selected = null;
+    state.dance = 0;
+    state.crowd = newCrowd();
+    document.getElementById("teach").classList.remove("show");
     state.guess = null;
     state.celebrated = false;
     setStage(null);
     renderWeights();
     renderStats();
     renderCheckpoints();
-    document.getElementById("inside").innerHTML = `<span class="muted">Press <b>Next monster</b> to see Robo think.</span>`;
-    if (say) ML.say(`My brain is empty again: all my "how much I care" numbers are zero.`);
+    document.getElementById("inside").innerHTML = `<span class="muted">Tap any monster in the crowd to see Robo think.</span>`;
+    if (say) ML.say(`My brain is empty again: all my "how much I care" numbers are zero, and a new crowd just arrived.`);
   }
 
-  document.getElementById("next").addEventListener("click", () => { stopAuto(); round(); });
+  document.getElementById("next").addEventListener("click", () => { stopAuto(); teachRandom(); });
   document.getElementById("auto").addEventListener("click", () => {
     if (state.auto) return stopAuto();
     if (state.rule === "me") return ML.toast("In teacher mode, you answer each monster yourself");
     state.auto = true;
     document.getElementById("auto").innerHTML = `${ML.icon("pause")} Stop`;
-    if (!state.busy) round();
+    if (!state.busy) teachRandom();
   });
   document.getElementById("reset").addEventListener("click", () => reset());
   document.getElementById("rule").addEventListener("change", (e) => {
     state.rule = e.target.value;
-    if (teacherResolve && state.waitingTeacher) { teacherResolve(false); }
     reset(false);
     ML.say(state.rule === "me"
-      ? `You make up the rule! Keep it in your head and answer honestly. I'll try to figure it out.`
+      ? `You make up the rule! Keep it in your head, tap a monster, and answer honestly. I'll try to figure it out.`
       : `New secret rule picked. Shh, don't tell me! I'll work it out from examples.`);
   });
-  document.getElementById("say-friendly").addEventListener("click", () => teacherResolve && teacherResolve(true));
-  document.getElementById("say-grumpy").addEventListener("click", () => teacherResolve && teacherResolve(false));
+  document.getElementById("say-friendly").addEventListener("click", () => state.selected && lesson(state.selected, true));
+  document.getElementById("say-grumpy").addEventListener("click", () => state.selected && lesson(state.selected, false));
+
+  // tap a monster in the crowd to teach Robo with it
+  const hit = (e) => {
+    const p = ML.canvasPoint(cvEl, e, W, H);
+    if (p.y < TOP - 4 || p.y > TOP + ROWS * CH) return -1;
+    return Math.floor((p.y - TOP) / CH) * COLS + Math.floor(p.x / CW);
+  };
+  cvEl.style.cursor = "pointer";
+  cvEl.addEventListener("pointermove", (e) => { state.hover = hit(e); });
+  cvEl.addEventListener("pointerleave", () => { state.hover = -1; });
+  cvEl.addEventListener("pointerdown", (e) => {
+    const i = hit(e), m = state.crowd[i];
+    if (!m || state.busy) return;
+    stopAuto();
+    if (m.taught) { ML.toast("Robo has already seen that one. Pick another!"); return; }
+    if (state.rule === "me") pickForTeacher(m); else lesson(m);
+  });
 
   // Chapter cards
   const types = document.getElementById("types");

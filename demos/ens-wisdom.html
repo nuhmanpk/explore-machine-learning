@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wisdom of the Crowd · Explore ML</title>
+  <meta name="description" content="Guess the jellybeans with a crowd and see why many noisy guesses average out to something sharp, and why a shared bias does not.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.35rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .gridmaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+    .gridmaps figure { margin: 0; min-width: 0; }
+    .gridmaps figcaption { font-weight: 800; font-size: .85rem; margin-bottom: 4px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ensemble" data-demo="ens-wisdom">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Ensembles &amp; Boosting</span>
+      <h1>Wisdom of the <span class="em">Crowd</span></h1>
+      <p class="hero-sub">One person guessing jellybeans is usually wrong. A whole crowd averaged together is often amazingly close.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">The jar has a secret number of jellybeans. Everyone guesses a bit too high or too low. Slide the <b>crowd size</b> up and watch the average settle on the truth!</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="candy"></i> Everybody's guesses <span class="muted" id="jar"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="pick"><i data-icon="question"></i> Ask one random person</button>
+            <button class="btn ghost small" id="newjar"><i data-icon="shuffle"></i> New jar</button>
+          </div>
+        </div>
+        <canvas id="strip" class="cv" role="img" aria-label="Dot plot of every guess along a number line, with the true count and the crowd average marked"></canvas>
+        <p class="cap"><span style="color:var(--good)">Green line</span> = the true number. <span style="color:var(--accent)">Purple arrow</span> = the crowd's average. Each dot is one person.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="n">Crowd size <span class="val"><b data-for="n">10</b> people</span></label>
+            <input type="range" id="n" min="1" max="200" step="1" value="10">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="bias">Everyone's shared bias <span class="val"><b data-for="bias">0%</b></span></label>
+            <input type="range" id="bias" min="0" max="40" step="1" value="0">
+            <div class="hint">Like a jar that looks fuller than it is: everyone leans the same way.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How close?</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Crowd average</div><div class="v" id="avg">0</div></div>
+            <div class="stat"><div class="k">Crowd is off by</div><div class="v" id="cerr" style="color:var(--accent)">0</div></div>
+            <div class="stat"><div class="k">A typical person is off by</div><div class="v" id="terr" style="color:var(--warn)">0</div></div>
+          </div>
+          <p class="cap" id="best"></p>
+          <div id="pickout" class="cap" aria-live="polite"></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Error as the crowd grows</h3>
+          <canvas id="chart" class="cv" role="img" aria-label="Chart of average crowd error against crowd size"></canvas>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--muted)"></i>no shared bias</span><span><i style="background:var(--accent)"></i>with your bias</span></div>
+        </div>
+      </aside>
+    </section>
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-grow"><span class="tick"></span><span>Big crowd: use 100 or more people, and make the crowd at least twice as close as a typical person.</span></div>
+      <div class="chal" id="c-pick"><span class="tick"></span><span>Fair fight: ask 5 random people. The crowd should beat at least 4 of them.</span></div>
+      <div class="chal" id="c-bias"><span class="tick"></span><span>Fooled together: set the shared bias to 20% or more, use 100+ people, and see the crowd stay wrong by at least 10%.</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Each person guesses with their own random wobble, some high and some low.</li>
+      <li>When you average many guesses, the highs and lows cancel out. The crowd error shrinks fast at first, then slowly (about one over the square root of the crowd size).</li>
+      <li>The one person who happened to be closest is often closer than the average, but you cannot know who they are before the answer is revealed.</li>
+      <li>If everybody leans the same way, averaging does nothing about it. A crowd can fix random mistakes, but not a mistake everyone shares.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>Everyone guesses the jar. Each guess is the truth, plus a shared lean, plus personal noise.</li>
+      <li>We average the first N guesses.</li>
+      <li>We compare that average with the truth, and with how far off a typical single person is.</li>
+      <li>The chart repeats the whole experiment 300 times with fake crowds, so the line is a fair average and not one lucky jar.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Each guess is modelled as <code>g<sub>i</sub> = T(1 + b + σ·ε<sub>i</sub>)</code> with <code>ε<sub>i</sub> ~ N(0,1)</code>, σ = 0.3 and bias <code>b</code> shared by everyone. The crowd mean has <span class="term">bias</span> <code>T·b</code> and <span class="term">variance</span> <code>(Tσ)²/n</code>, so its typical error falls like <code>1/√n</code> until it hits the floor set by the bias.</p>
+        <ul>
+          <li>This is the idea behind <span class="term">variance reduction</span> by averaging, used by bagging and random forests: average many noisy but roughly unbiased models.</li>
+          <li>It needs the errors to be <span class="term">independent</span>. If errors are correlated with correlation ρ, the variance floors at <code>ρσ²</code> instead of going to zero. A shared bias is the extreme case.</li>
+          <li>The jellybean story is the classic Galton ox-weight example (1907) and is why ensembles work: diversity matters as much as numbers.</li>
+        </ul>
+        <p>The chart is a Monte Carlo estimate (300 simulated crowds). The jar and crowd come from a seeded random generator, so a seed always gives the same crowd.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ens-wisdom-core.js"></script>
+  <script src="js/ens-wisdom.js"></script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tricked by Words · Explore ML</title>
+  <meta name="description" content="A pretend assistant obeys orders hidden inside an email. Try four defences against a fixed set of fake tricks. Pure simulation, nothing real happens.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .simbanner { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: .86rem; padding: 8px 12px; border-radius: 12px; border: 2px dashed var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--card)); margin-bottom: 10px; }
+    #doc { width: 100%; font: inherit; font-weight: 700; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); min-height: 44px; }
+    #doc:focus-visible, .tog button:focus-visible, input[type=range]:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .paper { background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 10px 0; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+    .paper .tl { font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-bottom: 4px; }
+    .paper mark { background: color-mix(in srgb, var(--bad) 25%, transparent); color: var(--ink); border-radius: 4px; padding: 0 3px; }
+    .paper mark.hid { outline: 2px dashed var(--bad); }
+    .log { display: grid; gap: 6px; margin-top: 10px; }
+    .step { display: flex; justify-content: space-between; gap: 8px; align-items: center; background: var(--bg-2); border: 2px solid var(--line); border-radius: 12px; padding: 6px 10px; font-weight: 800; font-size: .88rem; }
+    .pill { border-radius: 999px; padding: 2px 10px; font-size: .75rem; font-weight: 800; color: #fff; white-space: nowrap; }
+    .pill.ok { background: var(--good); } .pill.bad { background: var(--bad); } .pill.stop { background: var(--accent); }
+    .tog { display: grid; gap: 6px; }
+    .tog button { text-align: left; font: inherit; font-weight: 800; font-size: .88rem; padding: 8px 10px; min-height: 40px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .tog button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    .tog .st { font-size: .75rem; color: var(--muted); }
+    .big { font-family: var(--font-head); font-size: 2rem; font-weight: 600; line-height: 1; }
+    .track { height: 14px; border-radius: 8px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; margin-top: 6px; }
+    .track i { display: block; height: 100%; background: var(--bad); transition: width .3s; }
+    .alist { display: grid; gap: 4px; max-height: 300px; overflow-y: auto; }
+    .arow { display: flex; justify-content: space-between; gap: 6px; align-items: center; font-weight: 700; font-size: .82rem; padding: 3px 4px; }
+    @media (prefers-reduced-motion: reduce) { .track i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ethics" data-demo="ethics-inject">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="heart"></i> Ethics, Safety &amp; Alignment</span>
+      <h1>Tricked by <span class="em">Words</span></h1>
+      <p class="hero-sub">A pretend assistant reads an email and obeys any order it finds, even one a sneaky writer hid inside. Try four defences and score them.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Pick a sneaky document and press Run. Then switch on defences and watch the score at the right.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="simbanner"><i data-icon="info"></i><span>This is a simulation. The assistant is a tiny toy and every "action" is just a label on screen. Nothing is sent, deleted, bought or shared.</span></div>
+        <label for="doc" style="font-weight:800; font-size:.9rem">Document to give the assistant</label>
+        <select id="doc"></select>
+        <div class="paper"><span class="tl">The user asks</span><span id="task"></span></div>
+        <div class="paper"><span class="tl" id="doclbl">What a person sees in the document</span><span id="doctext"></span></div>
+        <div class="btn-row">
+          <button class="btn primary small" id="run"><i data-icon="play"></i> Run assistant</button>
+          <button class="btn ghost small" id="peek" aria-pressed="false"><i data-icon="eye"></i> Show what the AI reads</button>
+        </div>
+        <div class="log" id="log" aria-live="polite"></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Defences</h3>
+          <div class="tog" id="defs"></div>
+          <label for="yes" style="font-weight:800; font-size:.86rem">When asked "are you sure?", a tired user clicks Yes <b data-for="yes">0%</b> of the time</label>
+          <input id="yes" type="range" min="0" max="0.6" step="0.1" value="0" aria-label="Chance the user clicks yes without reading">
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Score against 12 fixed tricks</h3>
+          <div><div class="big" id="rate" style="color:var(--bad)">0%</div><div class="muted" style="font-weight:700; font-size:.85rem" id="ratetxt"></div><div class="track" aria-hidden="true"><i id="ratebar"></i></div></div>
+          <div class="three" style="grid-template-columns: repeat(2, 1fr)">
+            <div class="stat"><div class="k">Normal jobs done</div><div class="v" id="legit">0/4</div></div>
+            <div class="stat"><div class="k">Pop-up questions</div><div class="v" id="asks">0</div></div>
+          </div>
+          <div class="alist" id="alist"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-hit"><span class="tick"></span><span>Get tricked: with no defences, run a sneaky document and see the assistant obey it.</span></div>
+      <div class="chal" id="c-marker"><span class="tick"></span><span>Fake marker: switch on only "Mark the text as data", and notice the fake end marker trick still gets through.</span></div>
+      <div class="chal" id="c-hole"><span class="tick"></span><span>Find a hole: use only the allow-list and see a trick that uses an allowed action (changing who gets the message).</span></div>
+      <div class="chal" id="c-tired"><span class="tick"></span><span>Tired user: use only "Ask before acting", slide the tired user to 30% or more, and watch the score get worse.</span></div>
+      <div class="chal" id="c-all"><span class="tick"></span><span>Layers: stop all 12 tricks while all 4 normal jobs still work.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The toy assistant could not tell the user's orders from orders written inside the email. It simply obeyed any order-like sentence. That is called prompt injection.</li>
+      <li>Each defence stopped some tricks and missed others: marking text as data, an allow-list of actions, and asking before risky actions.</li>
+      <li>Layering them worked much better than any one alone. A tired user who clicks Yes without reading weakens "ask first".</li>
+      <li>This is only a toy with 12 fixed tricks. Real attackers invent new ones, so real systems also limit what the assistant is allowed to do.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>There is no language model here. The "assistant" is a small rule-based parser that treats every order-like sentence in its whole input as an instruction, which reproduces the core flaw of <span class="term">prompt injection</span>: instructions and data share one text channel. Everything runs locally, and every action is only a string.</p>
+        <ul>
+          <li><span class="term">Data/instruction separation</span> (delimiters, or structured roles): the assistant is told that text inside the data tags is not to be obeyed. Here, the parser ignores it unless the attacker closes the tag early (the fake end marker), so <span class="term">sanitising</span> the markers matters. Real models also obey marked data some of the time, so the toy leaks with a fixed 30% probability.</li>
+          <li><span class="term">Allow-list / least privilege</span>: each task may only use certain actions. It cannot stop an attack that uses an allowed action in a harmful way (sending to a different address).</li>
+          <li><span class="term">Human confirmation</span> for risky actions the user did not request. It is weakened by <span class="term">confirmation fatigue</span>, simulated by the tired-user slider (seeded, so results repeat).</li>
+          <li>An <span class="term">indirect</span> injection arrives through content the assistant reads (emails, web pages, files), not from the user. Hidden text (white on white, tiny print) is invisible to people but not to the assistant.</li>
+          <li>The attack success rate is measured on a fixed list, so it is a regression test, not a guarantee. Real defence is defence in depth: least privilege, isolating untrusted content, output checks, logging, and human review for high-impact actions.</li>
+        </ul>
+        <p>Further reading: Greshake et al., <i>Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection</i> (2023) · OWASP Top 10 for LLM Applications.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ethics-inject-core.js"></script>
+  <script src="js/ethics-inject.js"></script>
+</body>
+</html>

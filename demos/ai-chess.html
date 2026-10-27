@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chess vs the Thinking-Ahead AI · Explore ML</title>
+  <meta name="description" content="Play real chess against an AI that imagines moves and replies. Change how far ahead it looks, see the moves it considered, and learn how search plays chess.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    #board { aspect-ratio: 1; max-height: none !important; width: 100% !important; max-width: 560px; margin: 0 auto; display: block; cursor: pointer; border-radius: 12px; touch-action: manipulation; }
+    .status { margin-top: 8px; font-weight: 800; text-align: center; height: 1.8em; line-height: 1.8em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .evalwrap { max-width: 560px; margin: 8px auto 0; }
+    .evalbar { height: 12px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .evalbar i { display: block; height: 100%; width: 50%; background: var(--good); transition: width .35s; }
+    .evalcap { display: flex; justify-content: space-between; font-size: .75rem; font-weight: 800; color: var(--muted); margin-top: 2px; }
+    .depth-name { font-family: var(--font-head); font-weight: 600; font-size: 1.05rem; color: var(--accent); }
+    .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+    .presets .btn { flex: 1; padding: 6px 8px; font-size: .82rem; }
+    .presets .btn.on { border-color: var(--accent); color: var(--accent); }
+    .beat { font-size: .88rem; height: 5.6em; overflow: hidden; align-items: flex-start; }
+    .robo-say .bubble { flex: 1; min-width: 0; height: 112px; min-height: 0; overflow-y: auto; }
+    @media (max-width: 700px) { .robo-say .bubble { height: 168px; } }
+    .stage-left { grid-template-columns: minmax(0, 1fr); }
+    #inside { height: 230px; overflow-y: auto; }
+    #moves { height: 120px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 4px 12px; align-content: flex-start; font-weight: 700; font-size: .92rem; }
+    #moves .mv b { color: var(--muted); }
+    #cands { display: grid; gap: 6px; min-height: 190px; align-content: start; }
+    .cand { display: grid; grid-template-columns: 62px 1fr 72px; gap: 8px; align-items: center; font-weight: 800; font-size: .9rem; padding: 3px 6px; border-radius: 10px; border: 2px solid transparent; }
+    .cand.chosen { border-color: var(--accent); background: var(--accent-soft); }
+    .cand .bar { height: 10px; background: var(--bg-2); border-radius: 999px; overflow: hidden; }
+    .cand .bar i { display: block; height: 100%; border-radius: 999px; }
+    .cand .cv { text-align: right; color: var(--ink-2); font-size: .82rem; white-space: nowrap; }
+    .flow .arrow { text-align: left; }
+    .cand.pred .cv { color: var(--bad); }
+  </style>
+</head>
+<body data-page="demo" data-topic="ai" data-demo="ai-chess">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="target"></i> Artificial Intelligence · Thinking ahead</span>
+      <h1>Chess vs the <span class="em">thinking-ahead</span> AI</h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Real chess! I'm an AI that plays by <b>imagining moves and replies</b>. Tap a piece, then a dot. You're White.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your side</h3>
+          <div class="seg" id="side"><button data-s="w" class="on">White</button><button data-s="b">Black</button></div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn" id="hint"><i data-icon="bulb"></i> Hint</button>
+            <button class="btn" id="undo"><i data-icon="arrow-left"></i> Undo</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="eye"></i> How far ahead does it look?</h3>
+          <div class="field">
+            <label for="depth"><span class="depth-name" id="depth-name"></span> <span class="val" data-for="depth"></span></label>
+            <input type="range" id="depth" min="1" max="4" step="1" value="2">
+            <div class="hint">1 = only my own next move. 4 = my move, your reply, my move, your reply.</div>
+          </div>
+          <div class="presets" id="presets">
+            <button class="btn small" data-d="1">Baby</button><button class="btn small on" data-d="2">Kid</button>
+            <button class="btn small" data-d="3">Smart</button><button class="btn small" data-d="4">Sharp</button>
+          </div>
+          <p class="pill-note beat" id="beat"></p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="book"></i> Moves</h3>
+          <div id="moves"></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <canvas id="board"></canvas>
+          <div class="status" id="status"></div>
+          <div class="evalwrap">
+            <div class="evalbar"><i id="evalbar"></i></div>
+            <div class="evalcap"><span>AI ahead</span><span>Who will win?</span><span>You ahead</span></div>
+            <div id="predict" class="status" style="font-size:.9rem;font-weight:700"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="question"></i> What I think you'll play next</h3>
+          <label class="assist" style="display:flex;gap:10px;align-items:center;font-weight:800;font-size:.88rem;cursor:pointer"><input type="checkbox" id="showpred" checked style="width:18px;height:18px;accent-color:var(--accent)"> Show red arrows on the board</label>
+          <div id="pred" style="display:grid;gap:6px;margin-top:8px;min-height:150px;align-content:start"></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="layers"></i> The moves I considered</h3>
+          <div id="cands"></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row"><button class="btn primary" id="newgame"><i data-icon="reset"></i> New game</button></div>
+          <div class="stats">
+            <div class="stat"><div class="k">You win</div><div class="v" id="st-me">0</div></div>
+            <div class="stat"><div class="k">Draws</div><div class="v" id="st-draw">0</div></div>
+            <div class="stat"><div class="k">AI wins</div><div class="v" id="st-ai">0</div></div>
+          </div>
+          <div class="stat"><div class="k">Piece points (you − me)</div><div class="v" id="st-mat">0</div><div class="tcount muted" id="mat-sub" style="font-size:.75rem;font-weight:700"></div></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Make your first move. I'll explain what I imagined.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Imagine my moves</h3><p>I list every legal move I could play. In chess there are about 30 in a typical position.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Imagine your replies</h3><p>For each of my moves I picture every reply you could make, and my answers to those, as deep as my thinking depth allows.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Count the pieces</h3><p>Chess is too big to see to the end, so I score the last position by counting points: pawn 1, knight and bishop 3, rook 5, queen 9. Good squares earn a little extra.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="flag"></i></div><h3>Assume you play well</h3><p>For each of my moves I assume you find your best reply. That's my "worst case".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Pick the best worst-case</h3><p>I play the move whose worst case is best. That's <b>minimax</b>, and skipping useless branches is <b>alpha-beta pruning</b>.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The AI didn't learn from games. It <b>searched</b>: it imagined the future and picked the safest move.</li>
+        <li>At depth 1 it only sees its own next move, so it can't tell a protected pawn from a free one. At depth 2 it stops giving pieces away. Deeper, it sees traps and trades.</li>
+        <li>To <b>predict your next move</b>, the AI plays your side in its head. It scores each of your moves, then gives better moves a bigger chance. Strong players are predictable: the good move is usually the one they play!</li>
+        <li>Tic-tac-toe can be searched to the very end. Chess can't, so the AI must <b>guess</b> how good a position is. A better guess means better chess.</li>
+        <li>Real chess engines add a very good guesser. Modern ones, like AlphaZero and Leela, use a neural network for that, so learning and searching work together.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">minimax search with alpha-beta pruning</span>, written as <span class="term">negamax</span>, over the full legal-move tree of chess. It is classical (symbolic) AI: no data, no training. The move generator implements all the rules except underpromotion by the player (pawns auto-queen), threefold repetition and the draw by agreement: castling with its check rules, en passant, promotion, check, checkmate, stalemate, the 50-move rule and insufficient material. It matches the published <i>perft</i> counts (20, 400, 8,902, 197,281 positions at depths 1 to 4 from the start).</p>
+        <ul>
+          <li><b>Evaluation:</b> material (100/320/330/500/900 centipawns), plus small bonuses for central knights and bishops, advanced pawns (more for passed-pawn territory), rooks on the seventh and a king tucked into a corner. This is the <span class="term">evaluation function</span>: the AI's estimate when it runs out of depth.</li>
+          <li><b>Quiescence search:</b> at the depth limit the search keeps playing out captures (up to 4 more plies) so it doesn't stop in the middle of a trade and mistake it for a free piece. This reduces the "horizon effect".</li>
+          <li><b>Move ordering:</b> captures are searched first, biggest victim by smallest attacker. Alpha-beta prunes far more when the best moves come first.</li>
+          <li><b>Mate scores:</b> a checkmate scores &plusmn;100000 adjusted by distance, so the AI prefers faster mates and slower losses.</li>
+          <li><b>Ties:</b> equal-valued root moves are picked at random so games differ. The root window is widened by one so tied moves keep exact scores, the same trick as in the tic-tac-toe demo.</li>
+          <li><b>Strength:</b> depth 4 with quiescence is a modest club-beginner level. Real engines search 20+ plies using transposition tables, iterative deepening, null-move pruning, late-move reductions and bitboards. Stockfish searches millions of positions per second; there are roughly 10<sup>44</sup> chess positions in all.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ai-chess-core.js"></script>
+  <script src="js/ai-chess.js"></script>
+</body>
+</html>

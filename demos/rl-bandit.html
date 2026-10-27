@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lucky Slot Machines · Explore ML</title>
+  <meta name="description" content="Five slot machines, one secret best. Play, then watch a robot balance trying new machines with cashing in on its favourite.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .machines { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 12px 0; }
+    .machine { position: relative; display: grid; justify-items: center; gap: 4px; padding: 14px 8px 10px; border-radius: 18px; border: 3px solid var(--ink); background: var(--card); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer; box-shadow: 0 5px 0 var(--ink); touch-action: manipulation; transition: transform 0.08s, box-shadow 0.08s; }
+    .machine:active, .machine.pull { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+    .machine:disabled { opacity: 0.6; cursor: not-allowed; }
+    .machine svg { width: 54px; height: 54px; color: var(--accent); }
+    .machine .m-name { font-family: var(--font-head); font-size: 1.15rem; }
+    .machine .m-info { font-size: 0.78rem; color: var(--muted); text-align: center; }
+    .machine .pop { position: absolute; top: 4px; right: 8px; font-family: var(--font-head); font-size: 1.1rem; color: var(--good); opacity: 0; }
+    .machine .pop.show { animation: popup 0.9s ease-out; }
+    .machine .truth { font-size: 0.78rem; color: var(--accent); min-height: 1em; }
+    @keyframes popup { 0% { opacity: 1; transform: translateY(8px) scale(0.8); } 100% { opacity: 0; transform: translateY(-14px) scale(1.2); } }
+    .bars { display: grid; gap: 8px; margin: 10px 0; }
+    .brow { display: grid; grid-template-columns: 28px 1fr 92px; gap: 8px; align-items: center; font-weight: 800; font-size: 0.85rem; }
+    .brow .bl { font-family: var(--font-head); font-size: 1.1rem; text-align: center; }
+    .brow .track { position: relative; height: 22px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .brow .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: 999px; transition: width 0.15s; }
+    .brow .tick { position: absolute; top: 0; bottom: 0; width: 4px; background: var(--ink); display: none; }
+    .bars.peek .tick { display: block; }
+    .brow.last .track { border-color: var(--accent); }
+    .brow.fav .bl::after { content: "\2605"; color: var(--warn); font-size: 0.8rem; }
+    .brow .cnt { color: var(--muted); text-align: right; font-size: 0.78rem; }
+    .chart-wrap canvas { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .chart-head { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.82rem; font-weight: 800; margin: 6px 0; }
+    .chart-head i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: 3px; }
+    .chal { display: grid; gap: 8px; }
+    .chal .btn { justify-content: flex-start; text-align: left; }
+    .chal .done::after { content: " \2713"; color: var(--good); }
+    .you-top { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+    .you-top .stat { flex: 1 1 110px; }
+    .check-line { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: 0.9rem; margin: 8px 0; }
+    .cmp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+    @media (prefers-reduced-motion: reduce) { .machine, .brow .fill { transition: none; } .machine .pop.show { animation: none; opacity: 1; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="rl" data-demo="rl-bandit">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="slot"></i> Reinforcement Learning</span>
+      <h1>Lucky Slot <span class="em">Machines</span></h1>
+      <p class="hero-sub">Five slot machines. One of them secretly pays the most. You get a few pulls: which machine do you stick with, and when do you try a new one?</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Welcome to the casino! Every machine pays a different amount, and <b>nobody tells you which is best</b>. You have 30 pulls. Tap a machine to pull it!</p>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="gamepad"></i> Your turn</h2>
+    <div class="card" id="you-card">
+      <div class="you-top">
+        <div class="stat"><div class="k">Pulls left</div><div class="v" id="you-left">30</div></div>
+        <div class="stat"><div class="k">Your coins</div><div class="v" id="you-coins">0</div></div>
+        <div class="stat"><div class="k">Best possible</div><div class="v" id="you-best">?</div></div>
+      </div>
+      <div class="machines" id="you-grid"></div>
+      <div class="muted" id="you-msg" style="font-weight:700">Each machine shows how many times you pulled it and what it paid on average so far.</div>
+      <div class="btn-row" style="margin-top:10px"><button class="btn" id="you-again"><i data-icon="reset"></i> Play again</button></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="cpu"></i> Watch Robo learn</h2>
+    <section class="stage">
+      <div class="stage-left">
+        <div class="card">
+          <h3><i data-icon="trend"></i> Robo's notebook</h3>
+          <div class="muted" style="font-weight:700;font-size:.9rem">Bar = average coins Robo has seen from each machine. Star = Robo's favourite.</div>
+          <div class="bars" id="bars"></div>
+          <div class="stats">
+            <div class="stat"><div class="k">Pulls</div><div class="v" id="s-pulls">0</div></div>
+            <div class="stat"><div class="k">Coins</div><div class="v" id="s-coins">0</div></div>
+            <div class="stat"><div class="k">Per pull</div><div class="v" id="s-avg">0.0</div></div>
+            <div class="stat"><div class="k">Best possible</div><div class="v" id="s-opt">0.0</div></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-head"><span><i style="background:var(--accent)"></i>Robo</span><span><i style="background:var(--ink)"></i>Best possible</span><span><i style="background:var(--bad)"></i>Casino change</span><span class="muted">coins per pull, last 30</span></div>
+            <canvas id="chart"></canvas>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <h3><i data-icon="shuffle"></i> Strategy race</h3>
+          <div class="muted" style="font-weight:700;font-size:.9rem">Three robots play the very same machines with the very same luck.</div>
+          <div class="chart-head"><span><i style="background:var(--bad)"></i>Never explore</span><span><i style="background:var(--good)"></i>Curious 10%</span><span><i style="background:var(--muted)"></i>Always random</span></div>
+          <div class="chart-wrap"><canvas id="cmp"></canvas></div>
+          <div class="cmp-stats">
+            <div class="stat"><div class="k">Never</div><div class="v" id="c-g">0</div></div>
+            <div class="stat"><div class="k">Curious</div><div class="v" id="c-e">0</div></div>
+            <div class="stat"><div class="k">Random</div><div class="v" id="c-r">0</div></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Controls</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="step"><i data-icon="step"></i> One pull</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <label for="speed">Speed <span class="val" data-for="speed"></span></label>
+            <input type="range" id="speed" min="0" max="3" step="1" value="1">
+          </div>
+          <div class="field">
+            <label for="eps">Curiosity <span class="val" data-for="eps"></span></label>
+            <input type="range" id="eps" min="0" max="100" step="1" value="10">
+            <div class="hint">How often Robo tries a random machine instead of its favourite.</div>
+          </div>
+          <div class="btn-row">
+            <button class="btn small" data-eps="0">Never explore</button>
+            <button class="btn small" data-eps="10">Just right</button>
+            <button class="btn small" data-eps="100">Always explore</button>
+          </div>
+          <label class="check-line"><input type="checkbox" id="decay"> Get less curious over time</label>
+          <button class="btn small ghost" id="peek"><i data-icon="eye"></i> Peek at the secret</button>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <div class="chal">
+            <button class="btn" id="ch-shake"><i data-icon="shuffle"></i> The casino changes the machines</button>
+            <button class="btn" id="ch-more"><i data-icon="plus"></i> Add more machines</button>
+            <button class="btn" id="ch-noise"><i data-icon="dice"></i> Make payouts noisier</button>
+          </div>
+          <div class="muted" id="ch-msg" style="font-weight:700;font-size:.88rem;margin-top:8px">Each one is marked on the chart. Try them with "Never explore" and with "Just right".</div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="slot"></i></div><h3>Pull one</h3><p>Robo picks a machine and pulls. Sometimes it pays, sometimes nothing.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="pencil"></i></div><h3>Write it down</h3><p>Each machine has a running average: how much it usually pays.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Cash in</h3><p>Most of the time Robo picks the machine with the best average so far.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="dice"></i></div><h3>Stay curious</h3><p>Sometimes Robo rolls a dice and tries a random machine, in case a better one is hiding.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Nobody told you or Robo which machine was best. You both had to find out by playing.</li>
+      <li>If you only pull your favourite, you might stick with a machine that was just lucky early on.</li>
+      <li>If you only try random machines, you never cash in on what you learned.</li>
+      <li>A little curiosity (about 10%) beat both extremes in the race.</li>
+      <li>When the casino changed the machines, only the curious robots noticed.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is the <span class="term">multi-armed bandit</span> problem: the simplest reinforcement-learning setting, with one state and several actions (arms). It isolates the <span class="term">exploration vs exploitation</span> trade-off.</p>
+        <ul>
+          <li><b>Machines</b>: each arm pays a prize with a fixed win probability, with the prize size varying by up to the noise setting (unbiased). Mean payout is <code>p x prize</code>, so the true best is known to the page but hidden from the learner.</li>
+          <li><b>Estimate</b>: sample average <code>Q(a) += (r - Q(a)) / N(a)</code>, with the step floored at 0.1 so old data fades. That floor is a <span class="term">constant step-size</span> update, which is what lets Robo track a changing casino (a <span class="term">non-stationary</span> bandit).</li>
+          <li><b>Policy</b>: <span class="term">epsilon-greedy</span>. With probability eps pick a random arm, otherwise argmax Q (ties random). Q starts at 0, so pure greedy locks onto the first machine that pays anything. The decaying option uses <code>eps / (1 + t/40)</code>, floored at 3% of eps.</li>
+          <li><b>Regret</b> is the gap between the best possible total and what you earned, <code>sum(mu* - r_t)</code>. The "best possible" line on the chart is <code>mu*</code>. Greedy has linear regret when it locks onto a wrong arm, and fixed-eps has linear regret from endless exploring; decaying eps can do better.</li>
+          <li>The race uses <span class="term">common random numbers</span>: every step draws one payout per machine, and each strategy sees the payout for the arm it chose.</li>
+          <li>Smarter methods exist: <span class="term">UCB</span> adds an optimism bonus to rarely tried arms, and <span class="term">Thompson sampling</span> samples from a belief about each arm and plays the best sample. Both explore in a more targeted way than a dice roll.</li>
+        </ul>
+        <p>Further reading: Sutton &amp; Barto, <i>Reinforcement Learning: An Introduction</i>, chapter 2 (free online).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/rl-bandit-core.js"></script>
+  <script src="js/rl-bandit.js"></script>
+</body>
+</html>

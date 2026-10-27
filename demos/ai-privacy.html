@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your Data, Your Privacy · Explore ML</title>
+  <meta name="description" content="Train tiny models on invented data and watch a secret leak out of a model that remembers too much. Play detective, then protect the secret with noise, clean-up and keeping data at home.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .stage-left { grid-template-columns: minmax(0, 1fr); }
+    .sub-h { font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+    .lab-tabs { display: flex; margin: 0 0 14px; }
+    .lab-tabs .seg { width: 100%; } .lab-tabs .seg button { flex: 1; }
+    .guess { background: var(--bg-2); border: 2px dashed var(--line); border-radius: 16px; padding: 12px 14px; display: grid; gap: 8px; }
+    .guess .q { font-weight: 800; }
+    .guess .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+    .guess .opts .btn { flex: 1 1 140px; white-space: normal; text-align: center; }
+    .guess .res { min-height: 2.6em; font-weight: 700; font-size: .92rem; color: var(--ink-2); }
+    .prompt { font-family: var(--font-mono); font-size: 1.02rem; font-weight: 700; background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; line-height: 1.5; }
+    .prompt .gap { display: inline-block; min-width: 4.4em; text-align: center; border-radius: 8px; padding: 0 8px; background: var(--card); border: 2px solid var(--line); }
+    .prompt .gap.leak { background: color-mix(in srgb, var(--bad) 18%, var(--card)); border-color: var(--bad); color: var(--bad); }
+    .cands { display: grid; gap: 6px; height: 188px; align-content: start; }
+    .crow { display: grid; grid-template-columns: 84px 1fr 46px; gap: 8px; align-items: center; font-weight: 800; font-size: .86rem; }
+    .crow span { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; }
+    .crow .t { height: 16px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .crow .f { height: 100%; background: var(--muted); border-radius: 999px; transition: width .12s; }
+    .crow.sec .f { background: var(--bad); } .crow.sec span { color: var(--bad); }
+    .crow b { font-family: var(--font-mono); font-size: .78rem; text-align: right; }
+    .diary { height: 150px; overflow-y: auto; font-size: .84rem; font-weight: 600; color: var(--ink-2); background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+    .diary div { padding: 1px 0; } .diary .sec { color: var(--bad); font-weight: 800; }
+    .pill { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: .88rem; }
+    .pill.bad { background: color-mix(in srgb, var(--bad) 16%, var(--card)); color: var(--bad); }
+    .pill.ok { background: color-mix(in srgb, var(--good) 16%, var(--card)); color: var(--good); }
+    .pill.mid { background: color-mix(in srgb, var(--warn) 22%, var(--card)); color: #8a5a00; }
+    .vrow { height: 44px; overflow: hidden; display: flex; align-items: center; }
+    #mapcv, #histcv, #chart { width: 100% !important; max-height: none !important; }
+    #mapcv { max-width: 440px; margin: 0 auto; display: block; cursor: default; }
+    .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+    @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+    .det { display: grid; gap: 8px; }
+    .det .info { min-height: 3.4em; font-weight: 700; font-size: .92rem; }
+    .det .btn-row .btn { flex: 1 1 120px; }
+    .chal { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 700px) { .chal { grid-template-columns: 1fr; } }
+    .chal .btn { justify-content: flex-start; white-space: normal; text-align: left; line-height: 1.25; min-height: 64px; }
+    .chal .btn small { display: block; font-weight: 600; opacity: .75; font-size: .78rem; }
+    .chal-note { min-height: 2.6em; margin: 10px 0 0; font-weight: 700; font-size: .9rem; color: var(--ink-2); }
+    .prot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    @media (max-width: 900px) { .prot { grid-template-columns: 1fr; } }
+    .prot .card { align-content: start; }
+    .prot svg.fed { width: 100%; height: auto; display: block; }
+    .tiny-chart { width: 100%; }
+    .habit { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 800px) { .habit { grid-template-columns: 1fr; } }
+    .habit > div { background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 12px; font-weight: 700; font-size: .92rem; }
+    .habit i { color: var(--accent); }
+    .robo-say .bubble { flex: 1; min-width: 0; height: 112px; min-height: 0; overflow-y: auto; }
+    @media (max-width: 700px) { .robo-say .bubble { height: 168px; } }
+    #inside { height: 300px; overflow-y: auto; }
+    .stage > .stage-left, .stage > .panel { min-width: 0; }
+    @media (prefers-reduced-motion: reduce) { .crow .f { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ai" data-demo="ai-privacy">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="eye"></i> Artificial Intelligence · Privacy</span>
+      <h1>Your data, <span class="em">your</span> privacy</h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Models learn from examples, and sometimes they <b>remember</b> too much. Everything here is made up: invented kids, a pretend club and a fake secret code. Pick a lab, make a guess, then press <b>Show me</b>!</p>
+      </div>
+    </section>
+
+    <div class="lab-tabs"><div class="seg" id="tabs"><button data-v="A" class="on">Lab 1: the leaky diary</button><button data-v="B">Lab 2: play detective</button></div></div>
+
+    <section class="stage">
+      <div class="stage-left">
+        <!-- ============ Lab A ============ -->
+        <div class="card" id="labA">
+          <h3><i data-icon="book"></i> The Treehouse Club diary (all invented)</h3>
+          <div class="guess" id="gA">
+            <div class="q">If the model reads the diary 8 times with the code in it, will it finish the sentence with the secret code?</div>
+            <div class="opts"><button class="btn" data-g="0">No, it won't</button><button class="btn" data-g="1">A little</button><button class="btn" data-g="2">Yes, probably</button></div>
+            <div class="res" id="gAres">Make a guess, then press Show me.</div>
+          </div>
+          <p class="sub-h" style="margin-top:6px">Ask the model to finish this sentence</p>
+          <div class="prompt" id="promptA">the secret club code of mia is <span class="gap" id="gap">?</span></div>
+          <div class="vrow"><span class="pill ok" id="verdictA"></span></div>
+          <p class="sub-h">What it thinks comes next (top 5 words)</p>
+          <div class="cands" id="cands"></div>
+          <p class="sub-h" style="margin-top:12px">The diary it trains on <span class="muted" id="diaryN" style="text-transform:none;letter-spacing:0"></span></p>
+          <div class="diary" id="diary"></div>
+        </div>
+
+        <!-- ============ Lab B ============ -->
+        <div class="card" id="labB" hidden>
+          <h3><i data-icon="search"></i> Was this dot in the training set?</h3>
+          <div class="guess" id="gB">
+            <div class="q">A model is trained for a long time on 40 dots. A detective only sees how <i>sure</i> it is about each dot. How often can the detective tell "seen before" from "brand new"?</div>
+            <div class="opts"><button class="btn" data-g="0">50%: just guessing</button><button class="btn" data-g="1">About 65%</button><button class="btn" data-g="2">80% or more</button></div>
+            <div class="res" id="gBres">Make a guess, then press Show me.</div>
+          </div>
+          <div class="two">
+            <div>
+              <p class="sub-h">Dots and what the model learned <span class="muted" style="text-transform:none;letter-spacing:0">(filled = in training, ring = brand new)</span></p>
+              <canvas id="mapcv"></canvas>
+              <label class="unfair-toggle" style="display:flex;gap:8px;align-items:center;font-weight:700;font-size:.88rem;margin-top:6px"><input type="checkbox" id="showNew" checked> Show brand-new dots</label>
+            </div>
+            <div class="det">
+              <p class="sub-h">Your detective game</p>
+              <div class="info" id="detInfo">Press Start and I'll show you one dot.</div>
+              <div class="btn-row"><button class="btn primary" id="detIn"><i data-icon="check"></i> It was in training</button><button class="btn" id="detNew"><i data-icon="x"></i> Brand new</button></div>
+              <div class="muted" id="detScore" style="font-weight:800">Score: 0 of 0 (guessing gets about half)</div>
+              <p class="sub-h" style="margin-top:8px">How sure was the model? Training dots vs new dots</p>
+              <canvas id="histcv"></canvas>
+              <div class="legend"><span><i style="background:var(--accent)"></i>Training dots</span><span><i style="background:var(--muted)"></i>Brand-new dots</span><span><i style="background:var(--ink);height:3px"></i>Detective's rule</span></div>
+              <div class="field">
+                <label for="thr">Rule: "it was in training if the model is more than <span class="val" data-for="thr"></span> sure"</label>
+                <input type="range" id="thr" min="0.3" max="0.99" step="0.01" value="0.8">
+              </div>
+              <div class="vrow"><span class="pill ok" id="verdictB"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="train"><i data-icon="play"></i> Train</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Training speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="3">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-r">0</div></div>
+            <div class="stat"><div class="k" id="st-k2">Leak chance</div><div class="v" id="st-v2">–</div></div>
+          </div>
+          <div id="ctlA">
+            <div class="field"><label for="kA">Times the secret appears <span class="val" data-for="kA"></span></label><input type="range" id="kA" min="0" max="12" step="1" value="1"><div class="hint">0 = secret removed</div></div>
+            <div class="field"><label for="pagesA">Other diary pages <span class="val" data-for="pagesA"></span></label><input type="range" id="pagesA" min="0" max="4" step="1" value="0"><div class="hint">More harmless pages = a bigger crowd to hide in</div></div>
+            <div class="field"><label for="roundsA">Train for (rounds) <span class="val" data-for="roundsA"></span></label><input type="range" id="roundsA" min="10" max="600" step="10" value="300"></div>
+          </div>
+          <div id="ctlB" hidden>
+            <div class="field"><span class="lbl">Dots in the training set</span><div class="seg" id="nB"><button data-v="20">20</button><button data-v="40" class="on">40</button><button data-v="160">160</button></div><div class="hint">Changing this starts over</div></div>
+            <div class="field"><label for="l2B">Keep it simple (regularise) <span class="val" data-for="l2B"></span></label><input type="range" id="l2B" min="0" max="0.03" step="0.005" value="0"></div>
+            <div class="field"><label for="roundsB">Train for (rounds) <span class="val" data-for="roundsB"></span></label><input type="range" id="roundsB" min="100" max="3000" step="100" value="1500"></div>
+          </div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="trend"></i> Watch it learn <span class="muted" style="font-weight:700;font-size:.9rem" id="chartSub"></span></h3>
+      <canvas id="chart"></canvas>
+      <div class="legend" id="chartLegend"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="trophy"></i> Challenges</h2>
+    <div class="card">
+      <div class="chal">
+        <button class="btn" id="c1"><i data-icon="layers"></i><span>Repeat the secret 10 times<small>Lab 1: what does repeating do?</small></span></button>
+        <button class="btn" id="c2"><i data-icon="gauge"></i><span>Train too long<small>Lab 2: no safety brakes, 3000 rounds</small></span></button>
+        <button class="btn" id="c3"><i data-icon="noise"></i><span>Add noise<small>Turn the privacy dial up in the lab you're in</small></span></button>
+      </div>
+      <p class="chal-note" id="chalNote">Each challenge changes the lab while it trains, and the chart marks the moment with a flag.</p>
+    </div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> Protect the secret</h2>
+    <div class="prot">
+      <div class="card">
+        <h3><i data-icon="eraser"></i> 1. Clean the data</h3>
+        <p class="muted" style="margin:0;font-size:.9rem">The safest secret is one the model never saw. Take it out, or at least stop it repeating.</p>
+        <div class="btn-row">
+          <button class="btn" id="p-rm"><i data-icon="scissors"></i> Remove the secret</button>
+          <button class="btn" id="p-dd"><i data-icon="layers"></i> Keep just one copy</button>
+        </div>
+        <p class="muted" style="margin:0;font-size:.82rem">(These change Lab 1's diary while it trains.)</p>
+      </div>
+      <div class="card">
+        <h3><i data-icon="noise"></i> 2. Add noise (a toy privacy dial)</h3>
+        <p class="muted" style="margin:0;font-size:.9rem">Each learning step is limited in size, then a bit of random fuzz is added, so no single example can stand out.</p>
+        <div class="field"><label for="sigma">Privacy dial <span class="val" data-for="sigma"></span></label><input type="range" id="sigma" min="0" max="2" step="0.25" value="0"><div class="hint">0 = off · more noise = more private, less accurate</div></div>
+        <button class="btn small" id="curve"><i data-icon="trend"></i> Draw the trade-off</button>
+        <canvas class="tiny-chart" id="curvecv"></canvas>
+        <div class="legend"><span><i style="background:var(--bad)"></i>Secret leaks / detective wins</span><span><i style="background:var(--accent)"></i>Still useful</span></div>
+        <p class="muted" style="margin:0;font-size:.8rem" id="curveNote">Honest note: this is a toy. Real private training is careful maths, not a slider.</p>
+      </div>
+      <div class="card">
+        <h3><i data-icon="upload"></i> 3. Keep data on your device</h3>
+        <svg class="fed" viewBox="0 0 300 190" role="img" aria-label="Three phones keep their diaries at home and send only small lessons to a shared model">
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+          <g stroke="currentColor" fill="none" stroke-width="2" style="color:var(--ink)">
+            <rect x="12" y="104" width="52" height="78" rx="9" style="fill:var(--bg-2)"/><rect x="124" y="104" width="52" height="78" rx="9" style="fill:var(--bg-2)"/><rect x="236" y="104" width="52" height="78" rx="9" style="fill:var(--bg-2)"/>
+            <rect x="100" y="8" width="100" height="44" rx="12" style="fill:var(--card)"/>
+          </g>
+          <g font-family="Nunito, sans-serif" font-weight="800" font-size="10" fill="currentColor" style="color:var(--ink)" text-anchor="middle">
+            <text x="38" y="142">my</text><text x="38" y="154">diary</text><text x="150" y="142">my</text><text x="150" y="154">diary</text><text x="262" y="142">my</text><text x="262" y="154">diary</text>
+            <text x="150" y="26">Shared model</text><text x="150" y="40" font-size="9" style="fill:var(--muted)">averages lessons</text>
+          </g>
+          <g stroke="var(--accent)" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#ah)"><path d="M38 98 Q60 70 112 56"/><path d="M150 98 L150 58"/><path d="M262 98 Q240 70 188 56"/></g>
+          <g font-family="Nunito, sans-serif" font-weight="800" font-size="9" fill="var(--accent)" text-anchor="middle"><text x="62" y="78">lesson</text><text x="168" y="80">lesson</text><text x="238" y="78">lesson</text></g>
+        </svg>
+        <p class="muted" style="margin:0;font-size:.9rem">Your phone learns from your diary at home and sends only a small <b>lesson</b>, never the diary. (Lessons can still leak a little, so real systems add noise too.)</p>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="heart"></i> What you can do</h2>
+    <div class="card">
+      <div class="habit">
+        <div><i data-icon="eye"></i> Don't paste secrets (passwords, codes, private stuff) into chatbots. Things you type may be kept or used to train.</div>
+        <div><i data-icon="search"></i> Check what an app collects before saying yes. Ask: does it really need my photos, location or contacts?</div>
+        <div><i data-icon="eraser"></i> You can ask to see or delete your data. Grown-ups can do it in settings or by asking the company.</div>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="book"></i></div><h3>Learn from examples</h3><p>A model changes itself to match its training examples.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Repeats get remembered</h3><p>Things seen again and again, or seen rarely but studied for ages, stick hardest.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Clues leak</h3><p>A model is more sure about what it studied. That is a clue a detective can use.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="noise"></i></div><h3>Blur the clue</h3><p>Limit each step, add noise, and the model forgets who exactly was in the class.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="upload"></i></div><h3>Share less</h3><p>Best of all, collect less, delete what you don't need, and keep data at home.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>A model trained on a diary with a secret in it could <b>finish the secret</b> when asked. Repeating the secret made it worse; removing it fixed it.</li>
+        <li>A model that studied its examples too hard was <b>more sure about dots it had seen</b>. A detective could use that to guess who was in the training set, better than chance.</li>
+        <li>Noise and limits made the leak and the clue smaller, but the model also got a bit <b>less useful</b>. Privacy has a price.</li>
+        <li>Best protections: don't put secrets in, keep data at home, share less, and delete when you can.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Everything is synthetic. Lab 1 is a word-level language model with a 3-word context: a softmax table over a 60-word vocabulary trained by full-batch gradient descent. Lab 2 is a 2-14-14-1 tanh network on 2D points with 20% label noise. Both are deliberately tiny, so the effects are visible and cheap to measure.</p>
+        <ul>
+          <li><b><span class="term">Memorisation</span> and <span class="term">training-data extraction</span>:</b> rare or repeated strings can be reproduced by prompting with their prefix. Here the prompt "…code of mia is" shares its context with six harmless sentences, so a once-seen secret gets about 14% and ten repeats about 65%. Duplicated data raises extraction risk in large models too.</li>
+          <li><b><span class="term">Membership inference</span>:</b> the detective thresholds the model's confidence in the dot's label. When the network overfits (about 98% train vs 71% test accuracy) the best threshold wins about 71% of balanced guesses; with weight decay or four times more data it falls to about 57%. 50% is chance.</li>
+          <li><b><span class="term">Differential privacy</span> (<span class="term">epsilon</span>, noise):</b> DP-SGD clips each example's gradient so any one record has bounded influence, then adds Gaussian noise scaled to that bound. Smaller epsilon means more noise and a stronger guarantee. The dial is a toy: it does not compute or certify an epsilon, and the clipping here is per distinct sentence-piece, not true per-record accounting.</li>
+          <li><b><span class="term">Federated learning</span>:</b> devices train locally and send only model updates, which are averaged on a server. Updates can still leak, so it is usually combined with DP and secure aggregation.</li>
+          <li><b><span class="term">Data minimisation</span>, deletion and <span class="term">unlearning</span>:</b> collect only what you need, de-duplicate, remove sensitive items before training. Deleting a record from a dataset does not remove it from an already-trained model; machine unlearning and retraining are active research areas.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ai-privacy-core.js"></script>
+  <script src="js/ai-privacy.js"></script>
+</body>
+</html>

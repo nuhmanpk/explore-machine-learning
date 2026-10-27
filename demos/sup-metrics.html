@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Right or Wrong? · Explore ML</title>
+  <meta name="description" content="Why 99% accurate can still be useless. Be a dragon detector, count false alarms and misses, and watch a robot learn from lopsided data.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #cv, #hist { width: 100%; border-radius: 12px; }
+    .four { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .q { font-size: .78rem; font-weight: 700; color: var(--muted); margin-top: 4px; line-height: 1.25; }
+    .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+    .seg .btn.on { background: var(--ink); color: var(--bg); }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .dot-leg { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+    .warnline { font-weight: 800; color: var(--bad); }
+  </style>
+</head>
+<body data-page="demo" data-topic="sup" data-demo="sup-metrics">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="teacher"></i> Supervised Learning</span>
+      <h1>Right <span class="em">or</span> Wrong?</h1>
+      <p class="hero-sub">A dragon detector that is 99% accurate can still be useless. Scan 1000 villagers, count the false alarms and the misses, and find out why.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Each villager has a <b>dragon score</b>. You are the detector: ring the alarm for every score above your line. Drag the <b>alarm line</b>!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv"></canvas>
+        <div class="legend" style="margin-top:8px">
+          <span><i class="dot-leg" style="background:var(--bad)"></i>a real dragon</span>
+          <span><i class="dot-leg" style="background:var(--muted)"></i>an ordinary villager</span>
+        </div>
+        <div class="chart-box" style="margin-top:10px"><canvas id="hist"></canvas></div>
+        <p class="muted" style="margin:6px 4px 0; font-size:.86rem; font-weight:700">Red = dragons, grey = ordinary villagers (each group drawn at its own height so you can see the dragons). Star = best line for this job.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="thr">Alarm line <span class="val" id="thr-lbl">2.0</span></label>
+            <input type="range" id="thr" min="-3" max="6" step="0.1" value="2">
+            <div class="hint">Score above the line means ring the alarm. Low line = rings a lot, high line = rarely rings.</div>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn small" id="lazy"><i data-icon="pause"></i> Lazy robot: never ring</button>
+            <button class="btn small ghost" id="best"><i data-icon="target"></i> Best line</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Report card</h3>
+          <div class="four">
+            <div class="stat"><div class="k">Accuracy</div><div class="v" id="m-acc">0</div><div class="q">How many answers were right?</div></div>
+            <div class="stat"><div class="k">Precision</div><div class="v" id="m-prec">0</div><div class="q">Of the alarms, how many were real?</div></div>
+            <div class="stat"><div class="k">Recall</div><div class="v" id="m-rec">0</div><div class="q">Of the real ones, how many did we catch?</div></div>
+            <div class="stat"><div class="k">Job cost</div><div class="v" id="m-cost">0</div><div class="q">Lower is better for this job</div></div>
+          </div>
+          <p class="verdict" id="verdict" style="font-family:var(--font-head);font-weight:600;margin:8px 0 0"></p>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="repeat"></i> Watch it learn</h3>
+      <p class="muted" style="margin:0 0 8px">A tiny robot (logistic regression) studies the same villagers and learns its own dragon score by gradient descent. Watch <b>accuracy</b> shoot up while <b>recall</b> lags behind.</p>
+      <div class="grid-2">
+        <div>
+          <div class="btn-row">
+            <button class="btn primary" id="train"><i data-icon="play"></i> Train the robot</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="stats" style="margin-top:10px">
+            <div class="stat"><div class="k">Round</div><div class="v" id="l-ep">0</div></div>
+            <div class="stat"><div class="k">Accuracy</div><div class="v" id="l-acc">0</div></div>
+            <div class="stat"><div class="k">Recall</div><div class="v" id="l-rec" style="color:var(--bad)">0</div></div>
+            <div class="stat"><div class="k">Precision</div><div class="v" id="l-prec">0</div></div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="sure">Ring only if robot is <span class="val" data-for="sure"></span> sure</label>
+            <input type="range" id="sure" min="5" max="95" step="5" value="50">
+          </div>
+          <p class="muted" id="l-note" style="margin:6px 0 0;font-weight:700;font-size:.9rem"></p>
+        </div>
+        <div>
+          <div class="legend"><span><i style="background:var(--accent)"></i>accuracy</span><span><i style="background:var(--bad)"></i>recall (dragons caught)</span><span><i style="background:var(--warn)"></i>challenge done</span></div>
+          <div class="chart-box"><canvas id="chart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-lazy"><span class="tick"></span><span>Press the <b>Lazy robot</b>: it never rings and is still 95%+ accurate. Check its recall.</span></div>
+      <div class="chal" id="c-rare"><span class="tick"></span><span>Make the rare thing rarer: start above 5% dragons, then slide down to 1% or less. Accuracy rises, the detector does not get better.</span></div>
+      <div class="chal" id="c-med"><span class="tick"></span><span>Medical test: misses are scary. Choose it and put the line near the star.</span></div>
+      <div class="chal" id="c-spam"><span class="tick"></span><span>Spam filter: false alarms are scary. Choose it and put the line near the star.</span></div>
+      <div class="chal" id="c-cw"><span class="tick"></span><span>Class weights: make a dragon count 25x or more in training so the robot catches at least 60% of dragons.</span></div>
+      <div class="grid-2" style="margin-top:8px">
+        <div class="field">
+          <label>The job</label>
+          <div class="seg" id="scen">
+            <button class="btn small on" data-s="patrol">Dragon patrol</button>
+            <button class="btn small" data-s="med">Medical test</button>
+            <button class="btn small" data-s="spam">Spam filter</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="prev">How many dragons <span class="val" data-for="prev"></span></label>
+          <input type="range" id="prev" min="0.5" max="30" step="0.5" value="2">
+          <div class="hint">Out of 1000 villagers. Real dragons are rare.</div>
+        </div>
+        <div class="field">
+          <label for="cw">Class weight: a dragon counts as <span class="val" data-for="cw"></span></label>
+          <input type="range" id="cw" min="1" max="50" step="1" value="1">
+          <div class="hint">Makes the robot care more about dragon mistakes while learning.</div>
+        </div>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Four boxes tell the whole story: right alarms, false alarms, misses and right quiet.</li>
+      <li>When dragons are rare, saying "no" to everyone is almost always right, so accuracy hides the problem.</li>
+      <li>Precision asks "of the alarms, how many were real?". Recall asks "of the real ones, how many did we catch?".</li>
+      <li>Moving the line trades one for the other. Which mistake is worse decides where the line goes.</li>
+      <li>The robot learns on lopsided data and plays it safe. Giving rare examples more weight makes it catch more.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The four boxes are the <span class="term">confusion matrix</span>: TP, FP, FN, TN. <span class="term">Accuracy</span> = (TP+TN)/N. <span class="term">Precision</span> = TP/(TP+FP). <span class="term">Recall</span> (sensitivity) = TP/(TP+FN). <span class="term">F1</span> = 2PR/(P+R), the harmonic mean, shown here as <b id="f1-out">0</b> for the current line.</p>
+        <ul>
+          <li>The <span class="term">accuracy paradox</span>: with 1% positives, a classifier that always predicts negative scores 99% accuracy and 0 recall. On imbalanced data, report precision, recall, or F1 instead.</li>
+          <li>The <span class="term">precision/recall trade-off</span>: raising the decision threshold cuts false positives but adds false negatives. Sweeping it traces the <span class="term">ROC curve</span> (TPR vs FPR) and the <span class="term">precision-recall curve</span>; PR curves are more informative under heavy imbalance because precision depends on prevalence.</li>
+          <li>The star uses a <span class="term">cost-sensitive</span> choice: the threshold minimising <code>cost_FN·FN + cost_FP·FP</code> over the scores.</li>
+          <li>The learner is <span class="term">logistic regression</span> with full-batch <span class="term">gradient descent</span> on standardised features and weighted <span class="term">log-loss</span>. <span class="term">Class weights</span> multiply the loss of the rare class; this shifts predicted probabilities up, similar to lowering the threshold. Other remedies: resampling (SMOTE, undersampling), threshold tuning, better features.</li>
+          <li>Caveat: metrics here are on the same villagers used for training (only 3 parameters, so little overfitting). A real project scores on held-out data.</li>
+        </ul>
+        <p>Further reading: scikit-learn user guide, "Metrics and scoring" · Saito and Rehmsmeier (2015) on precision-recall plots.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/sup-metrics-core.js"></script>
+  <script src="js/sup-metrics.js"></script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Throw Darts to Find Pi · Explore ML</title>
+  <meta name="description" content="Throw random darts to estimate pi, then settle the Monty Hall puzzle by playing it ten thousand times.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .st3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .st3 .stat .v { font-size: 1.3rem; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cv { width: 100%; display: block; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .panel .card, .canvas-box { min-width: 0; }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .bar { height: 14px; border-radius: 8px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tags span { background: var(--bg-2); border: 2px solid var(--line); border-radius: 10px; padding: 2px 8px; font-weight: 800; font-size: .82rem; font-family: var(--font-mono); }
+    .tags span.p { border-color: var(--bad); } .tags span.n { border-color: var(--good); }
+    .doors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .door { font: inherit; font-family: var(--font-head); font-size: 2rem; font-weight: 700; min-height: 110px; border-radius: 16px; border: 3px solid var(--ink); background: var(--accent); color: #fff; cursor: pointer; }
+    .door:focus-visible { outline: 3px solid var(--warn); outline-offset: 2px; }
+    .door:disabled { cursor: default; }
+    .door.picked { box-shadow: 0 0 0 4px var(--warn); }
+    .door.open { background: var(--bg-2); color: var(--ink); font-size: 1rem; border-color: var(--line); }
+    .door.car { background: var(--good); color: #fff; }
+    @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="prob" data-demo="prob-monte">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="dice"></i> Probability &amp; Uncertainty</span>
+      <h1>Throw Darts to Find <span class="em">Pi</span></h1>
+      <p class="hero-sub">Random guesses can find exact-looking answers. Throw darts at a circle, then beat a puzzle by simulating it.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Throw some darts! <b>Nobody aims</b>, yet counting the ones inside the circle will reveal pi.</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <div class="seg" role="group" aria-label="Pick an experiment">
+            <button type="button" id="tab-pi" class="on" aria-pressed="true">Darts and pi</button>
+            <button type="button" id="tab-mh" aria-pressed="false">Monty Hall</button>
+          </div>
+        </div>
+
+        <div id="pane-pi">
+          <canvas id="board" class="cv" aria-label="A square with a quarter circle. Random darts land inside; the ones inside the circle are coloured."></canvas>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn primary small" id="d10"><i data-icon="plus"></i> 10 darts</button>
+            <button class="btn small" id="d1k"><i data-icon="plus"></i> 1,000 darts</button>
+            <button class="btn small" id="d10k"><i data-icon="zap"></i> 10,000 darts</button>
+            <button class="btn ghost small" id="dreset"><i data-icon="reset"></i> Reset</button>
+          </div>
+        </div>
+
+        <div id="pane-mh" hidden>
+          <p class="muted" id="mh-msg" style="font-weight:800; margin:0 0 8px" aria-live="polite">A car is behind one door, goats behind the others. Pick a door!</p>
+          <div class="doors" id="doors">
+            <button type="button" class="door" data-d="0" aria-label="Door 1">1</button>
+            <button type="button" class="door" data-d="1" aria-label="Door 2">2</button>
+            <button type="button" class="door" data-d="2" aria-label="Door 3">3</button>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn small" id="stay" disabled>Stay with my door</button>
+            <button class="btn small primary" id="swap" disabled>Switch doors</button>
+            <button class="btn small ghost" id="again" hidden><i data-icon="repeat"></i> Next round</button>
+          </div>
+          <div class="st3" style="margin-top:10px">
+            <div class="stat"><div class="k">By hand: stay</div><div class="v" id="h-stay">0 / 0</div></div>
+            <div class="stat"><div class="k">By hand: switch</div><div class="v" id="h-swap">0 / 0</div></div>
+            <div class="stat"><div class="k">Rounds</div><div class="v" id="h-n">0</div></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card" id="card-pi">
+          <h3><i data-icon="target"></i> The estimate</h3>
+          <div class="st3">
+            <div class="stat"><div class="k">Darts</div><div class="v" id="n">0</div></div>
+            <div class="stat"><div class="k">In circle</div><div class="v" id="in">0</div></div>
+            <div class="stat"><div class="k">Pi guess</div><div class="v" id="est">?</div></div>
+          </div>
+          <p class="muted" id="errtxt" style="margin:8px 0 0; font-weight:700">Real pi is 3.14159. Throw some darts!</p>
+        </div>
+
+        <div class="card" id="card-mh" hidden>
+          <h3><i data-icon="zap"></i> Run 10,000 games</h3>
+          <div class="btn-row">
+            <button class="btn small" id="sim-stay">Always stay</button>
+            <button class="btn small primary" id="sim-swap">Always switch</button>
+          </div>
+          <div class="field" style="margin-top:10px"><div class="lbl">Stay wins <span class="val" id="s-stay">-</span></div><div class="bar"><i id="b-stay" style="background:var(--warn)"></i></div></div>
+          <div class="field" style="margin-top:8px"><div class="lbl">Switch wins <span class="val" id="s-swap">-</span></div><div class="bar"><i id="b-swap" style="background:var(--good)"></i></div></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="trend"></i> Error shrinks slowly</h3>
+          <canvas id="curve" class="cv" aria-label="Chart of the average error in the pi guess against the number of darts, both on log scales."></canvas>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>typical error (40 runs)</span><span><i style="background:var(--warn)"></i>1 ÷ √darts</span><span><i style="background:var(--good)"></i>your guess</span></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-1k"><span class="tick"></span><span>Throw 1,000 darts and see a guess that is close to pi.</span></div>
+      <div class="chal" id="c-close"><span class="tick"></span><span>Keep throwing until your guess is within 0.03 of real pi (with at least 1,000 darts).</span></div>
+      <div class="chal" id="c-hand"><span class="tick"></span><span>Play Monty Hall by hand: try at least 3 rounds that stay and 3 that switch.</span></div>
+      <div class="chal" id="c-sim"><span class="tick"></span><span>Run 10,000 games of always-stay and of always-switch. Which one wins about twice as often?</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Random darts know nothing about circles, yet counting how many land inside gives pi. Area ratio times 4.</li>
+      <li>Few darts, wobbly guess. More darts, steadier guess. But to get 10 times more accurate you need about 100 times more darts.</li>
+      <li>In Monty Hall, your first pick wins only 1 time in 3, and that does not change when the host opens a goat door. So switching wins 2 times in 3.</li>
+      <li>When thinking is confusing, simulate it! Running the game thousands of times is a real way to find an answer.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p><span class="term">Monte Carlo methods</span> estimate a quantity by random sampling. For pi: draw <code>(x, y)</code> uniform on the unit square; <code>P(x² + y² ≤ 1) = π/4</code>, so <code>π ≈ 4 · hits / n</code>.</p>
+        <ul>
+          <li>Each dart is a Bernoulli trial with <code>p = π/4</code>, so the estimate has standard deviation <code>4 √(p(1−p) / n) ≈ 1.64 / √n</code>. That is the <span class="term">1/√n</span> error rate: it does not depend on dimension, which is why Monte Carlo is used for hard high-dimensional integrals (physics, graphics, finance, reinforcement learning rollouts).</li>
+          <li>The chart averages 40 independent runs per size, so the orange 1 ÷ √n guide and the blue measured curve are parallel lines on log-log axes (slope −1/2).</li>
+          <li><span class="term">Monty Hall</span>: P(car behind your first pick) = 1/3. The host always opens a goat door that you did not pick, which gives no new information about your pick, so the other closed door carries the remaining 2/3. The simulation here follows the exact rules, including the host choosing randomly when two goat doors are available.</li>
+          <li>The random number generator is a seeded <span class="term">pseudo-random</span> generator (mulberry32), so a run is reproducible.</li>
+        </ul>
+        <p>Further reading: Metropolis and Ulam (1949), <i>The Monte Carlo Method</i> · Khan Academy, <i>Monty Hall problem</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/prob-monte-core.js"></script>
+  <script src="js/prob-monte.js"></script>
+</body>
+</html>

@@ -9,11 +9,9 @@
   const { ctx: actx } = ML.setupCanvas(document.getElementById("acc"), AW, AH);
   const { hexRgb, rgb } = SupKit;
 
-  const NAMES = ["apple", "lemon", "pear"];
+  const FC = window.FruitCore;
+  const { NAMES } = FC;
   const COLOR_VARS = ["--bad", "--lang", "--vision"];
-  // Where each fruit really grows: [roundness, yellowness], spread.
-  const HOME = [{ x: 0.78, y: 0.22, s: 0.09 }, { x: 0.5, y: 0.8, s: 0.08 }, { x: 0.28, y: 0.42, s: 0.09 }];
-
   // ---------- vector fruit (same paths for canvas + HTML) ----------
   const FRUIT_PATHS = [
     { body: "M12 7.5c-2-1.6-7.5-1.6-7.5 4.5 0 4.3 2.8 8.5 5.2 8.5 1 0 1.4-.5 2.3-.5s1.3.5 2.3.5c2.4 0 5.2-4.2 5.2-8.5 0-6.1-5.5-6.1-7.5-4.5z",
@@ -71,36 +69,12 @@
   function readColors() { RGB = COLOR_VARS.map((v) => hexRgb(ML.cssVar(v))); }
   readColors();
 
-  function sample(c, spread = 1) {
-    const h = HOME[c];
-    return { x: ML.clamp(h.x + ML.randn() * h.s * spread, 0.02, 0.98), y: ML.clamp(h.y + ML.randn() * h.s * spread, 0.02, 0.98), c };
-  }
-  function makeTest(spread) {
-    state.test = [];
-    for (let i = 0; i < 60; i++) state.test.push(sample(i % 3, spread));
-  }
+  const sample = (c, spread = 1) => FC.sample(c, spread, ML);
+  function makeTest(spread) { state.test = FC.makeTest(spread, ML); }
 
-  // ---------- k-NN ----------
-  function knn(x, y, k = shownK(), pts = shownPts()) {
-    const d = pts.map((p, i) => [Math.hypot(p.x - x, p.y - y), i]);
-    d.sort((a, b) => a[0] - b[0]);
-    const near = d.slice(0, Math.min(k, d.length));
-    const v = [0, 0, 0];
-    near.forEach(([, i]) => v[pts[i].c]++);
-    const n = near.length || 1;
-    const probs = v.map((c) => c / n);
-    // tie-break by the single closest neighbour
-    const mx = Math.max(...v);
-    let guess = v.indexOf(mx);
-    if (v.filter((c) => c === mx).length > 1 && near.length) guess = pts[near[0][1]].c;
-    return { probs, near, votes: v, guess };
-  }
-  function testAcc(pts = state.pts, k = state.k) {
-    if (!pts.length) return null;
-    let ok = 0;
-    for (const t of state.test) if (knn(t.x, t.y, k, pts).guess === t.c) ok++;
-    return ok / state.test.length;
-  }
+  // ---------- k-NN (see sup-fruit-core.js) ----------
+  const knn = (x, y, k = shownK(), pts = shownPts()) => FC.knn(pts, x, y, k);
+  const testAcc = (pts = state.pts, k = state.k) => FC.testAcc(pts, state.test, k);
 
   // ---------- map rendering ----------
   function renderMap(g, gw, gh, pts, k) {

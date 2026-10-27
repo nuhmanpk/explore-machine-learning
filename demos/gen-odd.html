@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spot the Stranger · Explore ML</title>
+  <meta name="description" content="Train a network on one kind of picture, then catch the pictures it has never seen because it rebuilds them badly.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .three { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cp-head h3 { margin: 0; }
+    .cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; touch-action: none; }
+    .cv.pick { cursor: crosshair; }
+    .cv:focus-visible { outline: 3px solid var(--accent); }
+    .note { margin: 8px 4px 0; font-size: .88rem; font-weight: 700; color: var(--muted); }
+    .kchips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .kbtn { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px; min-height: 36px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .kbtn[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--card)); }
+    .kbtn:focus-visible { outline: 3px solid var(--accent); }
+    .kbtn i.sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .tag { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+    input[type=range] { width: 100%; }
+  </style>
+</head>
+<body data-page="demo" data-topic="gen" data-demo="gen-odd">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="palette"></i> Generative Models</span>
+      <h1>Spot the <span class="em">Stranger</span></h1>
+      <p class="hero-sub">A network that only practised on one kind of picture can't rebuild anything else. Its mistakes give away the strangers.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I learned to rebuild only <b>one kind</b> of picture. Strangers look wrong to me, so my rebuild is bad. Slide the <b>alarm line</b> and catch them all!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="field" style="margin-bottom:10px"><div class="lbl">The only kind it learns (normal)</div><div class="kchips" id="kinds" role="group" aria-label="Choose the normal kind of picture"></div></div>
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3><i data-icon="search"></i> Rebuild mistakes <span class="muted" id="state"></span></h3>
+          <button class="btn ghost small" id="shuffle"><i data-icon="shuffle"></i> Other examples</button>
+        </div>
+        <canvas class="cv" id="hist" role="img" aria-label="Rebuild error of each test picture, normal pictures and strangers as differently coloured dots, with the alarm line"></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>normal picture</span><span><i style="background:var(--bad)"></i>stranger</span><span><i style="background:var(--ink)"></i>alarm line</span></div>
+        <canvas class="cv" id="gal" style="margin-top:10px" role="img" aria-label="Eight test pictures with their rebuilds. Flagged ones have a red frame."></canvas>
+        <p class="note">Top: the picture. Bottom: the rebuild. A red frame means the alarm rang.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="thr">Alarm line (rebuild error) <b class="val" data-for="thr"></b></label>
+            <input type="range" id="thr" min="0" max="100" step="1" value="40">
+            <div class="hint">Error above the line rings the alarm. Low line rings a lot, high line rarely rings.</div>
+          </div>
+          <button class="btn small" id="best"><i data-icon="target"></i> Best line</button>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Did it catch them?</h3>
+          <div class="three"><div class="stat"><div class="k">Precision</div><div class="v" id="s-p">-</div></div><div class="stat"><div class="k">Recall</div><div class="v" id="s-r">-</div></div><div class="stat"><div class="k">Balance</div><div class="v" id="s-f">-</div></div></div>
+          <div class="two"><div class="stat"><div class="k">Strangers caught</div><div class="v" id="s-tp">-</div></div><div class="stat"><div class="k">False alarms</div><div class="v" id="s-fp" style="color:var(--bad)">-</div></div></div>
+          <p class="note" style="margin:0">Precision: of all alarms, how many were real strangers. Recall: of all strangers, how many we caught. Balance is the two together (F1).</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-low"><span class="tick"></span><span>Jumpy alarm: set the line so low that every stranger is caught (100% recall) but precision falls under 70%.</span></div>
+      <div class="chal" id="c-high"><span class="tick"></span><span>Sleepy alarm: set the line so high that the alarm only rings for real strangers (100% precision) yet it catches less than 60% of them.</span></div>
+      <div class="chal" id="c-best"><span class="tick"></span><span>Just right: reach a balance of 90% or more.</span></div>
+      <div class="chal" id="c-switch"><span class="tick"></span><span>Different job: pick another normal kind, wait for it to learn, and reach a balance of 90% again.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The network practised on only one kind of picture, so it learned that kind's shapes and nothing else. Anything different is rebuilt badly.</li>
+      <li>The <b>rebuild error</b> is an "oddness score". No stranger was ever shown to it and nobody labelled the strangers during training.</li>
+      <li>The alarm line is a trade-off. Low: you catch every stranger but cry wolf. High: no false alarms but strangers slip by. Precision and recall measure the two sides.</li>
+      <li>Some strangers look a bit like normal pictures (a ring is a square with a hole), so they are harder to catch.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">anomaly detection</span> (or novelty detection) with an <span class="term">autoencoder</span> (<code>64 → 24 → 3 → 24 → 64</code>). It is trained on 150 "normal" pictures only; the 3-number bottleneck leaves room for the normal shapes but not for the others.</p>
+        <ul>
+          <li>Anomaly score = <span class="term">reconstruction error</span> (mean squared error). A picture is flagged when its score is above the <span class="term">threshold</span>.</li>
+          <li><span class="term">Precision</span> = TP / (TP + FP). <span class="term">Recall</span> = TP / (TP + FN). <span class="term">F1</span> = 2TP / (2TP + FP + FN). Moving the threshold trades one for the other, tracing a precision-recall curve.</li>
+          <li>The test set is 30 normal and 30 stranger pictures, so one error moves the numbers by 3 percentage points. Real fraud or fault data has far fewer strangers, which makes precision much harder.</li>
+          <li>Autoencoders can be too good: a big bottleneck rebuilds strangers well too, and the detector stops working. Try the previous lessons' idea in reverse.</li>
+        </ul>
+        <p>Further reading: Chandola, Banerjee and Kumar, <i>Anomaly Detection: A Survey</i> (2009); Sakurada and Yairi (2014), <i>Anomaly detection using autoencoders</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/gen-odd-core.js"></script>
+  <script src="js/gen-odd.js"></script>
+</body>
+</html>

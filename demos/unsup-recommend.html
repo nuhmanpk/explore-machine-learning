@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Movie Recommender · Explore ML</title>
+  <meta name="description" content="Rate a few made-up movies and watch a robot find your taste twins and suggest what to watch next, using collaborative filtering and a tiny taste map.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .movies { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .mv { background: var(--card); border: 3px solid var(--line); border-radius: 16px; padding: 8px; display: grid; gap: 6px; position: relative; min-width: 0; }
+    .mv.pick { border-color: var(--accent); box-shadow: 0 3px 0 var(--accent); }
+    .mv.focus { outline: 3px dashed var(--accent); outline-offset: 2px; }
+    .mv .poster { height: 54px; border-radius: 11px; display: grid; place-items: center; color: #fff; }
+    .mv .poster svg { width: 30px; height: 30px; }
+    .mv .nm { font-family: var(--font-head); font-weight: 600; font-size: .95rem; line-height: 1.15; text-align: left; background: none; border: 0; padding: 0; color: var(--ink); cursor: pointer; }
+    .stars { display: flex; gap: 0; }
+    .stars button { background: none; border: 0; padding: 2px; cursor: pointer; color: var(--line); line-height: 0; border-radius: 6px; }
+    .stars button svg { width: 22px; height: 22px; fill: currentColor; }
+    .stars button.on { color: var(--warn); }
+    .stars button:focus-visible { outline: 3px solid var(--accent); }
+    .guess { font-size: .82rem; font-weight: 800; color: var(--muted); min-height: 2.3em; }
+    .guess b { color: var(--accent); font-size: 1rem; }
+    .badge-pick { position: absolute; top: -9px; right: 8px; background: var(--accent); color: #fff; font-weight: 800; font-size: .74rem; border-radius: 999px; padding: 2px 9px; }
+    .twin { display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; font-weight: 700; font-size: .92rem; }
+    .bar { height: 12px; border-radius: 99px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+    .twin small { color: var(--muted); font-family: var(--font-mono); font-size: .75rem; }
+    #mapcv, #chart { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); touch-action: manipulation; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .chal .n { font-family: var(--font-mono); color: var(--accent); }
+    .seg { display: flex; gap: 8px; flex-wrap: wrap; }
+    .why { font-size: .9rem; display: grid; gap: 6px; }
+    .why .row2 { display: flex; gap: 8px; align-items: flex-start; }
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: .8rem; font-weight: 800; color: var(--muted); margin-top: 6px; }
+    .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -1px; margin-right: 4px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body data-page="demo" data-topic="unsup" data-demo="unsup-recommend">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="heart"></i> Finding Groups</span>
+      <h1>Movie <span class="em">Recommender</span></h1>
+      <p class="hero-sub">Twenty kids have rated these made-up movies. Rate a few yourself and the robot will find the kids whose taste looks like yours, then guess which movies you'll love.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Tap the stars to rate <b>4 or 5 movies</b> you think you would like or hate. I'll take it from there!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <h3 style="margin:0 0 8px"><i data-icon="film"></i> Rate some movies <small class="muted" id="rated-note"></small></h3>
+        <div class="movies" id="grid"></div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn small ghost" id="b-clear"><i data-icon="eraser"></i> Clear my stars</button>
+          <button class="btn small" id="b-demo"><i data-icon="shuffle"></i> Rate for me (action fan)</button>
+        </div>
+
+        <h3 style="margin:16px 0 4px"><i data-icon="trophy"></i> Robo's top picks for you</h3>
+        <div id="picks" class="muted" style="font-weight:700">Rate a few movies first.</div>
+
+        <div id="twinbox" style="margin-top:14px">
+          <h3 style="margin:0 0 4px"><i data-icon="groups"></i> Your taste twins</h3>
+          <div id="twins"></div>
+        </div>
+        <div id="mapbox" hidden style="margin-top:14px">
+          <h3 style="margin:0 0 6px"><i data-icon="map"></i> The taste map</h3>
+          <canvas id="mapcv"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>kids</span><span><i style="background:var(--ink)"></i>movies</span><span><i style="background:var(--warn)"></i>you</span></div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn small" id="b-reveal"><i data-icon="eye"></i> Colour kids by their secret group</button>
+          </div>
+          <p class="muted" style="margin:6px 0 0;font-size:.85rem;font-weight:700">Kids who like similar movies end up close together. Tap a dot to see who it is.</p>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="lbl" style="font-weight:800;font-size:.92rem;margin-bottom:6px">How should I guess?</div>
+          <div class="seg">
+            <button class="btn small on" id="m-cf"><i data-icon="groups"></i> Taste twins</button>
+            <button class="btn small" id="m-mf"><i data-icon="map"></i> Taste map</button>
+          </div>
+          <div id="cf-opts" style="margin-top:10px; display:grid; gap:10px">
+            <div class="seg">
+              <button class="btn small on" id="s-pearson">Compare tastes</button>
+              <button class="btn small" id="s-cosine">Compare raw stars</button>
+            </div>
+            <div class="field">
+              <label for="k">Twins I listen to <span class="val" data-for="k"></span></label>
+              <input type="range" id="k" min="1" max="10" step="1" value="5">
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn primary" id="b-learn"><i data-icon="play"></i> Watch it learn</button>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Hold-out error</div><div class="v" id="s-err">–</div></div>
+            <div class="stat"><div class="k">You rated</div><div class="v" id="s-you">0</div></div>
+          </div>
+          <div class="chart-box" style="margin-top:8px"><canvas id="chart"></canvas></div>
+          <div class="legend" id="chart-legend"></div>
+          <div class="hint muted" style="font-size:.85rem; margin-top:4px" id="chart-note"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges <small class="muted">(they get a numbered flag on the chart)</small></h3>
+      <div class="chal" id="c-cheat"><span class="tick"></span><span><span class="n">1</span> The cheater: give every movie 5 stars. Can the robot learn anything about you?</span></div>
+      <div class="chal" id="c-cold"><span class="tick"></span><span><span class="n">2</span> A brand-new movie that nobody has rated. What can the robot say about it?</span></div>
+      <div class="chal" id="c-odd"><span class="tick"></span><span><span class="n">3</span> Odd taste: like and dislike movies in a way that matches nobody (best twin below 35%).</span></div>
+      <div class="chal" id="c-few"><span class="tick"></span><span><span class="n">4</span> Fewer ratings: let the crowd keep only 30% or less of their ratings.</span></div>
+      <div class="field" style="margin-top:8px; max-width:420px">
+        <label for="dens">Ratings the crowd kept <span class="val" data-for="dens"></span></label>
+        <input type="range" id="dens" min="10" max="100" step="5" value="100">
+      </div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn small" id="t-cheat"><i data-icon="star"></i> Rate all 5 stars</button>
+        <button class="btn small" id="t-cold"><i data-icon="plus"></i> Add a new movie</button>
+        <button class="btn small" id="t-odd"><i data-icon="wave"></i> Odd taste viewer</button>
+        <button class="btn small" id="t-few"><i data-icon="minus"></i> Crowd keeps 25%</button>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="star"></i></div><h3>You rate</h3><p>Your stars are your taste fingerprint.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="groups"></i></div><h3>Find twins</h3><p>Robo checks which kids gave similar stars on the same movies.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="heart"></i></div><h3>Ask the twins</h3><p>For a movie you haven't seen, Robo listens most to your closest twins.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="check"></i></div><h3>Test itself</h3><p>Robo hides some known ratings, guesses them, and checks how far off it was.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Nobody told the robot what "action" or "funny" means. It only saw stars.</li>
+      <li>It found kids whose stars looked like yours and borrowed their opinions.</li>
+      <li>The taste map showed groups of kids and movies appearing all by themselves.</li>
+      <li>It checks itself by hiding ratings it already knows. More kids joining makes the guesses better.</li>
+      <li>It struggles with cheaters, brand-new movies, odd tastes and when few ratings exist.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">collaborative filtering</span>: recommending from patterns in a <span class="term">user-item rating matrix</span> with many missing entries, with no information about the movies themselves. The 20 viewers and 12 movies are synthetic: three hidden taste groups plus noise, with about a third of ratings missing.</p>
+        <ul>
+          <li><b>User-based CF:</b> similarity between two viewers is computed on movies both rated. "Compare tastes" is the <span class="term">Pearson / mean-centred cosine</span> similarity (each person's average is subtracted first); "Compare raw stars" is plain <span class="term">cosine similarity</span>, which is high for almost everyone because ratings are all positive. The prediction is your mean plus the similarity-weighted average of each neighbour's deviation from their own mean, using the top-k neighbours. Similarities with few shared movies are shrunk.</li>
+          <li><b>Matrix factorisation:</b> rating ≈ μ + bᵤ + bᵢ + pᵤ·qᵢ with rank 2, trained by <span class="term">stochastic gradient descent</span> with L2 regularisation. The 2-D vectors are <span class="term">latent factors</span>, which is why the taste map can be drawn. The axes themselves have no fixed meaning. Both charts use <span class="term">hold-out</span> ratings the model never trained on (RMSE); the training error keeps falling while hold-out error can stall or rise, which is overfitting.</li>
+          <li><b>Cheating / no signal:</b> constant ratings have zero variance after centring, so the similarity is undefined and the model falls back to the crowd's average, a <span class="term">popularity baseline</span>.</li>
+          <li><b>Cold start:</b> an item or user with no ratings has no similarity to use. Real systems fall back to popularity or content features (genre, text) and hybrid models.</li>
+          <li><b>Sparsity:</b> fewer observed ratings means fewer co-rated items, noisier similarities and worse error.</li>
+          <li><b>Filter bubbles:</b> recommending only what your twins liked narrows what you see, and what is shown shapes what gets rated next (a <span class="term">feedback loop</span>). Real systems add exploration and diversity.</li>
+        </ul>
+        <p>Further reading: Koren, Bell and Volinsky, "Matrix Factorization Techniques for Recommender Systems" (2009) · the Netflix Prize.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/sup-kit.js"></script>
+  <script src="js/unsup-recommend-core.js"></script>
+  <script src="js/unsup-recommend.js"></script>
+</body>
+</html>

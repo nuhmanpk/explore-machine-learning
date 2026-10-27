@@ -1,6 +1,7 @@
 // Teach the Ear — live spectrogram, onset-aligned sound clips and a KNN classifier.
 (function () {
-  const BANDS = 32, CLIP = 45, SLICES = 12; // 45 frames ≈ 0.75 s
+  const core = window.EarCore;
+  const { BANDS, CLIP, SLICES } = core;
   const COLORS = ["--audio", "--rl", "--nn", "--vision"];
   const SW = 660, SH = 200;
   const spec = ML.setupCanvas(document.getElementById("spec"), SW, SH);
@@ -28,22 +29,13 @@
     analyser.fftSize = 2048;
     analyser.smoothingTimeConstant = 0.2;
     freq = new Uint8Array(analyser.frequencyBinCount);
-    // log-spaced band edges, 80 Hz → 8 kHz
-    const hz = actx.sampleRate / analyser.fftSize;
-    bandIdx = [];
-    for (let b = 0; b <= BANDS; b++) bandIdx.push(Math.max(1, Math.round((80 * Math.pow(100, b / BANDS)) / hz)));
+    bandIdx = core.bandEdges(actx.sampleRate, analyser.fftSize);
     return actx;
   }
 
   function bands() {
     analyser.getByteFrequencyData(freq);
-    const out = new Float32Array(BANDS);
-    for (let b = 0; b < BANDS; b++) {
-      let s = 0, n = 0;
-      for (let i = bandIdx[b]; i < Math.max(bandIdx[b + 1], bandIdx[b] + 1); i++) { s += freq[i]; n++; }
-      out[b] = Math.pow(s / n / 255, 1.5);
-    }
-    return out;
+    return core.bandsFromFreq(freq, bandIdx);
   }
 
   // ---------- built-in sounds ----------
@@ -140,13 +132,7 @@
     });
   }
 
-  function centroid(c) {
-    if (!c.examples.length) return null;
-    const m = new Float32Array(BANDS * SLICES);
-    for (const ex of c.examples) for (let i = 0; i < m.length; i++) m[i] += ex.img[i] / c.examples.length;
-    return m;
-  }
-
+  const centroid = core.centroid;
   // img is BANDS × SLICES, band-major columns (time → x, low → bottom)
   function drawClip(ctx, w, h, img, color) {
     ctx.clearRect(0, 0, w, h);
@@ -167,55 +153,9 @@
     ctx.globalAlpha = 1;
   }
 
-  // ---------- features ----------
-  function makeExample(frames) {
-    const img = new Float32Array(BANDS * SLICES);
-    const per = frames.length / SLICES;
-    for (let s = 0; s < SLICES; s++)
-      for (let b = 0; b < BANDS; b++) {
-        let v = 0, n = 0;
-        for (let f = Math.floor(s * per); f < Math.floor((s + 1) * per); f++) { v += frames[f][b]; n++; }
-        img[s * BANDS + b] = n ? v / n : 0;
-      }
-    let mx = 0;
-    for (const v of img) mx = Math.max(mx, v);
-    if (mx > 0) for (let i = 0; i < img.length; i++) img[i] /= mx;
-    const mean = new Float32Array(BANDS);
-    for (let s = 0; s < SLICES; s++) for (let b = 0; b < BANDS; b++) mean[b] += img[s * BANDS + b] / SLICES;
-    const vec = Array.from(img).concat(Array.from(mean).map((v) => v * 3));
-    const norm = Math.hypot(...vec) || 1;
-    return { img, vec: vec.map((v) => v / norm) };
-  }
-
-  // k-nearest neighbours with cosine similarity
-  function knn(vec, skip) {
-    const all = [];
-    S.classes.forEach((c, ci) => c.examples.forEach((ex, ei) => {
-      if (ex === skip) return;
-      let dot = 0;
-      for (let i = 0; i < vec.length; i++) dot += vec[i] * ex.vec[i];
-      all.push({ ci, ei, ex, sim: dot });
-    }));
-    all.sort((a, b) => b.sim - a.sim);
-    const near = all.slice(0, 3);
-    const votes = new Array(S.classes.length).fill(0);
-    for (const n of near) votes[n.ci] += 1 / (1.05 - n.sim);
-    const tot = votes.reduce((a, b) => a + b, 0) || 1;
-    return { near, probs: votes.map((v) => v / tot) };
-  }
-
-  function quizScore() {
-    let n = 0, ok = 0;
-    const ready = S.classes.filter((c) => c.examples.length).length >= 2;
-    if (!ready) return null;
-    S.classes.forEach((c, ci) => c.examples.forEach((ex) => {
-      const r = knn(ex.vec, ex);
-      if (!r.near.length) return;
-      n++;
-      if (r.probs.indexOf(Math.max(...r.probs)) === ci) ok++;
-    }));
-    return n ? ok / n : null;
-  }
+  const makeExample = core.makeExample;
+  const knn = (vec, skip) => core.knn(S.classes, vec, skip);
+  const quizScore = () => core.quizScore(S.classes);
 
   function totalExamples() { return S.classes.reduce((s, c) => s + c.examples.length, 0); }
 

@@ -240,27 +240,8 @@
 
   // ---------- KNN ----------
   // k is never bigger than the smallest taught group, so one group can't be out-voted by sheer numbers
-  function currentK() {
-    const sizes = classes.map((c) => c.examples.length).filter((n) => n > 0);
-    return Math.max(1, Math.min(K, ...sizes));
-  }
-  function predict(emb, skipEx = null) {
-    const all = [];
-    classes.forEach((c, ci) => c.examples.forEach((e) => {
-      let s = 0; const v = e.emb;
-      for (let i = 0; i < v.length; i++) s += v[i] * emb[i];
-      all.push({ ci, s, e, skip: e === skipEx });
-    }));
-    if (skipEx) all.splice(all.findIndex((a) => a.skip), 1);
-    all.sort((a, b) => b.s - a.s);
-    const k = currentK();
-    const top = all.slice(0, Math.min(k, all.length));
-    const votes = new Array(classes.length).fill(0);
-    // closer neighbours get a much louder vote: weight = e^(20·similarity)
-    top.forEach((t) => (votes[t.ci] += Math.exp(20 * (t.s - top[0].s))));
-    const tot = votes.reduce((a, b) => a + b, 0) || 1;
-    return { probs: votes.map((v) => v / tot), top };
-  }
+  const currentK = () => TeachCore.currentK(classes, K);
+  const predict = (emb, skipEx = null) => TeachCore.predict(classes, K, emb, skipEx);
 
   function renderBars(probs) {
     const bars = $("#bars");
@@ -487,31 +468,9 @@
     const pts = [];
     classes.forEach((c, ci) => c.examples.forEach((e) => pts.push({ e, ci })));
     if (pts.length < 2) { pca = { pts, comps: null }; return; }
-    const d = pts[0].e.emb.length, n = pts.length;
-    const mean = new Float32Array(d);
-    pts.forEach((p) => { for (let i = 0; i < d; i++) mean[i] += p.e.emb[i] / n; });
-    const X = pts.map((p) => { const r = new Float32Array(d); for (let i = 0; i < d; i++) r[i] = p.e.emb[i] - mean[i]; return r; });
-    const comps = [];
-    const rng = ML.seeded(7);
-    for (let c = 0; c < 2; c++) {
-      let v = new Float32Array(d).map(() => rng() - 0.5);
-      for (let it = 0; it < 30; it++) {
-        const u = X.map((x) => { let s = 0; for (let i = 0; i < d; i++) s += x[i] * v[i]; return s; });
-        const nv = new Float32Array(d);
-        X.forEach((x, k) => { for (let i = 0; i < d; i++) nv[i] += x[i] * u[k]; });
-        comps.forEach((pc) => { let s = 0; for (let i = 0; i < d; i++) s += nv[i] * pc[i]; for (let i = 0; i < d; i++) nv[i] -= s * pc[i]; });
-        let nn = 0; for (let i = 0; i < d; i++) nn += nv[i] * nv[i];
-        nn = Math.sqrt(nn) || 1;
-        for (let i = 0; i < d; i++) nv[i] /= nn;
-        v = nv;
-      }
-      comps.push(v);
-    }
-    const proj = (x) => comps.map((pc) => { let s = 0; for (let i = 0; i < d; i++) s += (x[i] - mean[i]) * pc[i]; return s; });
-    pts.forEach((p) => (p.xy = proj(p.e.emb)));
-    let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
-    pts.forEach(({ xy }) => { mnx = Math.min(mnx, xy[0]); mxx = Math.max(mxx, xy[0]); mny = Math.min(mny, xy[1]); mxy = Math.max(mxy, xy[1]); });
-    pca = { pts, proj, box: [mnx, mxx, mny, mxy] };
+    const fit = TeachCore.pcaFit(pts.map((p) => p.e.emb), ML.seeded(7));
+    pts.forEach((p, i) => (p.xy = fit.xy[i]));
+    pca = { pts, proj: fit.proj, box: fit.box };
   }
   function toScreen(xy) {
     const [mnx, mxx, mny, mxy] = pca.box, pad = 30;

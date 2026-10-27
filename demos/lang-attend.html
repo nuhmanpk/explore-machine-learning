@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Where to Look · Explore ML</title>
+  <meta name="description" content="See how a model decides which words to look at, and watch a tiny attention model learn it live in your browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .sw { position: relative; padding-top: 96px; }
+    .sw svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .sw path { fill: none; stroke-linecap: round; transition: stroke-width .25s, opacity .25s; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px 6px; position: relative; }
+    .wd {
+      font: inherit; font-weight: 800; padding: 6px 10px; border-radius: 12px; border: 2px solid var(--line);
+      background: var(--card); color: var(--ink); cursor: pointer; touch-action: manipulation; position: relative;
+      transition: background .2s, border-color .2s, transform .2s;
+    }
+    .wd:hover { border-color: var(--accent); }
+    .wd.asker { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .wd.ans { border-color: var(--good); }
+    .wd.user { border-color: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 30%, transparent); }
+    .wd.masked { opacity: .45; text-decoration: line-through; border-style: dashed; }
+    .bars { display: grid; gap: 3px; margin-top: 14px; font-size: .85rem; font-weight: 700; }
+    .br { display: grid; grid-template-columns: 78px 1fr 44px; gap: 8px; align-items: center; }
+    .br .bw { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .br .bt { height: 10px; border-radius: 6px; background: var(--bg-2); position: relative; overflow: hidden; }
+    .br .bt i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 6px; transition: width .2s; }
+    .br .bt i.you { background: var(--warn); height: 5px; top: 0; bottom: auto; }
+    .br .bt i.rob { top: auto; height: 5px; bottom: 0; }
+    .br b { text-align: right; font-family: var(--font-mono); font-size: .8rem; }
+    .bars .tot { text-align: right; color: var(--muted); font-size: .8rem; }
+    .note { font-weight: 700; color: var(--ink-2); font-size: .92rem; min-height: 1.4em; margin: 8px 2px 0; }
+    .lbl-s { margin: 14px 4px 6px; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .play-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+    .play-q { font-weight: 800; font-size: 1.05rem; }
+    .play-res { font-weight: 700; margin-top: 12px; min-height: 1.4em; }
+    .chal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .chal { background: var(--bg-2); border: 2px solid var(--line); border-radius: 16px; padding: 12px 14px; display: grid; gap: 8px; align-content: start; }
+    .chal h4 { margin: 0; font-family: var(--font-head); display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .chal p { margin: 0; color: var(--ink-2); font-weight: 600; font-size: .92rem; }
+    .chal .st { font-size: .75rem; font-weight: 800; padding: 2px 8px; border-radius: 99px; background: var(--card); border: 2px solid var(--line); color: var(--muted); white-space: nowrap; }
+    .chal.ok { border-color: var(--good); }
+    .chal.ok .st { color: var(--good); border-color: var(--good); }
+    .chal.no .st { color: var(--bad); border-color: var(--bad); }
+    #inside { min-height: 150px; }
+    #heat { display: none; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; vertical-align: -1px; }
+    @media (prefers-reduced-motion: reduce) { .sw path, .wd, .br .bt i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="lang" data-demo="lang-attend">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="eye"></i> Self-attention</span>
+      <h1>Where to <span class="em">look</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Sentences are tricky! In <b>"The cat chased the mouse because it was hungry"</b>, who is <b>it</b>? To work that out I shine a spotlight on the right words. You try first!</p>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="gamepad"></i> Play: you are the spotlight</h2>
+    <div class="card" id="play">
+      <div class="play-top">
+        <span class="play-q">Who is <span class="em">"it"</span>? <span class="muted" style="font-weight:700;font-size:.9rem">Tap one word (or two, if you're not sure) to aim your spotlight.</span></span>
+        <span class="chip accent" id="play-score">Round 1 of 6</span>
+      </div>
+      <div id="play-sw"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" id="lock"><i data-icon="check"></i> Lock in</button>
+        <button class="btn ghost" id="pnext" style="display:none"><i data-icon="play"></i> Next sentence</button>
+      </div>
+      <p class="play-res" id="play-res"></p>
+    </div>
+
+    <h2 class="section-title"><i data-icon="cpu"></i> Watch Robo learn where to look</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="btn-row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div class="seg" id="view"><button data-v="arcs" class="on">Arcs</button><button data-v="heat">Heatmap</button></div>
+          <div class="btn-row">
+            <button class="btn ghost small" id="hide-mode"><i data-icon="eraser"></i> Hide a word</button>
+            <button class="btn small" id="newsent"><i data-icon="shuffle"></i> New sentence</button>
+          </div>
+        </div>
+        <div id="watch-sw"></div>
+        <canvas id="heat"></canvas>
+        <p class="note" id="watch-note"></p>
+        <p class="lbl-s"><i data-icon="trend"></i> Test sentences Robo has never seen</p>
+        <canvas id="chart"></canvas>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:.78rem;font-weight:800;color:var(--ink-2);margin:4px 4px 0">
+          <span><span class="dot" style="background:var(--accent)"></span> Picks the right word</span>
+          <span><span class="dot" style="background:var(--good)"></span> Attention on the right word</span>
+          <span><span class="dot" style="background:var(--warn)"></span> A challenge</span>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="train"><i data-icon="play"></i> Robot, learn where to look!</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed">
+              <button data-v="0.08">Slow</button><button data-v="0.25" class="on">Normal</button><button data-v="1">Fast</button><button data-v="8">Turbo</button>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Rounds</div><div class="v" id="st-ep">0</div></div>
+            <div class="stat"><div class="k">Right word</div><div class="v" id="st-acc">–</div></div>
+            <div class="stat"><div class="k">Spotlight on it</div><div class="v" id="st-att">–</div></div>
+          </div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Tap a word to see who it looks at.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="trophy"></i> Challenges</h2>
+    <div class="card">
+      <div class="chal-grid">
+        <div class="chal" id="c1"><h4>A sneaky extra noun <span class="st">not tried</span></h4><p>Add a distractor, like <b>"near the fence"</b>. The right answer is still an animal. Can Robo ignore it?</p><button class="btn small" data-c="1"><i data-icon="play"></i> Try 200 sentences</button></div>
+        <div class="chal" id="c2"><h4>Swap one word <span class="st">not tried</span></h4><p>Change <b>hungry</b> to <b>scared</b> (or <b>big</b> to <b>small</b>). The answer should flip to the other noun!</p><button class="btn small" data-c="2"><i data-icon="shuffle"></i> Flip the clue word</button></div>
+        <div class="chal" id="c3"><h4>Hide the answer <span class="st">not tried</span></h4><p>Cover up the right noun. Does Robo's spotlight move to the other noun?</p><button class="btn small" data-c="3"><i data-icon="eraser"></i> Hide it</button></div>
+      </div>
+      <p class="note" id="chal-note"></p>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— Robo's brain saved along the way. Tap one to see where it looked on the sentence above.</span></h3>
+      <div class="checkpoints" id="ckpts"><span class="muted">They appear after 0, 10, 30, 100, 250 and 600 rounds.</span></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="scissors"></i></div><h3>Words become numbers</h3><p>Every word gets a list of numbers, plus a little number for <em>where</em> it sits in the sentence.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Ask and answer</h3><p>The word <b>it</b> makes a question. Every other word holds up a label saying what it is.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Shine the spotlight</h3><p>Questions that match labels get bright light. All the light adds up to 100%.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Nudge and repeat</h3><p>Light on the right noun? Great. If not, the numbers get nudged so next time it's brighter.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first Robo's spotlight was spread evenly over every word, like a flashlight with no aim.</li>
+        <li>Each practice round pushed more light onto the noun that <b>it</b> really meant.</li>
+        <li>A single clue word (<b>hungry</b> or <b>scared</b>, <b>big</b> or <b>small</b>) was enough to flip where Robo looked.</li>
+        <li>Chatbots do this for every word, many times, all at once. That is how they keep track of who is who.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">scaled dot-product attention</span>, trained from scratch with analytic gradients and Adam. No pretrained model, nothing downloaded.</p>
+        <ul>
+          <li><b>Query, key, value:</b> each token vector is <code>x = embedding + position</code>. The asker's <span class="term">query</span> is <code>q = W<sub>q</sub>c</code>, every token has a <span class="term">key</span> <code>k<sub>j</sub> = W<sub>k</sub>x<sub>j</sub></code>. Here the output we care about is the weights themselves; a full Transformer also mixes <span class="term">value</span> vectors with them.</li>
+          <li><b>Weights:</b> <code>a = softmax(q·k<sub>j</sub> / √d)</code> with <code>d = 12</code>. The <span class="term">softmax</span> makes them sum to 1. Dividing by √d keeps scores from growing too big and saturating. Hidden words get a score of −∞, so their weight is exactly 0.</li>
+          <li><b>Loss:</b> −log of the weight on the correct noun. Gradients flow into <code>W<sub>q</sub></code>, <code>W<sub>k</sub></code>, the word embeddings and the position vectors. They are checked against finite differences (relative error about 1e-8).</li>
+          <li><b>Positional information:</b> attention itself ignores word order, so a learned vector per position is added. Here that is how "first noun" and "second noun" differ.</li>
+          <li><b>Simplification:</b> in a real model a first layer lets "it" absorb the nearby clue word ("was hungry"). We feed <code>c = e<sub>it</sub> + e<sub>clue</sub></code> directly, and only the "it" row is trained, so other rows in the heatmap are mostly noise.</li>
+          <li><b>Results:</b> trained on 600 templated sentences, tested on 300 unseen ones, from about 40% (guessing) to 100% in roughly 100 rounds of 6 sentences. The weight on the correct noun goes from about 10% (1 / sentence length) to above 95%.</li>
+          <li><b>Real LLMs:</b> use <span class="term">multi-head</span> attention (many query/key/value sets looking for different things, like grammar, who-did-what, or nearby words), a <span class="term">causal mask</span> so a word only sees earlier ones, and stack dozens of such layers, each followed by a small feed-forward network.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/lang-attend-core.js"></script>
+  <script src="js/lang-attend.js"></script>
+</body>
+</html>

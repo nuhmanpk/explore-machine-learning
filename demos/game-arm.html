@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robo Arm · Explore ML</title>
+  <meta name="description" content="A fleet of robot arms with muscles learns to pick up a cube at A and drop it on a pad at B, then adapts to heavy cubes, tired muscles, shaky nerves, a tiny pad and a sliding pad.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .fly-pad { display: none; grid-template-columns: repeat(4, 52px); grid-template-rows: 48px; gap: 8px; justify-content: center; margin-top: 10px; }
+    .fly-pad.show { display: grid; }
+    .fly-pad .btn { padding: 0; font-size: 20px; }
+    #arena { background: #dfe6f7; }
+    #babies { width: 100%; flex-wrap: nowrap; }
+    #babies button { flex: 1; white-space: nowrap; font-size: .85rem; padding: 7px 6px; }
+    .assist { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: .88rem; cursor: pointer; }
+    .assist input { width: 18px; height: 18px; accent-color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-arm">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="wrench"></i> Game Lab · Neuroevolution</span>
+      <h1>Robo <span class="em">Arm</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Sixty robot arms, sixty random <b>muscle brains</b>. Each must grab the orange cube at <b>A</b> and drop it on the green pad at <b>B</b>. Press <b>Play</b>!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn" id="drive"><i data-icon="gamepad"></i> I'll control the arm</button>
+          <label class="assist"><input type="checkbox" id="assist" checked> Gravity helper</label>
+          <p class="muted" style="margin:0;font-size:.85rem">↑ ↓ shoulder muscles, ← → elbow muscles, <b>Space</b> squeezes the claw (or use the buttons under the lab). Switch the helper off to feel what the brain must do: hold the arm up with its muscles!</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make the job harder. Watch the arms struggle, then adapt.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="heavy"><i data-icon="layers"></i> Heavy cube <span class="tag">needs strength</span></button>
+            <button class="btn small" data-c="tired"><i data-icon="gauge"></i> Tired muscles <span class="tag">60% power</span></button>
+            <button class="btn small" data-c="shaky"><i data-icon="wave"></i> Shaky nerves <span class="tag">noisy squeezes</span></button>
+            <button class="btn small" data-c="small"><i data-icon="target"></i> Tiny pad <span class="tag">aim well</span></button>
+            <button class="btn small" data-c="moving"><i data-icon="shuffle"></i> Sliding pad <span class="tag">B moves</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> The fleet</h3>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.3">
+            <div class="hint">Small = careful copies. Big = wild new ideas.</div>
+          </div>
+          <div class="seg" id="babies"><button data-v="1" class="on">Show the babies</button><button data-v="0">Leader only</button></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="arena"></canvas>
+          <div class="fly-pad" id="pad" style="grid-template-columns: repeat(5, 52px)">
+            <button class="btn" data-k="up" aria-label="Lift shoulder"><i data-icon="arrow-up"></i></button>
+            <button class="btn" data-k="down" aria-label="Lower shoulder"><i data-icon="arrow-down"></i></button>
+            <button class="btn" data-k="left" aria-label="Lift elbow"><i data-icon="arrow-left"></i></button>
+            <button class="btn" data-k="right" aria-label="Lower elbow"><i data-icon="arrow-right"></i></button>
+            <button class="btn" data-k="claw" aria-label="Squeeze claw"><i data-icon="check"></i></button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the best half did, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--lang)"></i>Reached the cube (%)</span><span><i style="background:var(--vision)"></i>Picked it up (%)</span><span><i style="background:var(--accent)"></i>Delivered to B (%)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip"><i data-icon="step"></i> Next round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-round">1</div></div>
+            <div class="stat"><div class="k">Still working</div><div class="v" id="st-alive">60</div></div>
+            <div class="stat"><div class="k">Holding cube</div><div class="v" id="st-got">0</div></div>
+            <div class="stat"><div class="k">Delivered (best half)</div><div class="v" id="st-top">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the leading arm's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion arm from each round. Tap to watch it work on today's table.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Ten senses</h3><p>Each arm feels its two joint angles and how fast they swing, where its goal is, whether it holds the cube, how closed its claw is and how high it is.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Squeeze muscles</h3><p>Every joint has a lift muscle and a lower muscle. The brain squeezes each one from 0 to 100%. The stronger side wins, and the joint turns. Gravity is always pulling the arm down!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Pick, carry, drop</h3><p>Points for getting the claw to the cube, gripping it, carrying it toward B, and letting go over the pad. Wasting muscle power costs a little.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Copy with changes</h3><p>Babies get their parents' brains with small random changes. Smoother muscle control means more babies.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Make it harder</h3><p>Weak muscles, a heavy cube or a sliding pad break old tricks. The arms have to find new ones.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In round 1 the arms flopped about: muscles squeezed at random and gravity won. Nobody told them how an arm works.</li>
+        <li>Round after round, arms that happened to move the claw toward the cube had more babies. First they learned to <b>reach</b>, then to <b>grip</b>, then to <b>carry</b> and <b>drop</b>.</li>
+        <li>Challenges changed the rules. Scores fell, then climbed again as the arms found new tricks. That is <b>adapting</b>.</li>
+        <li>Factory robots do this job with hand-designed controllers. Research robots also learn it from rewards, like this, but with far more practice.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: 60 small feed-forward networks <code>[10 &rarr; 12 &rarr; 5]</code> (tanh) improved by a genetic algorithm, with no gradients and no labels. The arm is a two-link planar manipulator with gravity, so it must actively hold itself up. That makes it a <span class="term">feedback control</span> problem, like the drone and pole demos.</p>
+        <ul>
+          <li><b>Muscles:</b> each joint has an antagonist pair. Activations (0..1) follow the brain's command through a first-order lag, so muscles take a moment to tense. Joint torque is <code>K &middot; (lower &minus; lift)</code> plus gravity, which depends on the link angles and on the cube when it is held. Damping and joint limits keep the motion stable.</li>
+          <li><b>Inputs (10):</b> shoulder and elbow angles, both angular velocities, the vector from claw to goal (the cube before the grasp, a point above the pad after), whether the cube is held, how closed the claw is, whether the cube is within reach, and the claw's height. <b>Outputs (5):</b> four muscle commands and a claw squeeze (positive = close).</li>
+          <li><b>Grasp rule:</b> the claw must be within 22 px of the cube with the grip more than 60% closed; it lets go when the grip falls below 45%. A released cube falls under gravity, and the delivery counts only if it lands on the pad.</li>
+          <li><b>Fitness:</b> closeness of the claw to the cube (with extra credit for coming very close), +45 for a grasp plus up to +40 for carrying the cube toward B, +100 plus a speed bonus for a delivery, a small penalty for a miss, and a small penalty for average muscle activation so the arms learn to move economically. Scores are summed over two random tables per round (one shown, one scored in the background).</li>
+          <li><b>Genetic algorithm:</b> the top 8% survive unchanged, the rest are children of the top quarter (30% uniform crossover) with Gaussian mutation whose size is spread from small to large.</li>
+          <li><b>Measured in Node</b> (best half of the fleet, one run): about 70% of the best arms could grip the cube by round 5 and 90% by round 20. Deliveries took longer: about 30% by round 35 and around 50% from round 50 on, with round-to-round swings because every round uses new cube and pad positions. The shoulder sits well above the table on purpose: with a low shoulder the cube at A was out of reach for any arm pose.</li>
+          <li><b>The classic alternative:</b> compute joint angles with inverse kinematics, plan a smooth path, and track it with a PID or computed-torque controller. Industrial arms do exactly that, with torque motors instead of muscles. Evolving muscle activations is slower and less precise but needs no model of the arm at all, and it resembles how a nervous system might learn.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-arm-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-arm.js"></script>
+</body>
+</html>

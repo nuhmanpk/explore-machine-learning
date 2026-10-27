@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Who Did You Ask? · Explore ML</title>
+  <meta name="description" content="A robot learns what a town likes from a survey. Ask only one neighbourhood and it fails everywhere else. Fix it by asking a varied crowd.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #chart,#chart2 { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); touch-action: none; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .seg button { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .seg button:focus-visible, .tbl button:focus-visible, .feat input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .lab { display: block; font-weight: 800; font-size: .86rem; margin: 10px 0 6px; }
+    .bars { display: grid; gap: 6px; }
+    .bar { display: grid; grid-template-columns: 7.5em 1fr 3.4em; gap: 8px; align-items: center; font-size: .82rem; font-weight: 800; }
+    .bar .t { height: 12px; border-radius: 6px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar .t i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+    .bar b { font-family: var(--font-mono); text-align: right; }
+    @media (prefers-reduced-motion: reduce) { .bar .t i { transition: none; } }
+    .grp { display: grid; grid-template-columns: 6.5em 1fr 2.6em; gap: 8px; align-items: center; font-weight: 800; font-size: .86rem; margin: 6px 0; }
+    .grp input[type=range] { width: 100%; }
+    .grp .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .big { font-family: var(--font-head); font-size: 1.6rem; font-weight: 600; }
+  </style>
+</head>
+<body data-page="demo" data-topic="data" data-demo="data-sampling">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="layers"></i> Data &amp; Features</span>
+      <h1>Who Did You <span class="em">Ask?</span></h1>
+      <p class="hero-sub">The robot learns which people will like a new skate park, but only from the people you ask. Ask just one neighbourhood and see who it gets wrong.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I only know the people you asked. Right now you asked just Hilltop, because it was close by. How will I do in the rest of town?</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="map"></i> The town <span class="muted" id="askedct"></span></h3>
+          <div class="btn-row"><button class="btn ghost small" id="reset"><i data-icon="shuffle"></i> New town</button></div>
+        </div>
+        <div class="chart-box"><canvas id="chart" role="img" aria-label="Map of the town with four neighbourhoods. Ringed dots are people you asked. Painted colour shows the robot's guess."></canvas></div>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--good)"></i>likes the skate park</span><span><i style="background:var(--bad)"></i>does not</span><span><i style="background:var(--ink)"></i>ring = you asked them</span></div>
+        <p class="muted" style="margin:8px 4px 0; font-size:.88rem; font-weight:700">Faint dots are everyone in town. The colour painted behind them is what the robot would answer there.</p>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="groups"></i> How many will you ask?</h3>
+          <div class="grp"><label for="s-hill"><span class="sw" style="background:var(--accent)"></span>Hilltop</label><input type="range" id="s-hill" min="0" max="100" step="5" value="40"><b id="o-hill">40</b></div>
+          <div class="grp"><label for="s-lake"><span class="sw" style="background:var(--warn)"></span>Lakeside</label><input type="range" id="s-lake" min="0" max="100" step="5" value="0"><b id="o-lake">0</b></div>
+          <div class="grp"><label for="s-old"><span class="sw" style="background:var(--diff)"></span>Old Town</label><input type="range" id="s-old" min="0" max="100" step="5" value="0"><b id="o-old">0</b></div>
+          <div class="grp"><label for="s-mkt"><span class="sw" style="background:var(--good)"></span>Market</label><input type="range" id="s-mkt" min="0" max="100" step="5" value="0"><b id="o-mkt">0</b></div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn small" id="p-conv"><i data-icon="footprints"></i> Convenient: only Hilltop</button>
+            <button class="btn small" id="p-fair"><i data-icon="dice"></i> Fair: same from each</button>
+            <button class="btn small" id="p-big"><i data-icon="plus"></i> Ask 100 in Hilltop</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How well does it know the town? <span class="muted" style="font-size:.8rem">(people you did not ask)</span></h3>
+          <div class="three">
+            <div class="stat"><div class="k">Whole town</div><div class="v big" id="acc">0%</div></div>
+            <div class="stat"><div class="k">People asked</div><div class="v" id="asked">0</div></div>
+            <div class="stat"><div class="k">Worst place</div><div class="v" id="worst">0%</div></div>
+          </div>
+          <div class="bars" style="margin-top:10px">
+            <div class="bar"><span>Hilltop</span><div class="t"><i id="b-hill"></i></div><b id="p-hill">0%</b></div>
+            <div class="bar"><span>Lakeside</span><div class="t"><i id="b-lake"></i></div><b id="p-lake">0%</b></div>
+            <div class="bar"><span>Old Town</span><div class="t"><i id="b-old"></i></div><b id="p-old">0%</b></div>
+            <div class="bar"><span>Market</span><div class="t"><i id="b-mkt"></i></div><b id="p-mkt">0%</b></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-biased"><span class="tick"></span><span>See the bias: ask only one neighbourhood and find the whole-town score under 65% with one place under 55%.</span></div>
+      <div class="chal" id="c-fair"><span class="tick"></span><span>Fair crowd: get every neighbourhood to 70% or more.</span></div>
+      <div class="chal" id="c-smart"><span class="tick"></span><span>Smart, not big: get every neighbourhood to 65% or more while asking 100 people or fewer.</span></div>
+      <div class="chal" id="c-big"><span class="tick"></span><span>Big but biased: ask 100 or more people from one neighbourhood only and see the town still stuck under 65%.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The robot can only copy patterns from the people it was shown. People from a place nobody asked look like strangers to it, so it guesses.</li>
+      <li>Asking more people from the same place made the Hilltop score better but did almost nothing for the rest of town. A bigger biased sample is still biased.</li>
+      <li>A varied sample, with some people from every neighbourhood, fixed it with fewer people.</li>
+      <li>The score for the whole town can look fine while one group is badly treated, so always check each group separately.</li>
+      <li>Real examples: a face tool trained mostly on one skin tone, or a voice tool trained on one accent. The model is not mean, the data was narrow.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The town has four neighbourhoods of 200 people each. Within each, whether a person likes the skate park depends on which side of a line (through that neighbourhood's centre, at a different angle each) they are on, plus 5% random label noise. The learner is <span class="term">k-nearest neighbours</span> (k = 5) and it is scored on everyone who was <em>not</em> asked.</p>
+        <ul>
+          <li>This is <span class="term">sampling bias</span> (selection bias): the training distribution differs from the deployment distribution. A <span class="term">convenience sample</span> is the typical cause. The cure is a <span class="term">probability sample</span>, for example <span class="term">stratified sampling</span> with equal or proportional quotas per group.</li>
+          <li>Formally the trouble is <span class="term">covariate shift</span> (and here also differing <code>P(y|x)</code> per group): the model is confident only where it has data and is arbitrary where it has none. More data from the same region lowers variance there but cannot fix <span class="term">coverage</span>.</li>
+          <li>Reporting only an overall score hides <span class="term">subgroup performance</span> gaps. Fairness audits compare accuracy or error rates per group.</li>
+          <li>Sample order within each neighbourhood is a fixed seeded shuffle, so "ask 20" is always the same 20 people and results are deterministic.</li>
+          <li>Related ideas: importance weighting, active learning (ask where the model is unsure), data documentation such as datasheets for datasets.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/data-sampling-core.js"></script>
+  <script src="js/data-sampling.js"></script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mind Reader · Explore ML</title>
+  <meta name="description" content="Think of an animal. An AI asks yes/no questions and guesses it. See how it picks the best question, and why asking the right question matters.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .tiles { align-content: start; grid-auto-rows: min-content; display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+    .tile { min-height: 0; height: 84px; align-content: center; position: relative; display: grid; justify-items: center; gap: 0; padding: 8px 4px 10px; border: 2px solid var(--line); border-radius: 14px; background: var(--card); font: inherit; color: inherit; cursor: default; transition: opacity .35s, transform .25s, border-color .2s; overflow: hidden; }
+    .tile .em { font-size: 1.9rem; line-height: 1.15; }
+    .tile .nm { font-size: .72rem; font-weight: 800; color: var(--ink-2); }
+    .tile .pb { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--accent); width: 0; transition: width .35s; }
+    .tile.lead { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .tile.out .em { filter: grayscale(1); }
+    .qbox { text-align: center; padding: 14px 10px 4px; min-height: 130px; display: grid; align-content: center; gap: 6px; }
+    .qbox .no { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .qbox .qt { font-family: var(--font-head); font-weight: 600; font-size: 1.5rem; line-height: 1.2; }
+    .answers { display: flex; gap: 10px; justify-content: center; margin: 8px 0 4px; flex-wrap: wrap; }
+    .answers .btn { min-width: 110px; font-size: 1.05rem; }
+    #think { display: grid; gap: 6px; min-height: 170px; align-content: start; }
+    .qrow { display: grid; grid-template-columns: 1fr 64px 62px; gap: 8px; align-items: center; font-weight: 700; font-size: .84rem; padding: 4px 6px; border-radius: 10px; border: 2px solid transparent; }
+    .qrow.chosen { border-color: var(--accent); background: var(--accent-soft); }
+    .qrow .split { height: 10px; border-radius: 999px; background: var(--bg-2); overflow: hidden; border: 1px solid var(--line); }
+    .qrow .split i { display: block; height: 100%; background: var(--good); }
+    .qrow .bits { text-align: right; color: var(--ink-2); font-size: .78rem; white-space: nowrap; }
+    .robo-say .bubble { flex: 1; min-width: 0; height: 112px; min-height: 0; overflow-y: auto; }
+    @media (max-width: 700px) { .robo-say .bubble { height: 168px; } }
+    .stage-left { grid-template-columns: minmax(0, 1fr); }
+    #inside { height: 230px; overflow-y: auto; }
+    .flow .arrow { text-align: left; }
+    #pickwho { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; max-height: 190px; overflow-y: auto; }
+  </style>
+</head>
+<body data-page="demo" data-topic="ai" data-demo="ai-twenty">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="question"></i> Artificial Intelligence · Asking smart questions</span>
+      <h1>The <span class="em">mind-reader</span> game</h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Think of one of the animals below, but <b>don't tell me</b>. I'll ask yes/no questions and read your mind! Press <b>Start</b>.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Play</h3>
+          <button class="btn primary" id="start"><i data-icon="play"></i> Start</button>
+          <p class="muted" style="margin:0;font-size:.85rem">Shortcut: press <b>Y</b> for yes and <b>N</b> for no.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="bulb"></i> How does it pick questions?</h3>
+          <div class="seg" id="mode"><button data-m="smart" class="on">Smart</button><button data-m="random">Random</button></div>
+          <div class="hint muted" style="font-size:.85rem">Smart = ask the question that splits the animals most evenly. Random = any question at all. Try both!</div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="flask"></i> Test them both</h3>
+          <button class="btn" id="sim"><i data-icon="repeat"></i> Play every animal</button>
+          <div id="simout"></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="tiles" id="tiles"></div>
+          <div class="qbox">
+            <div class="no" id="qno">Ready?</div>
+            <div class="qt" id="qtext">Pick an animal in your head…</div>
+          </div>
+          <div id="controls" class="answers hidden"><button class="btn primary" id="yes"><i data-icon="check"></i> Yes</button><button class="btn" id="no"><i data-icon="x"></i> No</button></div>
+          <div id="guessbox" class="hidden" style="text-align:center">
+            <div style="font-size:1.2rem;font-weight:800" id="gguess"></div>
+            <div class="answers"><button class="btn primary" id="gy"><i data-icon="check"></i> Yes, that's it!</button><button class="btn" id="gn"><i data-icon="x"></i> No</button></div>
+          </div>
+          <div id="revealbox" class="hidden" style="text-align:center"><div id="pickwho"></div></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="layers"></i> Questions I'm weighing</h3>
+          <div id="think"></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Animals left</div><div class="v" id="st-left">38</div></div>
+            <div class="stat"><div class="k">Not sure (bits)</div><div class="v" id="st-bits">5.2</div></div>
+            <div class="stat"><div class="k">I guessed</div><div class="v" id="st-right">0</div></div>
+            <div class="stat"><div class="k">You fooled me</div><div class="v" id="st-wrong">0</div></div>
+          </div>
+          <div class="stat"><div class="k">Average questions</div><div class="v" id="st-avg">–</div></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Start. I'll explain why I ask each question.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="groups"></i></div><h3>Start unsure</h3><p>At the start every animal is equally possible. I'm as unsure as I can be.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Find a splitting question</h3><p>For each question I count how many animals would say yes. The best question is the one that splits them near 50/50.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="scissors"></i></div><h3>Cut the list</h3><p>Your answer shrinks every animal that doesn't fit. Half the list goes dim.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Repeat</h3><p>Ask again about what's left. Each good question is worth about one coin flip of information.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Guess</h3><p>When one animal has nearly all my belief, I guess. Wrong guess? I rule it out and keep going.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The AI never saw your animal. It used your answers to <b>narrow down</b> what was possible.</li>
+        <li>Asking the <b>right</b> question matters more than asking <b>many</b> questions. Smart picking needed about 6 questions where random needed about 10.</li>
+        <li>38 animals is about 5 yes/no choices' worth of mystery (<i>log<sub>2</sub> 38 &asymp; 5.2</i>). That is why even a clever AI needs 5 or more questions.</li>
+        <li>This idea, splitting the data with the most useful question, is exactly how <b>decision trees</b> work in machine learning. Apps that guess what you are thinking use the same trick.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a small <span class="term">Bayesian belief</span> over 38 animals with greedy <span class="term">information-gain</span> question selection, the same criterion that decision-tree learners (ID3, C4.5, CART) use to choose a split. It is search and probability, not training: the animal-by-trait table is written by hand.</p>
+        <ul>
+          <li><b>Belief:</b> one weight per animal, starting equal. An answer multiplies every animal's weight by 1 if its trait agrees and 0.06 if it doesn't, then the weights are re-scaled to sum to 1. Using 0.06 instead of 0 is a soft <span class="term">likelihood</span>: if you tap the wrong button, the right animal is hurt but not erased and can recover.</li>
+          <li><b>Question score:</b> for each unasked question the AI computes <code>p</code>, the share of belief that would answer yes, and scores it with the binary entropy <code>H(p) = &minus;p log<sub>2</sub> p &minus; (1&minus;p) log<sub>2</sub>(1&minus;p)</code>. This is the expected information in bits, and it is largest (1 bit) when <code>p = 0.5</code>.</li>
+          <li><b>Guess rule:</b> guess when one animal holds at least 80% of the belief, after 20 questions, or when no question can split what remains. A wrong guess sets that animal to zero and play continues, up to three guesses.</li>
+          <li><b>Measured:</b> asking every animal in turn with truthful answers, smart selection averages about 6.1 questions and guesses 100% right. Random useful questions average about 10.4 over many runs, also right every time. The theoretical floor for 38 equally likely animals is <code>log<sub>2</sub> 38 &approx; 5.25</code> questions on average, because a yes/no answer carries at most 1 bit.</li>
+          <li><b>Limits:</b> greedy selection is not always optimal (the best full question list is a harder search problem). Real animals have exceptions (some dogs hate water), so a hand-written table is a simplification. Systems like 20Q and Akinator learn these tables from thousands of players' answers; that part would be machine learning.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ai-twenty-core.js"></script>
+  <script src="js/ai-twenty.js"></script>
+</body>
+</html>

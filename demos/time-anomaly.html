@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spot the Odd One · Explore ML</title>
+  <meta name="description" content="A sensor sends a number every minute. Set an alarm line and see the trade-off between false alarms and missed problems.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.plot { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.15rem; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .seg { display: inline-flex; border: 2px solid var(--line); border-radius: 999px; overflow: hidden; }
+    .seg button { font: inherit; font-weight: 800; font-size: .82rem; border: 0; background: var(--card); color: var(--ink); padding: 6px 12px; min-height: 36px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    .seg button:focus-visible, .chk input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .chk { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: .9rem; min-height: 32px; }
+    .chk input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .field input[type=range] { width: 100%; }
+    .note { margin: 8px 4px 0; font-size: .88rem; font-weight: 700; }
+    .meter { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; margin-top: 4px; }
+    .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+    @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="time" data-demo="time-anomaly">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="clock"></i> Time Series &amp; Forecasting</span>
+      <h1>Spot the <span class="em">Odd One</span></h1>
+      <p class="hero-sub">A sensor reports a number every minute, and sometimes something goes wrong. Set how picky the alarm is: too jumpy cries wolf, too relaxed misses real trouble.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">The shaded band is what I expect. Anything outside it rings the alarm. Slide <b>Alarm line</b> and watch the red circles.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="gauge"></i> Sensor readings</h3>
+          <div class="btn-row"><button class="btn small" id="reveal" aria-pressed="false"><i data-icon="eye"></i> Show real problems</button><button class="btn ghost small" id="newdata"><i data-icon="shuffle"></i> New sensor</button></div>
+        </div>
+        <div class="chart-box"><canvas class="plot" id="chart" role="img" aria-label="Sensor readings with alarms marked"></canvas></div>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--muted)"></i>reading</span><span><i style="background:var(--accent)"></i>expected band</span><span><i style="background:var(--bad)"></i>alarm</span><span><i style="background:var(--good)"></i>real problem (revealed)</span></div>
+        <p class="muted note">The real problems are hidden until you press the button, but your score is always graded against them.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="thr">Alarm line <span class="val" id="thr-v">3.0</span></label>
+            <input type="range" id="thr" min="1" max="6" step="0.1" value="3">
+            <div class="hint">How many "usual wobbles" away counts as odd. Low = jumpy, high = relaxed.</div>
+          </div>
+          <div class="field" style="margin-top:8px">
+            <label for="win">Memory <span class="val" id="win-v">20</span> readings</label>
+            <input type="range" id="win" min="5" max="60" step="1" value="20">
+            <div class="hint">How many recent readings define what is normal.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="target"></i> Your score</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Alarms right</div><div class="v" id="s-prec">0%</div></div>
+            <div class="stat"><div class="k">Problems caught</div><div class="v" id="s-rec">0%</div></div>
+            <div class="stat"><div class="k">Balance</div><div class="v" id="s-f1">0%</div></div>
+          </div>
+          <p class="muted note" id="s-note"></p>
+          <canvas class="plot" id="pr" style="margin-top:8px" role="img" aria-label="Alarms right and problems caught for each alarm line"></canvas>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>alarms right</span><span><i style="background:var(--warn)"></i>problems caught</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-quiet"><span class="tick"></span><span>Quiet alarm: get 100% alarms right while still ringing at least 5 times.</span></div>
+      <div class="chal" id="c-catch"><span class="tick"></span><span>Catch them all: catch 90% or more of the real problems.</span></div>
+      <div class="chal" id="c-balance"><span class="tick"></span><span>Balanced: get the balance score to 65% or more.</span></div>
+      <div class="chal" id="c-drift"><span class="tick"></span><span>Slow drift: catch the sensor that slowly goes wrong (the green ramp, near time 240 to 275).</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>For every reading I compare it with the average and usual wobble of the recent past. If it is too far off, the alarm rings.</li>
+      <li>A low alarm line rings at everything, even normal wobbles. You catch the real problems, but most alarms are false.</li>
+      <li>A high line only rings for huge jumps. Every alarm is real, but the subtle problems slip by.</li>
+      <li>There is no perfect line: you are choosing which mistake you can live with. A smoke alarm should be jumpy; a spam filter should not.</li>
+      <li>Slow drifts are sneaky because my idea of normal drifts along with them. A longer memory helps.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a <span class="term">rolling z-score</span> detector: <code>z<sub>t</sub> = (x<sub>t</sub> − μ<sub>t</sub>) / σ<sub>t</sub></code>, where μ and σ are the mean and standard deviation of the previous <code>w</code> readings (never including the current one, so there is no peeking). Alarm if <code>|z<sub>t</sub>| &gt; threshold</code>. The first <code>w</code> readings are a warm-up with no alarms.</p>
+        <ul>
+          <li><span class="term">Precision</span> = alarms that were real problems ÷ all alarms. <span class="term">Recall</span> = real problems that got at least one alarm ÷ all real problems. <span class="term">F1</span> is their harmonic mean. Raising the threshold generally raises precision and lowers recall.</li>
+          <li>For pure Gaussian noise, a threshold of 3 flags about 0.3% of normal points, a threshold of 2 about 5%, which at one reading per minute is a lot of false alarms.</li>
+          <li>The hidden labels are 8 big spikes, 4 subtle spikes and one slow drift (points at least 3.5 off). Recall counts each of these 13 events once. Precision counts individual alarms.</li>
+          <li>A rolling baseline <span class="term">adapts</span> to <span class="term">concept drift</span>, so a slow ramp can look normal. Real systems also use seasonal baselines, robust statistics (median and MAD) or learned models such as isolation forests and autoencoders.</li>
+          <li>Anomaly labels are rare in practice, so people often tune the threshold to a tolerable alarm rate rather than to F1.</li>
+        </ul>
+        <p>Further reading: Chandola, Banerjee and Kumar (2009), <i>Anomaly Detection: A Survey</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/time-anomaly-core.js"></script>
+  <script src="js/time-anomaly.js"></script>
+</body>
+</html>

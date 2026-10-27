@@ -14,7 +14,7 @@
 
   // Data lives in u = temp/40 ∈ [0,1], v = cones/100 ∈ [0,1].
   // Model: v = w·s(u) + c with s(u) = 3(u − 0.5). Centering + scaling keeps the loss bowl round.
-  const s = (u) => 3 * (u - 0.5);
+  const { s, score, slopeTxt } = LineCore;
   const WR = [-0.6, 1.0], CR = [-0.3, 1.3]; // landscape window
 
   const state = {
@@ -42,35 +42,9 @@
   const shownC = () => (state.viewing ? state.viewing.c : state.dc);
   const lineV = (u, w = shownW(), c = shownC()) => w * s(u) + c;
 
-  function mse(w = state.w, c = state.c) {
-    if (!state.pts.length) return 0;
-    let t = 0;
-    for (const p of state.pts) t += (w * s(p.u) + c - p.v) ** 2;
-    return t / state.pts.length;
-  }
-  const score = (m) => Math.round(m * 10000); // "oopsie points" = squared cones
-  function grad() {
-    let gw = 0, gc = 0, up = 0, down = 0;
-    const n = state.pts.length || 1;
-    for (const p of state.pts) {
-      const r = state.w * s(p.u) + state.c - p.v;
-      gw += r * s(p.u); gc += r;
-      if (r < 0) up++; else down++;
-    }
-    return { gw: (2 * gw) / n, gc: (2 * gc) / n, up, down };
-  }
-  function ols() {
-    const n = state.pts.length;
-    if (n < 2) return null;
-    let sx = 0, sy = 0, sxx = 0, sxy = 0;
-    for (const p of state.pts) { const x = s(p.u); sx += x; sy += p.v; sxx += x * x; sxy += x * p.v; }
-    const d = n * sxx - sx * sx;
-    if (Math.abs(d) < 1e-9) return null;
-    const w = (n * sxy - sx * sy) / d;
-    return { w, c: (sy - w * sx) / n };
-  }
-  // Human units: cones per °C and cones at 20°C.
-  const slopeTxt = (w) => (w * 3 * 100) / 40;
+  function mse(w = state.w, c = state.c) { return LineCore.mse(state.pts, w, c); }
+  const grad = () => LineCore.grad(state.pts, state.w, state.c);
+  const ols = () => LineCore.ols(state.pts);
 
   // ---------- checkpoints ----------
   const MILESTONES = [0, 1, 2, 3, 5, 10, -1];
@@ -108,11 +82,7 @@
 
   // ---------- data ----------
   function makeDays(noise, n = 12) {
-    state.pts = [];
-    for (let i = 0; i < n; i++) {
-      const u = ML.rand(0.08, 0.95);
-      state.pts.push({ u, v: ML.clamp(0.12 + 0.72 * u + ML.randn() * noise, 0.03, 0.97) });
-    }
+    state.pts = LineCore.makeDays(ML.rand, ML.randn, noise, n);
     dataChanged();
   }
   function restartTraining() {

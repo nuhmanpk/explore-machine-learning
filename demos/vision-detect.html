@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Draw the Box · Explore ML</title>
+  <meta name="description" content="Draw a box around each toy on the table, score it with IoU, then watch a robot learn to find the boxes by itself. Object detection for kids.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    canvas.sc { width: 100%; border-radius: 10px; display: block; touch-action: none; }
+    #play { cursor: crosshair; background: var(--bg-2); image-rendering: pixelated; }
+    #scene { cursor: pointer; background: var(--bg-2); }
+    .cap { font-weight: 800; font-size: .8rem; color: var(--muted); text-align: center; margin-top: 4px; }
+    .big-num { font-family: var(--font-head); font-size: 2.4rem; font-weight: 600; line-height: 1; }
+    .sumline { font-family: var(--font-head); font-size: 1.05rem; font-weight: 600; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: grid; gap: 8px; }
+    .chal .item { display: flex; gap: 10px; align-items: center; font-weight: 700; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg-2); }
+    .chal .item.done { border-color: var(--good); }
+    .chal .item .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); white-space: nowrap; }
+    .chal .item.done .tag { color: var(--good); }
+    .tgl { display: inline-flex; gap: 8px; align-items: center; font-weight: 800; cursor: pointer; }
+    .tgl input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .chip.on { background: var(--accent); color: #fff; }
+    .frac { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 800; }
+    .frac .f { display: inline-grid; text-align: center; }
+    .frac .f b { border-bottom: 3px solid var(--ink); padding: 0 6px; }
+    .frac .f span { padding: 0 6px; font-size: .85rem; color: var(--muted); }
+    .sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 4px; }
+    #thr { width: 100%; }
+  </style>
+</head>
+<body data-page="demo" data-topic="vision" data-demo="vision-detect">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="eye"></i> Computer Vision</span>
+      <h1>Draw the <span class="em">Box</span></h1>
+      <p class="hero-sub">Telling a circle from a square is easy. Finding <b>where</b> it is, and how big, is a different job. Draw a box around each toy, then watch a robot learn to do it too.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Here is a toy table! I will name a toy. <b>Drag a box</b> around it as tightly as you can. I score you with <b>IoU</b>: how much your box and the true box overlap.</p>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="target"></i> Part 1 &middot; Draw the box</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="sumline" id="ask" aria-live="polite" style="margin-bottom:8px"></div>
+        <canvas id="play" class="sc" aria-label="Toy table. Drag to draw a box around the toy named above."></canvas>
+        <div class="cap">Press, drag and let go. Green = where your box and the true box overlap.</div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn primary" id="next"><i data-icon="step"></i> Next toy</button>
+          <button class="btn" id="newplay"><i data-icon="shuffle"></i> New table</button>
+          <label class="tgl"><input type="checkbox" id="help" checked> Show the answer box</label>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Your IoU</h3>
+          <div class="big-num" id="iou">0.00</div>
+          <div class="muted" style="font-weight:700; font-size:.85rem" id="verdict">Draw a box to see your score.</div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="layers"></i> IoU in kid words</h3>
+          <div class="frac"><span>IoU =</span><span class="f"><b id="f-top">0</b><span>shared squares</span></span><span>&divide;</span><span class="f"><b id="f-bot">0</b><span>squares covered by either box</span></span></div>
+          <p class="muted" style="font-weight:700; font-size:.85rem; margin:8px 0 0">1.00 is a perfect match, 0.00 means the boxes do not touch. Detectors usually call 0.50 or more a hit.</p>
+        </div>
+        <div class="card">
+          <div class="two">
+            <div class="stat"><div class="k">Boxes drawn</div><div class="v" id="n-drawn">0</div></div>
+            <div class="stat"><div class="k">Average IoU</div><div class="v" id="avg">&ndash;</div></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="network"></i> Part 2 &middot; Watch it learn</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="scene" class="sc" aria-label="A fresh toy table with the robot's boxes. Tap a toy to ask about it."></canvas>
+        <div class="cap">The robot's boxes on a table it never trained on. Tap a toy to ask Robo about it.</div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn primary" id="learn"><i data-icon="play"></i> Robot, learn to find boxes!</button>
+          <button class="btn" id="lstep"><i data-icon="step"></i> One step</button>
+          <button class="btn" id="newscene"><i data-icon="shuffle"></i> New scene</button>
+          <button class="btn ghost" id="lreset"><i data-icon="repeat"></i> Forget it</button>
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <label class="tgl"><input type="checkbox" id="nms" checked> Merge duplicate boxes (NMS)</label>
+          <label class="tgl"><input type="checkbox" id="truth"> Show true boxes</label>
+          <label class="tgl"><input type="checkbox" id="grid" checked> Show the 8x8 grid</label>
+        </div>
+        <div style="margin-top:10px">
+          <label for="thr" style="font-weight:800">Only show boxes it is at least <span id="thr-v">50</span>% sure about</label>
+          <input type="range" id="thr" min="5" max="95" value="50" step="5">
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="trend"></i> Average IoU on tables it has never seen</h3>
+          <div class="chart-box"><canvas id="chart" class="sc"></canvas></div>
+          <div class="three" style="margin-top:10px">
+            <div class="stat"><div class="k">Steps</div><div class="v" id="steps">0</div></div>
+            <div class="stat"><div class="k">Avg IoU</div><div class="v" id="miou">0.00</div></div>
+            <div class="stat"><div class="k">Toys found</div><div class="v" id="found">&ndash;</div></div>
+          </div>
+          <div class="muted" style="font-weight:700; font-size:.85rem; margin-top:8px" id="ghost-line"></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="trophy"></i> Challenges</h2>
+    <section class="card">
+      <p class="muted" style="margin:0 0 10px; font-weight:700">Make the tables harder with the buttons. The robot keeps training on whatever you pick, and each win puts a flag on the chart. A win means average IoU of 0.50 or more.</p>
+      <div class="chal" id="chal"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="chip" id="c-small"><i data-icon="search"></i> Smaller toys</button>
+        <button class="chip" id="c-overlap"><i data-icon="layers"></i> Overlapping toys</button>
+        <button class="chip" id="c-clutter"><i data-icon="noise"></i> Add clutter</button>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="maze"></i></div><h3>Cut into cells</h3><p>The table becomes an 8 by 8 grid. Every cell gets the same little brain.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Each cell guesses</h3><p>"Is a toy here?", how far its middle is, how wide and tall, and which shape.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gauge"></i></div><h3>Compare with the truth</h3><p>The robot sees how far its guesses are from the real boxes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Nudge and repeat</h3><p>Tiny nudges on fresh tables, again and again, until boxes fit snugly.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Finding a toy means two answers: <b>what</b> it is and <b>where</b> it is (a box).</li>
+      <li>IoU scores a box: shared area divided by total area. Perfect is 1.0, no touching is 0.</li>
+      <li>The robot split the table into cells, and each cell guessed a box, a shape and how sure it was.</li>
+      <li>Nobody told it where toys are. It nudged its numbers to make its boxes overlap the true ones more.</li>
+      <li>Big toys got several cells shouting at once. Merging duplicates keeps just the surest box.</li>
+      <li>The sureness slider is a trade: too strict misses toys, too relaxed invents ghost boxes.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p><span class="term">Image classification</span> outputs one label per image. <span class="term">Object detection</span> outputs a variable-size set of (class, <span class="term">bounding box</span>, confidence) triples. This lesson trains a tiny YOLO-style, single-shot detector in plain JavaScript on procedurally generated 64x64 scenes.</p>
+        <ul>
+          <li><span class="term">IoU</span> (Jaccard index) = area(A &cap; B) / area(A &cup; B). Detections are usually counted as correct at IoU &ge; 0.5.</li>
+          <li><span class="term">Grid cells</span> (YOLO): the image is an 8x8 grid. Each cell outputs an objectness logit, a box (centre offset from the cell centre, width and height through a sigmoid) and 3 class logits. The same small network (169 inputs, 40 tanh units, 8 outputs) is shared across all cells. Its input is a fine 12x12 and a coarse 5x5 crop of a colourfulness map around the cell. Real detectors use anchor boxes and a CNN backbone instead.</li>
+          <li><span class="term">Bounding-box regression</span>: box numbers are trained with squared error; objectness with binary cross-entropy (positives weighted 2x); class with softmax cross-entropy. Cells whose centre lies near an object's centre are all positives (like FCOS centre sampling), so big objects get duplicate predictions. Optimiser: Adam, batches of 8 fresh scenes.</li>
+          <li><span class="term">Non-max suppression</span>: sort by confidence, keep a box, drop any remaining box with IoU &gt; 0.4 against it, repeat.</li>
+          <li>The held-out score here is the mean over true objects of the best IoU among shown boxes (0 if missed). Real benchmarks use <span class="term">mAP</span>: sweep the confidence threshold, trace the precision-recall curve per class, take the area under it, and average over classes (and over IoU thresholds for COCO mAP@[.5:.95]). Moving the sureness slider here walks along that precision-recall trade-off.</li>
+        </ul>
+        <p>Further reading: <i>You Only Look Once</i> (Redmon et al., 2016) &middot; <i>FCOS</i> (Tian et al., 2019) &middot; CS231n detection lecture notes.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/vision-detect-core.js"></script>
+  <script src="js/vision-detect.js"></script>
+</body>
+</html>

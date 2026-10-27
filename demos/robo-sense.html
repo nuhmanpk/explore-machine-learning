@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trust Your Sensors · Explore ML</title>
+  <meta name="description" content="Fuse a noisy sensor and a drifting odometer with a real Kalman filter to track a moving robot.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #plot, .cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); touch-action: none; display: block; }
+    .field { margin-bottom: 10px; }
+    .field label { display: flex; justify-content: space-between; font-weight: 800; }
+    .field .hint { color: var(--muted); font-size: .82rem; font-weight: 700; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .stat .v { font-size: 1.3rem; }
+    .note { margin: 8px 0 0; font-weight: 700; font-size: .9rem; color: var(--muted); }
+    .tgl { display: flex; align-items: center; gap: 8px; font-weight: 800; cursor: pointer; }
+    .tgl input { width: 20px; height: 20px; }
+    .tgl input:focus-visible, .seg button:focus-visible { outline: 3px solid var(--accent); }
+    .stage > * { min-width: 0; }
+
+  </style>
+</head>
+<body data-page="demo" data-topic="robotics" data-demo="robo-sense">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="wrench"></i> Robotics &amp; Control</span>
+      <h1>Trust Your <span class="em">Sensors</span></h1>
+      <p class="hero-sub">A robot wanders around. Its position sensor is jittery and its wheel counter slowly drifts. A Kalman filter blends them into a better guess.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">The <b>blue dots</b> are a noisy sensor. The <b>orange</b> robot trusts only its wheels and drifts away. My <b>green</b> guess uses both. The ring shows how unsure I am!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="map"></i> Where is the robot?</h3>
+          <div class="btn-row"><button class="btn primary small" id="play"><i data-icon="pause"></i> Pause</button><button class="btn small" id="step"><i data-icon="step"></i> Step</button><button class="btn ghost small" id="reset"><i data-icon="reset"></i> New robot</button></div>
+        </div>
+        <canvas id="cv" class="cv" aria-label="Map of the true robot, noisy sensor dots, drifting odometry and the Kalman estimate with its uncertainty ellipse"></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--ink)"></i>true robot</span><span><i style="background:var(--accent)"></i>noisy sensor</span><span><i style="background:var(--warn)"></i>wheels only</span><span><i style="background:var(--good)"></i>Kalman guess + 2σ ring</span></div>
+        <p class="note" id="verdict"></p>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Knobs</h3>
+          <div class="field"><label for="noise">Sensor noise <span class="val" data-for="noise"></span></label><input type="range" id="noise" min="2" max="40" step="1" value="20"><div class="hint">How wrong each sensor reading is, in pixels.</div></div>
+          <div class="field"><label for="qs">Filter: expect swerving <span class="val" data-for="qs"></span></label><input type="range" id="qs" min="0" max="100" step="1" value="60"><div class="hint">Low: trust my smooth-path idea. High: trust the sensor.</div></div>
+          <label class="tgl"><input type="checkbox" id="tunnel"> <span>Tunnel: sensor goes dark</span></label>
+        </div>
+        <div class="card">
+          <h3><i data-icon="ruler"></i> Typical error (last 5 s)</h3>
+          <div class="stats three"><div class="stat"><div class="k">Sensor</div><div class="v" id="e-raw">-</div></div><div class="stat"><div class="k">Wheels</div><div class="v" id="e-odo">-</div></div><div class="stat"><div class="k">Kalman</div><div class="v" id="e-kf" style="color:var(--good)">-</div></div></div>
+          <p class="muted" style="margin:6px 0 0;font-size:.85rem;font-weight:700">Smaller is better. Measured in pixels from the true robot.</p>
+        </div>
+        <div class="card inside"><h3><i data-icon="eye"></i> What's happening inside</h3><div class="inside-body" id="inside"></div></div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-best"><span class="tick"></span><span>Beat the noise: with sensor noise 15 or more, get the Kalman error under half the raw sensor error.</span></div>
+      <div class="chal" id="c-drift"><span class="tick"></span><span>Watch the wheels drift: wait until the orange guess is 60 pixels from the truth.</span></div>
+      <div class="chal" id="c-tunnel"><span class="tick"></span><span>Into the tunnel: switch it on and watch the ring grow to twice its size while the sensor is dark.</span></div>
+      <div class="chal" id="c-bad"><span class="tick"></span><span>Break it: tune the filter so badly that it is no better than the raw sensor.</span></div>
+
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The sensor is right on average but jumps around. The wheel counter is smooth but slowly drifts away.</li>
+      <li>A Kalman filter predicts where the robot should be, then corrects the prediction with each measurement.</li>
+      <li>It weighs them by how much it trusts each: a noisy sensor gets less weight, a good prediction gets more.</li>
+      <li>The ring is its uncertainty. It grows while predicting blind (in the tunnel) and shrinks when a measurement arrives.</li>
+      <li>Tune it wrong and it lags behind turns (too trusting of its model) or just copies the noise (too trusting of the sensor).</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>A <span class="term">Kalman filter</span> for a <span class="term">constant-velocity model</span>, one 2-state filter (position, velocity) per axis. Each step: <b>predict</b> <code>x ← F x</code>, <code>P ← F P Fᵀ + Q</code>, then <b>update</b> with <code>K = P Hᵀ (H P Hᵀ + R)⁻¹</code>, <code>x ← x + K (z − H x)</code>, <code>P ← (I − K H) P</code>.</p>
+        <ul>
+          <li><code>R</code> = sensor noise variance (here the true sensor standard deviation). <code>Q</code> = process noise from a random-acceleration model, scaled by the slider.</li>
+          <li>The ring is a 2σ ellipse from the position variance (we show axis-aligned, since x and y are filtered separately).</li>
+          <li><span class="term">Dead reckoning</span> (odometry) integrates a biased, noisy velocity, so error grows without bound. A position fix bounds it.</li>
+          <li>Too small Q: the filter believes its straight-line model and <span class="term">lags</span>. Too large Q: it follows the noisy measurements. The best value matches how much the robot really swerves.</li>
+          <li>The real robot here is not exactly constant-velocity (random swerves, pulled to the middle), so the filter is useful but not optimal, like in real life. Real robots usually also fuse the wheel speed, with an Extended or Unscented Kalman filter for non-linear motion.</li>
+        </ul>
+        <p>Further reading: Thrun, Burgard, Fox, <i>Probabilistic Robotics</i>, ch. 3 · Roger Labbe, <i>Kalman and Bayesian Filters in Python</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/robo-sense-core.js"></script>
+  <script src="js/robo-sense.js"></script>
+</body>
+</html>

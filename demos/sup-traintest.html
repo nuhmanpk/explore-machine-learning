@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Train vs Test · Explore ML</title>
+  <meta name="description" content="Hide some example cards, teach a model with the rest, then grade it on the cards it never saw.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #cv { width: 100%; border-radius: 12px; touch-action: manipulation; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .verdict { font-family: var(--font-head); font-size: 1.25rem; font-weight: 600; margin: 8px 0 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .dot-leg { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+    .bar { height: 14px; border-radius: 8px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; margin-top: 6px; }
+    .bar > i { display: block; height: 100%; width: 0; transition: width .2s; }
+    .split-note { margin: 6px 0 0; font-weight: 700; font-size: .9rem; }
+    @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="sup" data-demo="sup-traintest">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="teacher"></i> Supervised Learning</span>
+      <h1>Train <span class="em">vs</span> Test</h1>
+      <p class="hero-sub">Here is a pile of 100 cards. Keep some to study, hide the rest for an exam. Then see who really learned and who only memorised.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Drag <b>cards to study with</b>. <b>Solid dots</b> are my study cards. <b>Hollow dots</b> are secret exam cards. The colours are my guess for every spot.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv"></canvas>
+        <div class="row" style="margin-top:10px; justify-content:space-between">
+          <div class="btn-row">
+            <button class="btn primary" id="robot"><i data-icon="play"></i> Robot, study!</button>
+            <button class="btn ghost" id="redeal"><i data-icon="shuffle"></i> Deal a new split</button>
+          </div>
+          <div class="legend">
+            <span><i class="dot-leg" style="background:var(--sup)"></i>blue cards</span>
+            <span><i class="dot-leg" style="background:var(--rl)"></i>orange cards</span>
+            <span><i class="dot-leg" style="border:3px solid var(--ink)"></i>exam (hidden)</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="m">Cards to study with <span class="val" data-for="m"></span></label>
+            <input type="range" id="m" min="4" max="80" step="1" value="12">
+            <div class="hint" id="m-hint"></div>
+          </div>
+          <div class="bar" aria-hidden="true"><i id="bar" style="background:var(--accent)"></i></div>
+          <p class="verdict" id="verdict"></p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Study score vs exam score</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Study</div><div class="v" id="tr" style="color:var(--accent)">0%</div></div>
+            <div class="stat"><div class="k">Exam</div><div class="v" id="te" style="color:var(--bad)">0%</div></div>
+            <div class="stat"><div class="k">Gap</div><div class="v" id="gap">0</div></div>
+          </div>
+          <div class="legend" style="margin-top:8px"><span><i style="background:var(--accent)"></i>study score</span><span><i style="background:var(--bad)"></i>exam score</span></div>
+          <div class="chart-box"><canvas id="chart"></canvas></div>
+          <p class="muted" style="margin:6px 0 0; font-size:.82rem; font-weight:700">Across: number of study cards. Stars mark your challenge moments.</p>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <div class="cp-head">
+        <h3><i data-icon="clock"></i> Snapshots while studying</h3>
+      </div>
+      <p class="muted" style="margin:6px 0 4px; font-size:.9rem; font-weight:700">Press <b>Robot, study!</b>. At each card count below I take a photo. Tap one to go back to it.</p>
+      <div class="checkpoints" id="cps"></div>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-peek"><span class="tick"></span><span>Peek at the exam: press the button and watch both scores hit 100%. Is that real?</span></div>
+      <div class="chal" id="c-noisy"><span class="tick"></span><span>Noisier cards: set noise to 0.55 or more with 20+ study cards. The exam score stays much lower.</span></div>
+      <div class="chal" id="c-luck"><span class="tick"></span><span>Unlucky split: deal 5 different splits with the same settings. Does the exam score stay the same?</span></div>
+      <div class="grid-2" style="margin-top:8px">
+        <div class="field">
+          <label for="noise">Noise in the cards <span class="val" data-for="noise"></span></label>
+          <input type="range" id="noise" min="0.15" max="0.7" step="0.05" value="0.35">
+        </div>
+        <div>
+          <div class="btn-row">
+            <button class="btn small" id="peek"><i data-icon="eye"></i> Peek at the exam</button>
+            <button class="btn small" id="noisy"><i data-icon="zap"></i> Noisier cards</button>
+            <button class="btn small" id="deal5"><i data-icon="shuffle"></i> Deal another split</button>
+          </div>
+        </div>
+      </div>
+      <p class="split-note" id="splits"></p>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The model only learned from the study cards, then was graded on exam cards it had never seen.</li>
+      <li>Looking things up from study cards gives 100% on the study cards. That score tells you very little.</li>
+      <li>The exam score is the honest one. With few study cards it is low; with more, it climbs and the gap shrinks.</li>
+      <li>Peeking at the exam cards makes both scores look great, but it is cheating. It no longer tests anything new.</li>
+      <li>A different random split gives a different exam score, so one number is a bit lucky or unlucky.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The robot is a <span class="term">1-nearest-neighbour classifier</span> (k-NN with k = 1): it predicts the label of the closest <span class="term">training</span> point. It has zero bias towards a smooth boundary, so it fits the training set perfectly (training accuracy 100% unless two identical points disagree). That is memorisation, and it is an <span class="term">overfit</span> model by construction on noisy data.</p>
+        <ul>
+          <li>The data are the <span class="term">two moons</span> with Gaussian noise. The pool of 100 cards is shuffled and cut into a <span class="term">train</span> and a <span class="term">test (hold-out)</span> set; the slider sets the split.</li>
+          <li><span class="term">Generalisation error</span> is estimated on the test set. As training data grows, test accuracy rises toward the Bayes-rate limit set by the noise (the <span class="term">learning curve</span>).</li>
+          <li><span class="term">Data leakage</span>: letting test cards into training inflates the test score to 100% and says nothing about new data. We also show a score on 300 fresh cards that never touched training.</li>
+          <li>The test score of one split is a noisy estimate (small test sets have high variance). Remedies: repeated splits, <span class="term">k-fold cross-validation</span>, and keeping one final untouched test set.</li>
+        </ul>
+        <p>Further reading: <i>An Introduction to Statistical Learning</i>, ch. 5 · scikit-learn user guide, "Cross-validation: evaluating estimator performance".</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/sup-kit.js"></script>
+  <script src="js/sup-traintest-core.js"></script>
+  <script src="js/sup-traintest.js"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Friends of Friends · Explore ML</title>
+  <meta name="description" content="Explore a small social network, find friend groups, and see why apps suggest people you might know.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #net { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); touch-action: manipulation; cursor: pointer; }
+    .people { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .people button { font: inherit; font-weight: 800; font-size: .78rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 3px 9px; min-height: 30px; cursor: pointer; }
+    .people button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 2px 0 var(--accent); }
+    .people button:focus-visible, .modes button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .modes button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .sugg { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .sugg li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; background: var(--bg-2); border: 2px solid var(--line); border-radius: 12px; padding: 6px 8px; font-weight: 700; font-size: .9rem; }
+    .sugg small { grid-column: 1 / -1; color: var(--muted); font-weight: 700; }
+    .sugg .pct { font-family: var(--font-mono); color: var(--accent); }
+    .gsw { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+  </style>
+</head>
+<body data-page="demo" data-topic="graphs" data-demo="graph-social">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="network"></i> Graphs, Ranking &amp; Search</span>
+      <h1>Friends of <span class="em">Friends</span></h1>
+      <p class="hero-sub">Each dot is a person and each line is a friendship. Tap someone to see their friend group and who they might want to meet.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Look, the dots huddle into clumps! Tap a person and I will tell you who their friends have in common with them.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="groups"></i> The town</h3>
+          <div class="btn-row modes">
+            <button class="btn small" id="m-pick" aria-pressed="true"><i data-icon="eye"></i> Look at people</button>
+            <button class="btn small" id="m-link" aria-pressed="false"><i data-icon="magnet"></i> Make or break friendships</button>
+            <button class="btn ghost small" id="newtown"><i data-icon="shuffle"></i> New town</button>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="net" role="img" aria-label="Network of 24 people and their friendships. Use the list of names below to pick someone."></canvas></div>
+        <p class="muted" id="hint" style="margin:8px 4px 0; font-size:.88rem; font-weight:700"></p>
+        <div class="people" id="people" role="group" aria-label="Pick a person"></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="heart"></i> <span id="pname">Nobody picked yet</span></h3>
+          <div class="three">
+            <div class="stat"><div class="k">Friends</div><div class="v" id="pdeg">-</div></div>
+            <div class="stat"><div class="k">Group size</div><div class="v" id="pgrp">-</div></div>
+            <div class="stat"><div class="k">Groups found</div><div class="v" id="ngrp">0</div></div>
+          </div>
+          <p class="muted" id="pfriends" style="margin:8px 0 0; font-weight:700; font-size:.9rem"></p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> People you may know</h3>
+          <ul class="sugg" id="sugg"><li><span class="muted">Pick someone to see suggestions.</span></li></ul>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-pick"><span class="tick"></span><span>Say hello: tap a person to see their friends and suggestions.</span></div>
+      <div class="chal" id="c-hub"><span class="tick"></span><span>Find the most popular person: the dot with the most friends. Big dots are a clue.</span></div>
+      <div class="chal" id="c-accept"><span class="tick"></span><span>Take a suggestion: press Add on one of the suggested people.</span></div>
+      <div class="chal" id="c-bridge"><span class="tick"></span><span>Build a bridge: make friends between two different groups.</span></div>
+      <div class="chal" id="c-break"><span class="tick"></span><span>Break up a friendship (use the Make or break mode) and watch the suggestions change.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The picture is a graph: dots are people, lines are friendships. A force layout pulls friends together and pushes everyone else apart, so clumps appear by themselves.</li>
+      <li>Groups were found by label passing. Everybody starts with their own label and keeps copying the label most of their friends have, until nothing changes.</li>
+      <li>Suggestions come from shared friends. If you and Sam both know Ava, Ben and Cleo, you probably belong together.</li>
+      <li>When you add or remove a friendship, everything is worked out again from the new picture.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The town is an undirected <span class="term">graph</span> <code>G = (V, E)</code> drawn with a <span class="term">force-directed layout</span> (Fruchterman-Reingold style): nodes repel like charges, edges act as springs, a weak gravity keeps everything in view.</p>
+        <ul>
+          <li><span class="term">Community detection</span> uses asynchronous <span class="term">label propagation</span> (Raghavan et al. 2007): visit nodes in random order and adopt the most common label among neighbours, with random tie-breaks. It is very fast but <span class="term">non-deterministic</span>; we fix the seed so results are repeatable. Louvain and Leiden optimise <span class="term">modularity</span> instead and are more robust.</li>
+          <li><span class="term">Link prediction</span> with <span class="term">common neighbours</span> scores a pair by <code>|N(u) ∩ N(v)|</code>. The <span class="term">Jaccard</span> version normalises by the size of the union: <code>|N(u) ∩ N(v)| / |N(u) ∪ N(v)|</code>, so people with huge friend lists do not win just by being popular.</li>
+          <li>Real systems add more signals (Adamic-Adar weights rare shared friends more, plus profile and activity data) and learn the weights with a model. The idea that <span class="term">friends of friends become friends</span> is called <span class="term">triadic closure</span>.</li>
+          <li>Suggestions can create <span class="term">filter bubbles</span>: recommending only people already close to your group strengthens the clumps.</li>
+        </ul>
+        <p>Further reading: Easley and Kleinberg, <i>Networks, Crowds, and Markets</i> · Liben-Nowell and Kleinberg, <i>The link-prediction problem for social networks</i> (2007).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/graph-social-core.js"></script>
+  <script src="js/graph-social.js"></script>
+</body>
+</html>

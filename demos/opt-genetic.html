@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evolve an Answer · Explore ML</title>
+  <meta name="description" content="Evolve a hidden picture with a genetic algorithm: breed, mutate, and watch the best guess improve.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .pair { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .pair figure { margin: 0; text-align: center; font-weight: 800; font-size: .9rem; }
+    .pair canvas, .cv { width: 100%; max-width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+    .three > *, .four > * { min-width: 0; }
+    .four { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .ctl { display: grid; gap: 4px; margin-bottom: 10px; }
+    .ctl label { font-weight: 800; font-size: .9rem; display: flex; justify-content: space-between; gap: 8px; }
+    .ctl input[type=range] { width: 100%; }
+    .ctl .hint { font-size: .82rem; color: var(--muted); font-weight: 700; }
+    .note { font-weight: 700; font-size: .9rem; color: var(--muted); margin: 6px 0 0; }
+    .tbl { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .tbl th, .tbl td { text-align: left; padding: 4px 6px; border-bottom: 2px solid var(--line); font-weight: 700; }
+    .tbl td.n { font-family: var(--font-mono); }
+    input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+    button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="optim" data-demo="opt-genetic">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="target"></i> Optimisation &amp; Search</span>
+      <h1>Evolve an <span class="em">Answer</span></h1>
+      <p class="hero-sub">Nobody draws the picture. A crowd of random scribbles is bred over and over, and the best ones have the most babies.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">There is a secret 8 by 8 picture. My scribbles start totally random. Press <b>Run</b> and watch them evolve!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="dice"></i> Best scribble <span class="muted" id="gen"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="run"><i data-icon="play"></i> Run</button>
+            <button class="btn small" id="step"><i data-icon="step"></i> One generation</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <div class="pair">
+          <figure style="flex:1 1 130px;max-width:230px"><canvas id="best" aria-label="Best picture so far"></canvas>Best so far</figure>
+          <figure style="flex:1 1 130px;max-width:230px"><canvas id="tgt" aria-label="Secret target picture"></canvas>Secret target</figure>
+        </div>
+        <p class="note">Little red dots on the left show pixels that are still wrong.</p>
+        <div class="seg" id="pic" style="margin-top:8px" role="group" aria-label="Pick a target picture"><button data-p="heart" class="on">Heart</button><button data-p="smile">Smile</button><button data-p="arrow">Arrow</button></div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Evolution knobs</h3>
+          <div class="ctl"><label for="pop">Crowd size <b data-for="pop">60</b></label><input id="pop" type="range" min="6" max="200" step="2" value="60" aria-label="Crowd size"></div>
+          <div class="ctl"><label for="mut">Mutation (chance each pixel flips) <b data-for="mut">1%</b></label><input id="mut" type="range" min="0" max="0.4" step="0.005" value="0.01" aria-label="Mutation rate"><span class="hint" id="muthint"></span></div>
+          <div class="ctl"><label for="cross"><span>Mix two parents (crossover)</span><input id="cross" type="checkbox" checked></label></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Score</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Best</div><div class="v" id="sb">0/64</div></div>
+            <div class="stat"><div class="k">Average</div><div class="v" id="sa">0</div></div>
+            <div class="stat"><div class="k">Generation</div><div class="v" id="sg">0</div></div>
+          </div>
+          <div class="chart-box" style="margin-top:8px"><canvas id="chart" class="cv" aria-label="Fitness over generations"></canvas></div>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>best</span><span><i style="background:var(--warn)"></i>average</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-solve"><span class="tick"></span><span>Evolve it: get all 64 pixels right.</span></div>
+      <div class="chal" id="c-fast"><span class="tick"></span><span>Speedy: solve it in 40 generations or fewer (right after Start over).</span></div>
+      <div class="chal" id="c-tiny"><span class="tick"></span><span>Tiny crowd: solve it with a crowd of 20 or fewer. Tip: about 2% mutation.</span></div>
+      <div class="chal" id="c-frozen"><span class="tick"></span><span>Frozen: set mutation to 0% and run 30 generations. Does it ever finish?</span></div>
+      <div class="chal" id="c-chaos"><span class="tick"></span><span>Chaos: set mutation to 25% or more and run 30 generations without reaching 58 pixels.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Each scribble is 64 on/off switches. Its score is how many pixels match the secret picture.</li>
+      <li>Every generation the better scribbles are picked as parents, mixed together, and given a few random flips.</li>
+      <li>With 0% mutation nobody can invent anything new, so the crowd gets stuck. With huge mutation the good bits get wrecked as fast as they are found.</li>
+      <li>A little mutation (about 1 to 3%) and mixing parents is the sweet spot.</li>
+      <li>Nobody told the crowd what a heart looks like. It only got a score.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li><b>Start</b> with a crowd of random answers.</li>
+      <li><b>Score</b> each one: how many pixels are right?</li>
+      <li><b>Select</b> parents. Better scores win more often (a small tournament of 3).</li>
+      <li><b>Crossover</b>: copy the first part from one parent and the rest from the other.</li>
+      <li><b>Mutate</b>: flip a few pixels at random. Keep the very best one unchanged.</li>
+      <li><b>Repeat</b> until the score stops improving.</li>
+    </ol></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a <span class="term">genetic algorithm</span>, a population-based search that needs only a <span class="term">fitness function</span> (here: Hamming matches to a target), no gradients.</p>
+        <ul>
+          <li><span class="term">Selection</span>: size-3 tournament; <span class="term">elitism</span> copies the best individual unchanged so the best score never drops.</li>
+          <li><span class="term">Crossover</span>: single point. It lets two partial solutions combine (the building-block idea). Turn it off and progress slows because good bits can only spread by cloning.</li>
+          <li><span class="term">Mutation</span> rate <code>μ</code> per bit. With <code>μ = 0</code> diversity only shrinks (premature convergence). With <code>μ → 0.5</code> each child is nearly random, so the search turns into random guessing. The balance is <span class="term">exploration vs exploitation</span>; a common rule of thumb is <code>μ ≈ 1/length</code>.</li>
+          <li>Used for scheduling, design search, neuroevolution. It is good when the answer is hard to differentiate, but it can be slow and has no guarantee of finding the best answer.</li>
+        </ul>
+        <p>Further reading: Mitchell, <i>An Introduction to Genetic Algorithms</i> (1996) · Eiben and Smith, <i>Introduction to Evolutionary Computing</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/opt-genetic-core.js"></script>
+  <script src="js/opt-genetic.js"></script>
+</body>
+</html>

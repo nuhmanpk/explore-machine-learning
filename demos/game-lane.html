@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lane Keeper · Explore ML</title>
+  <meta name="description" content="A fleet of little cars with tiny brains learns to stay in the lane of a winding road, then adapts to hairpin bends, a narrow lane, rain, cones in the road and a higher speed limit.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .fly-pad { display: none; grid-template-columns: repeat(4, 52px); grid-template-rows: 48px; gap: 8px; justify-content: center; margin-top: 10px; }
+    .fly-pad.show { display: grid; }
+    .fly-pad .btn { padding: 0; font-size: 20px; }
+    #arena { background: #8fd09c; }
+    #babies { width: 100%; flex-wrap: nowrap; }
+    #babies button { flex: 1; white-space: nowrap; font-size: .85rem; padding: 7px 6px; }
+    .assist { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: .88rem; cursor: pointer; }
+    .assist input { width: 18px; height: 18px; accent-color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-lane">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="car"></i> Game Lab · Neuroevolution</span>
+      <h1>Lane <span class="em">Keeper</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Sixty baby cars, sixty random brains. Each must follow the <b>winding road</b> and stay between the white lines. Press <b>Play</b>!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn" id="drive"><i data-icon="gamepad"></i> I'll drive</button>
+          <p class="muted" style="margin:0;font-size:.85rem">← → steer, ↑ faster, ↓ slower (or the buttons under the road). Stay in the lane to the green finish line. Try it before the robots do: bends come fast!</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make the road harder. Watch the drivers struggle, then adapt.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="sharp"><i data-icon="trend"></i> Hairpin bends <span class="tag">tighter turns</span></button>
+            <button class="btn small" data-c="narrow"><i data-icon="ruler"></i> Narrow lane <span class="tag">little room</span></button>
+            <button class="btn small" data-c="rain"><i data-icon="wave"></i> Rain <span class="tag">slippery</span></button>
+            <button class="btn small" data-c="cones"><i data-icon="target"></i> Cones <span class="tag">dodge them</span></button>
+            <button class="btn small" data-c="fast"><i data-icon="gauge"></i> Higher speed <span class="tag">faster bends</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> The fleet</h3>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.3">
+            <div class="hint">Small = careful copies. Big = wild new ideas.</div>
+          </div>
+          <div class="seg" id="babies"><button data-v="1" class="on">Show the babies</button><button data-v="0">Leader only</button></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="arena"></canvas>
+          <div class="fly-pad" id="pad">
+            <button class="btn" data-k="left" aria-label="Steer left"><i data-icon="arrow-left"></i></button>
+            <button class="btn" data-k="up" aria-label="Faster"><i data-icon="arrow-up"></i></button>
+            <button class="btn" data-k="down" aria-label="Slower"><i data-icon="arrow-down"></i></button>
+            <button class="btn" data-k="right" aria-label="Steer right"><i data-icon="arrow-right"></i></button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the best half did, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--lang)"></i>Road driven (%)</span><span><i style="background:var(--accent)"></i>Finished the whole road (%)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip"><i data-icon="step"></i> Next round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-round">1</div></div>
+            <div class="stat"><div class="k">Driving now</div><div class="v" id="st-alive">60</div></div>
+            <div class="stat"><div class="k">Leader went</div><div class="v" id="st-far">0<small>%</small></div></div>
+            <div class="stat"><div class="k">Finished (best half)</div><div class="v" id="st-top">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the leading car's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion car from each round. Tap to watch it drive today's road.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Nine senses</h3><p>Each car feels how far it is from the middle of the lane, which way it points, its speed, where the road is at three spots ahead, any cone coming up, and how sharply the road bends right now.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>Those numbers go into a small brain with two answers: how far to turn the wheel, and how fast to go.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Go the furthest</h3><p>Cars earn points for each bit of road they cover, a bonus for finishing, and lose a little for wobbling away from the middle. Leaving the lane or hitting a cone ends the run.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Copy with changes</h3><p>Babies get their parents' brains with small random changes. Smoother steering means more babies.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Change the road</h3><p>Add rain, hairpins or cones. Old tricks stop working, and the cars have to find new ones. Every round has a brand-new road too.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In round 1 the cars drove off the road within moments. Nobody told them what a bend is, or which way to turn the wheel.</li>
+        <li>Round after round, cars whose brains happened to steer toward the middle of the road lasted longer and had more babies, so the whole fleet learned lane-keeping.</li>
+        <li>Every round used a different random road, so what they learned is a <b>general</b> skill, not one memorised track.</li>
+        <li>Real lane-keeping assist uses a camera to find the lane lines and a controller to steer. Learning-based driving research trains on far more roads than this.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: 60 small feed-forward networks <code>[9 &rarr; 10 &rarr; 2]</code> (tanh) improved by a genetic algorithm, with no gradients and no labels. The car is a <span class="term">kinematic bicycle model</span>. Staying in a lane is a classic <span class="term">path-following</span> control problem.</p>
+        <ul>
+          <li><b>The road:</b> a path whose curvature is a sum of three sine waves with random phase and size, eased in over the first 120 px. Each round (and each scoring pass) draws a new road, so evolution cannot memorise a track and has to learn a general steering policy. Random roads like this cross themselves about 40% of the time (85% with hairpins), which would let a car hop onto another stretch, so a road is redrawn until no part comes within a lane-width of a far-away part.</li>
+          <li><b>Inputs (9):</b> lateral offset from the lane centre, heading error against the road direction, speed, the lateral position of the road centre in the car's own frame at three look-ahead distances (34, 78 and 130 px, the white dots), the sideways offset and distance of the nearest cone in the next 140 px, and the current road curvature.</li>
+          <li><b>Outputs (2):</b> a steering command (tanh, up to about 35&deg; of wheel angle, low-pass filtered because real wheels take time to turn) and a target speed between a minimum and the speed limit.</li>
+          <li><b>Failure:</b> any part of the car body leaving the lane, or hitting a cone, ends the run. <b>Fitness:</b> road covered (up to 100), plus a finishing bonus (more for finishing early), minus a small penalty for the average distance from the centre line, summed over two random roads per round.</li>
+          <li><b>Genetic algorithm:</b> the top 8% survive unchanged; the rest are children of the top quarter (30% uniform crossover) with Gaussian mutation whose size is spread from small to large.</li>
+          <li><b>Measured in Node</b> (best half, one run per setting): on the default road about 90% finished by round 10 and 100% by round 30. With hairpin bends, 100% finished by round 10. Cones were much harder: after 30 rounds only about 13% finished and the best half covered about 55% of the road, because dodging needs a precise sense of where the cone is relative to the lane.</li>
+          <li><b>The classic alternative:</b> a pure-pursuit or Stanley controller steers directly toward a look-ahead point on the path, using a few lines of geometry. It works very well, and is in many real lane-keeping systems. Evolution here has to rediscover something like it from scratch, which shows why the look-ahead points matter so much.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-lane-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-lane.js"></script>
+</body>
+</html>

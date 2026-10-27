@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Word Map · Explore ML</title>
+  <meta name="description" content="Place words on a map yourself, then watch a tiny model learn word meanings from sentences, live in your browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .we-main { display: grid; gap: 18px; min-width: 0; }
+    #map { cursor: grab; }
+    #map.drag { cursor: grabbing; }
+    #map.locked { cursor: pointer; }
+    .box-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .box-head h2 { font-size: 1.25rem; margin: 0; display: flex; align-items: center; gap: 8px; }
+    .box-head h2 svg, .card h3 svg { color: var(--accent); }
+    .view-label { margin: 12px 0 6px 4px; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .nb { display: grid; gap: 6px; margin: 8px 0; }
+    .nb-row { display: grid; grid-template-columns: 90px 1fr 46px; gap: 8px; align-items: center; font-weight: 800; font-size: .92rem; }
+    .nb-row .track { height: 12px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+    .nb-row .fill { display: block; height: 100%; border-radius: 999px; }
+    .nb-row .n { font-family: var(--font-mono); text-align: right; font-size: .82rem; }
+    .vec { display: flex; gap: 3px; align-items: center; height: 34px; margin: 6px 0; }
+    .vec i { flex: 1; border-radius: 3px; min-height: 2px; }
+    .why { font-weight: 600; color: var(--ink-2); font-size: .92rem; }
+    .why b { color: var(--accent); }
+    .math { display: grid; gap: 8px; }
+    .math .eq { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-weight: 800; }
+    .math select, .chal input[type=text], .chal textarea { font: inherit; font-weight: 700; padding: 6px 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); min-width: 0; }
+    .math select { max-width: 112px; }
+    .math .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+    .math-out { font-weight: 800; min-height: 1.6em; }
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal .presets button { width: auto; justify-content: center; }
+    .chal textarea { width: 100%; min-height: 66px; resize: vertical; }
+    .chal .newword { display: none; gap: 6px; padding: 10px; border-radius: 12px; background: var(--bg-2); }
+    .chal .newword.open { display: grid; }
+    .chal .newword .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+    #inside { min-height: 150px; }
+    .score-line { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .ckpt .cp-n { display: block; font-family: var(--font-mono); color: var(--accent); }
+    @media (max-width: 520px) { .nb-row { grid-template-columns: 72px 1fr 42px; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="lang" data-demo="lang-embed">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="map"></i> Language Models · Word embeddings</span>
+      <h1>The <span class="em">Word Map</span></h1>
+      <p class="hero-sub">A computer can't know what "cat" means. But it can learn that "cat" shows up in the same kinds of sentences as "dog". Let's turn that into a map.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Here are 42 words, scattered at random. <b>Drag each word</b> to where you think it belongs. Put friends close together! Then I'll try to learn my own map.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="we-main">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <div class="box-head">
+            <h2><i data-icon="map"></i> <span id="map-title">Your guess</span></h2>
+            <div class="btn-row" style="margin:0">
+              <button class="btn small" id="check"><i data-icon="check"></i> Check my map</button>
+            </div>
+          </div>
+          <canvas id="map"></canvas>
+          <div class="legend" id="legend" style="margin-top:10px"></div>
+          <div class="view-label"><i data-icon="trend"></i> How well the map groups friends (nearest 3 neighbours in the same group)</div>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Robo's map score</span><span><i style="background:var(--warn);height:3px"></i>Your guess</span><span><i style="background:var(--muted);height:3px"></i>Mistakes (loss), lower is better</span><span><i style="background:var(--bad);height:3px"></i>You changed something</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="train"><i data-icon="play"></i> Robot, read &amp; learn!</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget all</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed">
+              <button data-v="12">Slow</button><button data-v="45" class="on">Normal</button><button data-v="150">Fast</button><button data-v="800">Turbo</button>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Sentences read</div><div class="v" id="st-sent">0</div></div>
+            <div class="stat"><div class="k">Robo's map score</div><div class="v" id="st-acc">–</div></div>
+            <div class="stat"><div class="k">Your guess</div><div class="v" id="st-you">–</div></div>
+            <div class="stat"><div class="k">Mistakes</div><div class="v" id="st-loss">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div id="inside"><span class="muted">Tap any word on the map.</span></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="wand"></i> Word maths</h3>
+          <div class="math">
+            <div class="eq">
+              <select id="m-a" aria-label="first word"></select> <span>−</span>
+              <select id="m-b" aria-label="second word"></select> <span>+</span>
+              <select id="m-c" aria-label="third word"></select> <span>=</span>
+            </div>
+            <div class="presets" id="presets"></div>
+            <div class="math-out" id="math-out"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Try to break it</h3>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="word"><i data-icon="plus"></i> Add a new word <span class="tag">find its place</span></button>
+            <div class="newword" id="newword">
+              <div class="presets" id="nw-presets"></div>
+              <input type="text" id="nw-word" placeholder="new word, e.g. zebra" maxlength="14" aria-label="new word">
+              <textarea id="nw-sents" aria-label="sentences with the new word" spellcheck="false" placeholder="one sentence per line, using only words from the map"></textarea>
+              <button class="btn primary small" id="nw-go"><i data-icon="play"></i> Teach it</button>
+            </div>
+            <button class="btn small" data-c="shuffle"><i data-icon="shuffle"></i> Jumble the sentences <span class="tag">lose context</span></button>
+            <button class="btn small" data-c="few"><i data-icon="clock"></i> Read only a few <span class="tag">stop early</span></button>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— Robo's map saved along the way. Tap one to look at it.</span></h3>
+      <div class="checkpoints" id="ckpts"><span class="muted">They appear after 0, 300, 1000, 2000, 4000 and 8000 sentences.</span></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="chat"></i></div><h3>Read sentences</h3><p>Robo reads thousands of tiny sentences like "the cat chased the mouse" and "she ate some cake".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Guess the neighbours</h3><p>Pick a word. Can its number-list tell which words sit next to it? Right guess: pull them closer. Wrong guess: push apart.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Squash to a map</h3><p>Each word has 12 numbers. We squash them down to 2, so you can see them as dots on a flat map.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wand"></i></div><h3>Directions mean things</h3><p>The step from "man" to "woman" points the same way as "king" to "queen". That's word maths!</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first the map was random. Nobody told Robo that cats and dogs are both animals.</li>
+        <li>Robo only saw which words sit <b>next to each other</b>. Words used in the same places got the same kind of numbers, so they landed close together.</li>
+        <li>Jumble the sentences and the map falls apart: <b>meaning comes from context</b>.</li>
+        <li>Chatbots start the same way. Every word becomes a list of numbers learned from lots of text.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a miniature <span class="term">word2vec</span> trained from scratch in your browser. Nothing is downloaded.</p>
+        <ul>
+          <li><b>Embedding:</b> each of the ~80 vocabulary words (42 on the map plus function words) has a learned <span class="term">vector</span> in ℝ¹². Words in the same group are generated from the same sentence templates, so they share contexts.</li>
+          <li><b>Skip-gram with negative sampling (SGNS):</b> for every word and each neighbour within ±2 positions, the model raises <code>σ(w·c)</code> for the true context word and lowers it for 5 randomly drawn words. Plain SGD, learning rate decaying from 0.06. About 8000 sentences (≈ 280k word pairs) take a fraction of a second.</li>
+          <li><b>Cosine similarity</b> measures closeness (the angle between vectors, not their length). The "map score" is the share of each word's 3 cosine-nearest neighbours that belong to its own group. Random vectors score about 20%.</li>
+          <li><b>The 2D picture</b> uses <span class="term">PCA</span> (power iteration on the covariance of the unit-length vectors). It is only a shadow of the 12D space, so some distances get distorted.</li>
+          <li><b>Analogies:</b> <code>king − man + woman</code> is computed on normalised vectors and the nearest word (excluding the inputs) is returned. It works here because the corpus pairs king/man with "he" and queen/woman with "she". Real analogy results are much noisier than the famous examples.</li>
+          <li><b>Bias:</b> embeddings absorb whatever patterns the text has. Train on real news or web text and the same maths yields stereotypes (for example, occupations drifting toward one gender). Here Robo only learned "he" and "she" because we wrote those sentences.</li>
+          <li><b>Jumbling</b> the words destroys co-occurrence structure, so the score returns to chance. Modern LLMs learn context-dependent vectors (Transformers), but the first layer is still an embedding table like this one.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/lang-embed-core.js"></script>
+  <script src="js/lang-embed.js"></script>
+</body>
+</html>

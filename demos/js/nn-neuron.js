@@ -6,18 +6,7 @@
     { icon: "groups", name: "Friends coming", on: true, w: 2 },
     { icon: "book", name: "Homework", on: false, w: -0.5 },
   ];
-  // What a real kid decided. Linearly separable (e.g. w = [2,-3,2,-2], b = -1).
-  const DAYS = [
-    { x: [1, 0, 0, 0], y: 1 },
-    { x: [1, 1, 0, 0], y: 0 },
-    { x: [0, 0, 1, 1], y: 0 },
-    { x: [1, 0, 1, 1], y: 1 },
-    { x: [0, 0, 0, 0], y: 0 },
-    { x: [0, 0, 1, 0], y: 1 },
-    { x: [0, 1, 1, 0], y: 0 },
-    { x: [0, 0, 0, 1], y: 0 },
-  ];
-  const LR = 0.5;
+  const { DAYS, LR, sigmoid, perceptronStep } = window.NeuronCore;
   // Extra icon not in the shared set.
   const RAIN = '<path d="M17.5 15H7a4 4 0 1 1 1-7.87A5.5 5.5 0 0 1 18.5 9a3 3 0 0 1-1 6z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>';
   const ico = (name) => name === "rain"
@@ -42,10 +31,10 @@
 
   // ---------- neuron maths ----------
   const xs = () => INPUTS.map((i) => (i.on ? 1 : 0));
-  const sumOf = (x) => INPUTS.reduce((s, inp, i) => s + inp.w * x[i], state.bias);
-  const sigmoid = (z) => 1 / (1 + Math.exp(-z));
-  const out = (z) => (state.act === "step" ? (z > 0 ? 1 : 0) : sigmoid(z));
-  const predict = (x) => (sumOf(x) > 0 ? 1 : 0);
+  const ws = () => INPUTS.map((i) => i.w);
+  const sumOf = (x) => NeuronCore.sumOf(ws(), state.bias, x);
+  const out = (z) => NeuronCore.out(state.act, z);
+  const predict = (x) => NeuronCore.predict(ws(), state.bias, x);
   const fmt = (v) => (v > 0 ? "+" : "") + v.toFixed(1);
   const emojiOf = (x) => x.map((v, i) => (v ? ico(INPUTS[i].icon) : "")).join("") || '<span style="font-size:.6em;font-weight:800">plain day</span>';
 
@@ -170,8 +159,9 @@
     const d = DAYS[i];
     loadDay(i, false);
     state.lessons++;
-    const p = predict(d.x);
-    const err = d.y - p;
+    const step = perceptronStep(ws(), state.bias, d);
+    const p = step.p;
+    const err = step.err;
     const tag = `Day ${i + 1} ${emojiOf(d.x)}`;
     if (err === 0) {
       state.cleanRun++;
@@ -180,9 +170,9 @@
       state.cleanRun = 0;
       const on = INPUTS.filter((_, k) => d.x[k]);
       INPUTS.forEach((inp, k) => {
-        if (d.x[k]) setSlider("w" + k, ML.clamp(+(inp.w + LR * err * d.x[k]).toFixed(1), -3, 3));
+        if (d.x[k]) setSlider("w" + k, step.w[k]);
       });
-      setSlider("bias", ML.clamp(+(state.bias + LR * err).toFixed(1), -3, 3));
+      setSlider("bias", step.b);
       const dir = err > 0 ? "UP" : "DOWN";
       const which = on.length ? `the knobs for ${on.map((x) => ico(x.icon)).join(" ")}` : "no switch knobs (none were on)";
       ML.say(`${tag}: I said <b>${p ? "GO" : "STAY"}</b> but the kid said <b>${d.y ? "GO" : "STAY"}</b>. Oops! So I turn ${dir} ${which}, and make my mood a bit ${err > 0 ? "more eager" : "lazier"}.`);

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Same Size, Fair Fight · Explore ML</title>
+  <meta name="description" content="Age is measured in tens, income in tens of thousands. See how mixed-up units fool a robot, and how scaling makes the fight fair.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #chart,#chart2 { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); touch-action: none; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .seg button { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .seg button:focus-visible, .tbl button:focus-visible, .feat input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .lab { display: block; font-weight: 800; font-size: .86rem; margin: 10px 0 6px; }
+    .bars { display: grid; gap: 6px; }
+    .bar { display: grid; grid-template-columns: 7.5em 1fr 3.4em; gap: 8px; align-items: center; font-size: .82rem; font-weight: 800; }
+    .bar .t { height: 12px; border-radius: 6px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar .t i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+    .bar b { font-family: var(--font-mono); text-align: right; }
+    @media (prefers-reduced-motion: reduce) { .bar .t i { transition: none; } }
+    #chart { cursor: crosshair; }
+    #chart:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .big { font-family: var(--font-head); font-size: 1.6rem; font-weight: 600; }
+  </style>
+</head>
+<body data-page="demo" data-topic="data" data-demo="data-scale">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="layers"></i> Data &amp; Features</span>
+      <h1>Same Size, <span class="em">Fair Fight</span></h1>
+      <p class="hero-sub">Age goes up to 80 but income goes up to 200,000. Watch the robot ignore age completely, then fix it by putting both on the same size.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Click the picture to place a new person. I will find the 5 people nearest to them. Are they really the most alike? Then try the scaling buttons!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="groups"></i> Who is alike? <span class="muted" style="font-size:.8rem">(click or use arrow keys to move the star)</span></h3>
+          <div class="btn-row"><button class="btn ghost small" id="reset"><i data-icon="shuffle"></i> New crowd</button></div>
+        </div>
+        <div class="chart-box"><canvas id="chart" tabindex="0" role="img" aria-label="Scatter plot of age against income. A star marks the new person and ringed dots are the nearest neighbours."></canvas></div>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--good)"></i>likes the gadget</span><span><i style="background:var(--bad)"></i>does not</span><span><i style="background:var(--warn)"></i>star = new person</span><span><i style="background:var(--ink)"></i>ring = 5 nearest</span></div>
+        <p class="muted" style="margin:8px 4px 0; font-size:.88rem; font-weight:700">The picture always shows age sideways and income upwards. The ringed people are the ones the robot thinks are nearest, using the setting you picked.</p>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="ruler"></i> Make the sizes fair</h3>
+          <div class="seg" id="g-mode" role="group" aria-label="Scaling method">
+            <button type="button" data-v="none" aria-pressed="true">No scaling</button>
+            <button type="button" data-v="minmax" aria-pressed="false">Min-max (0 to 1)</button>
+            <button type="button" data-v="standard" aria-pressed="false">Standardise</button>
+          </div>
+          <span class="lab">Income is written in</span>
+          <div class="seg" id="g-unit" role="group" aria-label="Income unit">
+            <button type="button" data-v="1" aria-pressed="true">dollars</button>
+            <button type="button" data-v="1000" aria-pressed="false">thousands of dollars</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Does it work?</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Right on 300 test people</div><div class="v big" id="acc">0%</div></div>
+            <div class="stat"><div class="k">Distance from age</div><div class="v" id="sh-age">0%</div></div>
+            <div class="stat"><div class="k">Distance from income</div><div class="v" id="sh-inc">0%</div></div>
+          </div>
+          <div class="bars" style="margin-top:10px">
+            <div class="bar"><span>Age</span><div class="t"><i id="b-age" style="background:var(--accent)"></i></div><b id="p-age">0%</b></div>
+            <div class="bar"><span>Income</span><div class="t"><i id="b-inc" style="background:var(--warn)"></i></div><b id="p-inc">0%</b></div>
+          </div>
+          <p class="muted" style="margin:8px 0 0; font-weight:700; font-size:.88rem">Share of the "how far apart" measurement that each clue supplies for the star's 5 neighbours. Fair is about half and half.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Learning speed <span class="muted" style="font-size:.8rem">(gradient descent, 60 steps)</span></h3>
+          <div class="chart-box"><canvas id="chart2" role="img" aria-label="Error against steps for three scaling settings"></canvas></div>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--bad)"></i>no scaling</span><span><i style="background:var(--warn)"></i>min-max</span><span><i style="background:var(--good)"></i>standardise</span></div>
+          <p class="muted" id="gdnote" style="margin:6px 0 0; font-weight:700; font-size:.88rem"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-blind"><span class="tick"></span><span>See the problem: with no scaling and income in dollars, make age supply under 5% of the distance.</span></div>
+      <div class="chal" id="c-fair"><span class="tick"></span><span>Fair fight: reach at least 85% test accuracy with scaling on, from a start under 75%.</span></div>
+      <div class="chal" id="c-units"><span class="tick"></span><span>Units matter: with no scaling, switch income to thousands of dollars and watch accuracy jump.</span></div>
+      <div class="chal" id="c-fast"><span class="tick"></span><span>Faster learning: pick a scaling that gets the learning error below 1% of its start within 60 steps.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The robot measures how far apart two people are by adding up the gaps in each clue. A gap of 50,000 dollars is huge next to a gap of 30 years, so income wins and age hardly counts.</li>
+      <li>Scaling squeezes every clue onto a similar size. Then age and income both get a vote and the nearest people really are the most alike.</li>
+      <li>Writing income in thousands of dollars helped too. The units you pick quietly change what the robot sees.</li>
+      <li>Learning by small steps (gradient descent) has the same trouble: with clues of very different sizes it creeps along. Scaled clues learn much faster.</li>
+      <li>Not every robot cares. Decision trees ignore sizes. But distance-based and step-by-step learners need fair sizes.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The classifier is <span class="term">k-nearest neighbours</span> (k = 5, majority vote, Euclidean distance) and the data is two features with labels from <code>age_norm + income_norm + noise &gt; 1</code>. Accuracy is measured on 300 held-out people; scalers are fitted on the 200 training people only to avoid <span class="term">data leakage</span>.</p>
+        <ul>
+          <li><span class="term">Min-max scaling</span>: <code>x' = (x − min) / (max − min)</code>, mapping to [0, 1] but sensitive to outliers.</li>
+          <li><span class="term">Standardisation</span> (z-score): <code>x' = (x − μ) / σ</code>, giving mean 0 and standard deviation 1.</li>
+          <li>Euclidean distance is <code>√Σ(aᵢ − bᵢ)²</code>, so a feature with a larger range dominates the sum. The "distance share" bars show <code>Σ(Δage)² / Σ(Δ²)</code> over the neighbours.</li>
+          <li>The learning-speed chart fits <code>spend = w₁·age + w₂·income + b</code> by <span class="term">gradient descent</span> on mean squared error, always using the largest stable step <code>1/λmax</code> of the Hessian <code>(2/n)XᵀX</code> (found by power iteration). The loss surface is a long thin valley when features differ in scale (a large <span class="term">condition number</span>), so progress along the flat direction is very slow. Scaling reduces the condition number.</li>
+          <li>Used with scaling: k-NN, k-means, SVMs, PCA, neural networks, regularised regression. Mostly unaffected: decision trees and random forests.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/data-scale-core.js"></script>
+  <script src="js/data-scale.js"></script>
+</body>
+</html>

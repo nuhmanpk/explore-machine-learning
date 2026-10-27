@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Learn from Mistakes · Explore ML</title>
+  <meta name="description" content="Watch AdaBoost build a strong classifier from tiny one-cut stumps, making the hard dots bigger every round.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.35rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .gridmaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+    .gridmaps figure { margin: 0; min-width: 0; }
+    .gridmaps figcaption { font-weight: 800; font-size: .85rem; margin-bottom: 4px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ensemble" data-demo="ens-boost">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Ensembles &amp; Boosting</span>
+      <h1>Learn from <span class="em">Mistakes</span></h1>
+      <p class="hero-sub">Each tiny helper makes just one straight cut. After each round, the dots it got wrong grow bigger so the next helper pays more attention.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Purple dots are inside a circle, orange are outside. One straight cut cannot do it. Press <b>Add one helper</b> and watch the mistakes grow!</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="layers"></i> Round <span id="round">0</span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="step"><i data-icon="step"></i> Add one helper</button>
+            <button class="btn small" id="ten"><i data-icon="plus"></i> Add 10</button>
+            <button class="btn small" id="auto"><i data-icon="play"></i> Auto</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <canvas id="map" class="cv" role="img" aria-label="Map of the dots. Dot size shows how much the learner cares about each dot. Background shows the combined vote."></canvas>
+        <p class="cap">Bigger dot = the learner cares more about it. Thick ring = the newest helper got it wrong. Dashed line = the newest helper's cut. Background = what all helpers say together.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Scores</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Newest helper alone</div><div class="v" id="s-last">-</div></div>
+            <div class="stat"><div class="k">All together, fresh dots</div><div class="v" id="s-test" style="color:var(--accent)">-</div></div>
+            <div class="stat"><div class="k">Biggest dot is</div><div class="v" id="s-big" style="color:var(--warn)">1x</div></div>
+          </div>
+          <div class="btn-row" style="margin-top:8px"><button class="btn small ghost" id="newdata"><i data-icon="shuffle"></i> New dots</button></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Score as rounds pass</h3>
+          <canvas id="chart" class="cv" role="img" aria-label="Chart of accuracy against boosting rounds"></canvas>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>fresh dots</span><span><i style="background:var(--good)"></i>training dots</span></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> The helpers so far</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-step"><span class="tick"></span><span>Take it step by step: add 3 helpers one at a time.</span></div>
+      <div class="chal" id="c-hard"><span class="tick"></span><span>Spot the hard one: get a dot to be at least twice as big as at the start.</span></div>
+      <div class="chal" id="c-acc"><span class="tick"></span><span>Strong together: reach 90% on fresh dots, even though each helper alone makes only one cut.</span></div>
+      <div class="chal" id="c-long"><span class="tick"></span><span>Keep going: reach 40 rounds.</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The first helper makes one straight cut, the best it can. It is not great, maybe 65% right.</li>
+      <li>Dots it got wrong grow bigger; dots it got right shrink.</li>
+      <li>The next helper sees the bigger dots as more important, so it picks a cut that fixes those.</li>
+      <li>Each helper gets a say in the final vote, louder if it was accurate. Together a pile of weak cuts draws a shape no single cut could.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>Give every dot the same weight.</li>
+      <li>Find the single cut (a stump) with the lowest weighted mistake rate.</li>
+      <li>Give that helper a vote size from its error: fewer mistakes means a louder vote.</li>
+      <li>Multiply the weights of the dots it got wrong up, and the right ones down, then rescale.</li>
+      <li>Repeat. The final answer is the sign of the sum of all votes.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">discrete AdaBoost</span> (Freund and Schapire) with depth-1 <span class="term">decision stumps</span> as <span class="term">weak learners</span>. For round t with weighted error <code>ε<sub>t</sub></code>: <code>α<sub>t</sub> = ½ ln((1 − ε<sub>t</sub>) / ε<sub>t</sub>)</code>, then <code>w<sub>i</sub> ← w<sub>i</sub> · exp(−α<sub>t</sub> y<sub>i</sub> h<sub>t</sub>(x<sub>i</sub>))</code>, normalised to sum 1. The final model is <code>H(x) = sign(Σ α<sub>t</sub> h<sub>t</sub>(x))</code>.</p>
+        <ul>
+          <li>Boosting reduces <span class="term">bias</span>: it builds a complex boundary out of simple pieces. Each stump looks at one axis, so the final model is a sum of one-feature functions. A circle (x² + y²) is exactly such a sum, which is why this puzzle suits stumps.</li>
+          <li>It is a <span class="term">stagewise additive model</span> minimising exponential loss <code>Σ exp(−y F(x))</code>, which is why misclassified points get exponentially growing weight.</li>
+          <li>Training error can reach zero while test error keeps improving on clean data, a famous observation about margins. With noisy labels, though, the growing weights chase the wrong labels; the next lesson shows this.</li>
+          <li>Errors are clamped strictly between 0 and ½ so α stays finite.</li>
+        </ul>
+        <p>Data: 90 random dots in the unit square, class 1 inside a circle of radius 0.33 around the centre, no label noise. Tested on 500 fresh dots.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ens-boost-core.js"></script>
+  <script src="js/ens-boost.js"></script>
+</body>
+</html>

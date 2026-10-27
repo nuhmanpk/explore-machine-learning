@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Next State Please · Explore ML</title>
+  <meta name="description" content="Walk through a weather chain that only remembers today, see its long-run frequencies, then write sentences with a tiny next-word chain.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .st3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .st3 .stat .v { font-size: 1.3rem; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cv { width: 100%; display: block; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .panel .card, .canvas-box { min-width: 0; }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .bar { height: 14px; border-radius: 8px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tags span { background: var(--bg-2); border: 2px solid var(--line); border-radius: 10px; padding: 2px 8px; font-weight: 800; font-size: .82rem; font-family: var(--font-mono); }
+    .tags span.p { border-color: var(--bad); } .tags span.n { border-color: var(--good); }
+    .tbl { display: grid; grid-template-columns: auto repeat(3, 1fr); gap: 6px; align-items: center; }
+    .tbl .h { font-weight: 800; font-size: .75rem; color: var(--muted); text-align: center; }
+    .tbl .rl { font-weight: 800; font-size: .85rem; }
+    .tbl input { width: 100%; min-width: 0; font: inherit; font-family: var(--font-mono); font-weight: 700; padding: 6px 4px; text-align: center; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+    .tbl input:focus-visible { outline: 3px solid var(--accent); }
+    @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="prob" data-demo="prob-markov">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="dice"></i> Probability &amp; Uncertainty</span>
+      <h1>Next State <span class="em">Please</span></h1>
+      <p class="hero-sub">Tomorrow's weather depends only on today's. Edit the chances, let a walker wander, and see where it settles.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Press <b>Next day</b> a few times, or hold <b>Play</b>. The walker only looks at today to pick tomorrow!</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <h3 style="margin:0 0 8px"><i data-icon="footprints"></i> The weather walker</h3>
+        <canvas id="map" class="cv" aria-label="Three weather states with arrows showing the chance of moving between them, and a dot that walks."></canvas>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn primary small" id="step"><i data-icon="step"></i> Next day</button>
+          <button class="btn small" id="play" aria-pressed="false"><i data-icon="play"></i> Play</button>
+          <button class="btn small" id="s1k"><i data-icon="zap"></i> 1,000 days</button>
+          <button class="btn ghost small" id="wreset"><i data-icon="reset"></i> Restart walk</button>
+        </div>
+        <p class="muted" id="today" style="margin:8px 0 0; font-weight:800" aria-live="polite"></p>
+        <h3 style="margin:14px 0 8px"><i data-icon="gauge"></i> How often each weather happened</h3>
+        <canvas id="freq" class="cv" aria-label="Bars of how often the walker visited each weather, with markers showing the long-run answer."></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>walker's share of days</span><span><i style="background:var(--ink)"></i>long-run answer (power iteration)</span></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="pencil"></i> Tomorrow's weather table</h3>
+          <p class="muted" style="margin:0 0 8px; font-weight:700; font-size:.86rem">Each row is today's weather. Type the chance (out of 100) of each tomorrow. Rows are scaled to add up to 100%.</p>
+          <div class="tbl" id="tbl" role="group" aria-label="Transition table"></div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn small ghost" id="treset"><i data-icon="reset"></i> Default table</button>
+            <button class="btn small" id="trainy"><i data-icon="zap"></i> Make it rainy</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="repeat"></i> Power iteration</h3>
+          <canvas id="power" class="cv" aria-label="Lines showing the chance of each weather converging as the table is applied again and again."></canvas>
+          <div class="mono" id="power-txt" style="font-family:var(--font-mono); font-size:.8rem; margin-top:6px; line-height:1.5"></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="chat"></i> A tiny text writer</h3>
+      <p class="muted" style="margin:0 0 8px; font-weight:700">The same trick with words. The "weather" is the current word, and the table says which word tends to come next. It learned from this tiny story:</p>
+      <p class="muted" id="corpus" style="margin:0 0 8px; font-size:.84rem; font-style:italic"></p>
+      <div class="row" style="margin-bottom:8px">
+        <div class="seg" role="group" aria-label="How many words to look back">
+          <button type="button" data-o="1" class="on" aria-pressed="true">Look back 1 word</button>
+          <button type="button" data-o="2" aria-pressed="false">Look back 2 words</button>
+        </div>
+        <button class="btn small primary" id="gen"><i data-icon="pencil"></i> Write a sentence</button>
+      </div>
+      <p class="big" id="sentence" style="margin:4px 0" aria-live="polite">Press the button!</p>
+      <div class="tags" id="nexts" style="margin-top:6px"></div>
+      <p class="muted" id="lm-note" style="margin:8px 0 0; font-weight:700; font-size:.88rem">After each word, the chain only looks at the last word or two. A big language model also predicts the next word, but looks at far more words and learned from billions of sentences.</p>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-walk"><span class="tick"></span><span>Take a walk: let the walker travel 100 days.</span></div>
+      <div class="chal" id="c-match"><span class="tick"></span><span>Settle down: after 2,000 days, every bar lands within 3.5 points of the long-run marker.</span></div>
+      <div class="chal" id="c-rainy"><span class="tick"></span><span>Make it rain: edit the table so rain happens more than half of all days in the long run.</span></div>
+      <div class="chal" id="c-text"><span class="tick"></span><span>Write a sentence with the tiny text writer.</span></div>
+      <div class="chal" id="c-o2"><span class="tick"></span><span>Look back 2 words and write a sentence. Does it sound more like the story?</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>A Markov chain only needs today to guess tomorrow. It forgets everything before.</li>
+      <li>Walk long enough and the share of days in each state settles to fixed numbers, no matter where you started.</li>
+      <li>Power iteration finds those numbers without walking at all: just keep applying the table to a spread of chances until it stops changing.</li>
+      <li>Change the table and the long-run weather changes with it.</li>
+      <li>Next-word writing works the same way. Looking back 2 words copies the story more closely. Real language models look back at thousands of words.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>A <span class="term">Markov chain</span> is a random process with the <span class="term">Markov property</span>: <code>P(X<sub>t+1</sub> | X<sub>t</sub>, X<sub>t−1</sub>, …) = P(X<sub>t+1</sub> | X<sub>t</sub>)</code>. It is described by a row-stochastic <span class="term">transition matrix</span> P (each row sums to 1).</p>
+        <ul>
+          <li>A distribution row vector π evolves as <code>π<sub>t+1</sub> = π<sub>t</sub> P</code>. The <span class="term">stationary distribution</span> satisfies <code>π = π P</code> (a left eigenvector with eigenvalue 1). Power iteration repeats the multiplication until it converges.</li>
+          <li>For a chain that is <span class="term">irreducible</span> and <span class="term">aperiodic</span> (every state reachable, no rigid cycles) the stationary distribution is unique and the chain converges to it from any start (ergodic theorem). The speed depends on the second-largest eigenvalue modulus. A table with a state that never leaves (an <span class="term">absorbing state</span>) breaks uniqueness.</li>
+          <li>The walker's visit frequencies converge to π by the law of large numbers for Markov chains. Consecutive days are correlated, so convergence is slower than for independent draws.</li>
+          <li>The text writer is an <span class="term">n-gram model</span>: order 1 is a bigram chain (state = last word), order 2 a trigram chain (state = last two words). Counts from the story become probabilities. It can only reproduce word combinations it has seen.</li>
+          <li>Modern <span class="term">language models</span> also predict a distribution over the next token, but condition on a long context using a learned neural network instead of a count table. MCMC, PageRank and hidden Markov models are other famous uses of chains.</li>
+        </ul>
+        <p>Further reading: Norris, <i>Markov Chains</i> · Brin and Page (1998), the PageRank paper · Shannon (1948), <i>A Mathematical Theory of Communication</i> (the first n-gram text).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/prob-markov-core.js"></script>
+  <script src="js/prob-markov.js"></script>
+</body>
+</html>

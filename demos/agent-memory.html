@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A Small Backpack · Explore ML</title>
+  <meta name="description" content="A helper can only keep a few words in mind at once. Compare three ways of remembering and see which facts survive.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    @media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cp-head h3 { margin: 0; }
+    .toy { font-size: .8rem; font-weight: 800; color: var(--muted); background: var(--bg-2); border: 2px dashed var(--line); border-radius: 10px; padding: 4px 8px; margin: 8px 0 0; }
+    .opt { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 10px; min-height: 34px; cursor: pointer; }
+    .opt:focus-visible, .sel:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .opt.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sel { font: inherit; font-weight: 700; padding: 6px 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); max-width: 100%; }
+    .txt { width: 100%; font: inherit; font-weight: 700; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+    .mono { font-family: var(--font-mono); }
+    .pill { display: inline-block; font-family: var(--font-mono); font-weight: 700; font-size: .82rem; background: var(--bg-2); border: 2px solid var(--line); border-radius: 8px; padding: 1px 6px; overflow-wrap: anywhere; }
+    .pill.bad { border-color: var(--bad); color: var(--bad); } .pill.good { border-color: var(--good); color: var(--good); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+    .strips { display: grid; gap: 10px; }
+    .strip .nm { font-weight: 800; font-size: .88rem; display: flex; justify-content: space-between; gap: 8px; }
+    .cells { display: grid; grid-template-columns: repeat(40, 1fr); gap: 2px; margin-top: 4px; }
+    .cells i { height: 18px; border-radius: 3px; background: var(--line); opacity: .55; border: 2px solid transparent; box-sizing: border-box; }
+    .cells i.v { background: var(--accent); opacity: 1; } .cells i.s { background: var(--warn); opacity: 1; } .cells i.r { background: var(--good); opacity: 1; }
+    .cells i.f { border-color: var(--ink); }
+    .qt { width: 100%; border-collapse: collapse; font-size: .88rem; font-weight: 700; }
+    .qt th, .qt td { padding: 4px 6px; text-align: center; border-bottom: 1px solid var(--line); }
+    .qt td:first-child, .qt th:first-child { text-align: left; }
+    .qt tr.sel td { background: var(--bg-2); }
+    .qbtn { all: unset; cursor: pointer; text-decoration: underline dotted; } .qbtn:focus-visible { outline: 3px solid var(--accent); }
+    .ok { color: var(--good); font-weight: 800; } .no { color: var(--bad); font-weight: 800; }
+    .ctx { max-height: 220px; overflow-y: auto; display: grid; gap: 3px; font-size: .86rem; font-weight: 700; }
+    .ctx div { padding: 2px 6px; border-radius: 6px; background: var(--bg-2); } .ctx .s { border-left: 4px solid var(--warn); } .ctx .r { border-left: 4px solid var(--good); } .ctx .v { border-left: 4px solid var(--accent); }
+    .score { display: grid; grid-template-columns: 90px 1fr 36px; gap: 6px; align-items: center; font-weight: 800; font-size: .86rem; margin: 4px 0; }
+    .score div { background: var(--bg-2); border-radius: 6px; overflow: hidden; height: 12px; } .score i { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+    .legend2 { display: flex; gap: 10px; flex-wrap: wrap; font-size: .8rem; font-weight: 800; color: var(--muted); }
+    .legend2 b { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 3px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="agents" data-demo="agent-memory">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="robot"></i> Agents &amp; Tools</span>
+      <h1>A Small <span class="em">Backpack</span></h1>
+      <p class="hero-sub">A chat helper can only hold so many words in its backpack. Make the backpack smaller and see which memory trick still remembers your facts.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Drag the <b>backpack size</b>. Three memory tricks try to answer questions about the chat. The reader is a simple toy, not a real language model.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="chat"></i> The chat <span class="muted" id="wcount"></span></h3>
+          <div class="btn-row"><button class="btn ghost small" id="newchat"><i data-icon="shuffle"></i> New chat</button></div>
+        </div>
+        <label for="win" style="font-weight:800">Backpack size: <b id="wval">80</b> words</label>
+        <input type="range" id="win" min="20" max="300" step="5" value="80" style="width:100%" aria-label="Backpack size in words">
+        <div class="strips" id="strips" style="margin-top:10px"></div>
+        <div class="legend2" style="margin-top:8px"><span><b style="background:var(--accent)"></b>word for word</span><span><b style="background:var(--warn)"></b>squashed summary</span><span><b style="background:var(--good)"></b>fetched by search</span><span><b style="background:var(--line)"></b>forgotten</span><span><b style="border:2px solid var(--ink)"></b>a fact to remember</span></div>
+        <h3 style="margin:14px 0 6px"><i data-icon="question"></i> Questions about the chat <span class="muted" style="font-size:.8rem">(tap one)</span></h3>
+        <table class="qt" id="qt"></table>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="trophy"></i> Answers recalled</h3>
+          <div id="scores"></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What is in the backpack</h3>
+          <div class="btn-row" id="tabs" role="group" aria-label="Memory trick"></div>
+          <p style="margin:8px 0;font-weight:800" id="qline"></p>
+          <div class="ctx" id="ctx"></div>
+          <p class="toy">Toy reader: it finds the newest line with the right keyword and a known value. Not a real language model.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-forget"><span class="tick"></span><span>Shrink the backpack until keep-last remembers 2 or fewer of the facts.</span></div>
+      <div class="chal" id="c-rag"><span class="tick"></span><span>Find a size where search memory gets 7 or more while keep-last gets 3 or fewer.</span></div>
+      <div class="chal" id="c-sum"><span class="tick"></span><span>Find a size where the summary beats keep-last by 2 or more.</span></div>
+      <div class="chal" id="c-tiny"><span class="tick"></span><span>Make the backpack 40 words or smaller and still get 8 out of 8 with search memory.</span></div>
+      <div class="chal" id="c-big"><span class="tick"></span><span>Make the backpack big enough that all three tricks get 8 out of 8.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The backpack holds a fixed number of words. Keep-last just drops the oldest ones, so early facts vanish first.</li>
+      <li>The summary squashes old lines into fewer words, but a squash can throw away the one line you needed.</li>
+      <li>Search memory keeps everything outside the backpack and fetches only the lines that match the question.</li>
+      <li>A bigger backpack costs more to carry, so clever memory lets a small one do the job of a big one.</li>
+      <li>Search can still miss: it only finds lines that share words with the question.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>A language model can only read a limited <span class="term">context window</span> (measured in tokens; here, words). Anything outside it is invisible. An agent needs an <span class="term">external memory</span> policy to decide what goes back in.</p>
+        <ul>
+          <li><b>Keep-last-N</b> (a sliding window): newest turns that fit the budget.</li>
+          <li><b>Summarise</b>: half the budget is recent turns; older turns are compressed by removing stopwords and ranked by a hand-written importance score (digits and capitalised names), keeping the best that fit. A real system asks a model to write the summary, which is also <span class="term">lossy</span>.</li>
+          <li><b>Retrieval</b> (the idea behind RAG): one third recent turns, the rest the top-3 older turns by <span class="term">TF-IDF</span> cosine similarity to the question. <code>tfidf(w) = tf · (ln((N+1)/(df+1)) + 1)</code>, so rare words count for more than common ones.</li>
+          <li><b>Toy reader</b>: a keyword and value matcher stands in for the language model that would read the context. Scores show whether the right line reached the context, which is the thing memory controls.</li>
+          <li>Metric: number of the 8 recall questions answered correctly. Facts lean towards the start of the chat, so small windows hurt.</li>
+        </ul>
+        <p>Further reading: Lewis et al., <i>Retrieval-Augmented Generation</i> (2020) · Liu et al., <i>Lost in the Middle</i> (2023).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/agent-memory-core.js"></script>
+  <script src="js/agent-memory.js"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How Sure Is Sure? · Explore ML</title>
+  <meta name="description" content="A fruit-ripeness robot is too sure of itself. Measure how honest its confidence is, calibrate it, and teach it to say I don't know.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    @media (max-width: 460px) { .four { grid-template-columns: repeat(2, 1fr); } }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    #rel { width: 100%; max-width: 420px; display: block; margin: 0 auto; background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; }
+    #rel text { fill: var(--muted); font: 700 9px var(--font-body); }
+    .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+    .seg button { font: inherit; font-weight: 800; font-size: .88rem; padding: 8px 12px; min-height: 40px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+    .seg button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .seg button:focus-visible, input[type=range]:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .answers { display: grid; gap: 6px; }
+    .ans { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; background: var(--bg-2); border: 2px solid var(--line); border-radius: 12px; padding: 6px 10px; font-weight: 800; font-size: .88rem; }
+    .ans.idk { opacity: .75; border-style: dashed; }
+    .pill { border-radius: 999px; padding: 2px 10px; font-size: .75rem; font-weight: 800; color: #fff; }
+    .pill.ok { background: var(--good); } .pill.no { background: var(--bad); } .pill.idk { background: var(--muted); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ethics" data-demo="ethics-calibrate">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="heart"></i> Ethics, Safety &amp; Alignment</span>
+      <h1>How Sure Is <span class="em">Sure?</span></h1>
+      <p class="hero-sub">A robot guesses if fruit is ripe, and says how sure it is. Is "95% sure" really right 95% of the time? Let's check, then teach it to say "I don't know".</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">If I say "90% sure" I should be right 9 times in 10. Look at the chart: the dots should sit on the dashed line. They don't yet!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px"><h3 style="margin:0"><i data-icon="gauge"></i> Is its confidence honest?</h3>
+          <div class="btn-row"><button class="btn ghost small" id="newd"><i data-icon="shuffle"></i> New fruit</button></div></div>
+        <div class="seg" id="meth" role="group" aria-label="Confidence method">
+          <button type="button" data-m="raw" aria-pressed="true">As trained</button>
+          <button type="button" data-m="temp" aria-pressed="false">Cool it down (temperature)</button>
+          <button type="button" data-m="platt" aria-pressed="false">Stretch and shift (Platt)</button>
+        </div>
+        <svg id="rel" viewBox="0 0 260 260" role="img" aria-label="Reliability chart: confidence on the bottom, how often it is really right on the side"></svg>
+        <p class="muted" style="margin:6px 4px 0; font-size:.86rem; font-weight:700">Bottom: how sure it said it was. Side: how often it was really right. Bars on the dashed line mean honest. Bars below it mean overconfident.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="question"></i> Say "I don't know"</h3>
+          <label for="thr" style="font-weight:800; font-size:.9rem">Answer only if at least <b data-for="thr">50%</b> sure</label>
+          <input id="thr" type="range" min="0.5" max="0.99" step="0.01" value="0.5" aria-label="Confidence needed before the robot answers">
+          <div class="four">
+            <div class="stat"><div class="k">Right when it answers</div><div class="v" id="acc">0%</div></div>
+            <div class="stat"><div class="k">Answers given</div><div class="v" id="cov">0%</div></div>
+            <div class="stat"><div class="k">Wrong answers shown</div><div class="v" id="wr" style="color:var(--bad)">0</div></div>
+            <div class="stat"><div class="k">Honesty error</div><div class="v" id="ece">0</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="chat"></i> A few fruit</h3>
+          <div class="answers" id="ans"></div>
+        </div>
+        <div class="card"><p id="stmt" style="margin:0; font-weight:700; font-size:.92rem"></p></div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-over"><span class="tick"></span><span>Catch it bragging: with "As trained", find 40 or more wrong answers where it was 90% sure or more.</span></div>
+      <div class="chal" id="c-cal"><span class="tick"></span><span>Make it honest: pick a method that brings the honesty error to 0.05 or less.</span></div>
+      <div class="chal" id="c-idk"><span class="tick"></span><span>Know when you don't know: get 85% right when it answers, while still answering 30% or more.</span></div>
+      <div class="chal" id="c-safe"><span class="tick"></span><span>Almost no confident mistakes: show 15 or fewer wrong answers, while still answering 15% or more.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Trained on only a few fruit, the robot learned to sound very sure. Many of its "I'm 95% sure" answers were wrong.</li>
+      <li>Calibrating did not make it smarter. Its accuracy stayed about the same, but its confidence became a number you can trust.</li>
+      <li>With honest confidence, "I don't know" works: you give up some answers and the ones left are right more often.</li>
+      <li>This is like a chatbot that states a made-up fact in a confident voice. Knowing when to be unsure is a safety feature.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>A <span class="term">logistic regression</span> with 14 features (3 informative, 11 noise) is trained on 50 examples with no regularisation for many steps, so it fits noise and produces extreme logits. This is <span class="term">overconfidence</span>, common in modern neural networks too.</p>
+        <ul>
+          <li>The <span class="term">reliability diagram</span> bins predictions by confidence (the probability of the chosen answer) and plots the bin's real accuracy. <span class="term">Expected calibration error</span> is the weighted average gap: <code>ECE = Σ (n<sub>b</sub>/N) · |acc<sub>b</sub> − conf<sub>b</sub>|</code>.</li>
+          <li><span class="term">Temperature scaling</span> divides the logit by one number T fitted on a separate validation set by minimising log loss: <code>p = σ(z / T)</code>. It never changes which answer is picked, only how sure it sounds.</li>
+          <li><span class="term">Platt scaling</span> fits <code>p = σ(a·z + c)</code> on the validation set, which can also shift the model if it is biased towards one answer.</li>
+          <li><span class="term">Selective prediction</span> (abstention) answers only above a confidence threshold, producing a risk-coverage trade-off. It works only if confidence ranks correct above incorrect answers and is well calibrated.</li>
+          <li>Language models can state false claims fluently (<span class="term">hallucination</span>). Calibrated uncertainty, retrieval, and abstention are active ways to reduce harm, but token probability is not truth.</li>
+        </ul>
+        <p>Further reading: Guo et al., <i>On Calibration of Modern Neural Networks</i> (2017) · Platt, <i>Probabilistic Outputs for Support Vector Machines</i> (1999) · Geifman and El-Yaniv, <i>Selective Classification for Deep Neural Networks</i> (2017).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ethics-calibrate-core.js"></script>
+  <script src="js/ethics-calibrate.js"></script>
+</body>
+</html>

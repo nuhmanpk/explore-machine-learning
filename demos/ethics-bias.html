@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Is It Fair? · Explore ML</title>
+  <meta name="description" content="A pretend club-approval robot learned from unfair old decisions. Check how it treats two groups, then try to fix it.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .gbars { display: grid; gap: 10px; }
+    .gb h4 { margin: 0 0 4px; font-size: .88rem; color: var(--muted); font-weight: 800; }
+    .gline { display: grid; grid-template-columns: 70px 1fr 46px; gap: 8px; align-items: center; font-weight: 800; font-size: .85rem; margin: 3px 0; }
+    .track { height: 16px; border-radius: 8px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .track i { display: block; height: 100%; width: 0; transition: width .3s; }
+    .track i.a { background: var(--accent); } .track i.b { background: var(--warn); }
+    .tog { display: grid; gap: 6px; }
+    .tog button { text-align: left; font: inherit; font-weight: 800; font-size: .9rem; padding: 8px 10px; min-height: 40px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+    .tog button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    .tog button:focus-visible, input[type=range]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .tog .st { font-size: .75rem; color: var(--muted); }
+    .wrow { display: grid; grid-template-columns: 120px 1fr 40px; gap: 6px; align-items: center; font-size: .82rem; font-weight: 700; margin: 3px 0; }
+    .wbar { height: 10px; background: var(--bg-2); border-radius: 5px; position: relative; }
+    .wbar i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+    .wbar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; background: var(--line); }
+    .gapnote { font-weight: 800; font-size: .95rem; padding: 8px 10px; border-radius: 12px; background: var(--bg-2); border: 2px solid var(--line); }
+    .gapnote.ok { border-color: var(--good); } .gapnote.bad { border-color: var(--bad); }
+    .people { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+    .people i { aspect-ratio: 1; border-radius: 50%; background: var(--line); }
+    .people i.yes { background: var(--accent); } .people i.yes.gb { background: var(--warn); }
+    .people i.no.q { box-shadow: inset 0 0 0 2px var(--bad); background: var(--card); }
+    @media (max-width: 420px) { .wrow { grid-template-columns: 90px 1fr 36px; } .gline { grid-template-columns: 56px 1fr 40px; } }
+    @media (prefers-reduced-motion: reduce) { .track i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ethics" data-demo="ethics-bias">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="heart"></i> Ethics, Safety &amp; Alignment</span>
+      <h1>Is It <span class="em">Fair?</span></h1>
+      <p class="hero-sub">A pretend club robot learned from old decisions that were unfair to Group B. Check who it says yes to, then try to fix it.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Everything here is made up. Look at the two bars: the robot copied the old unfairness. Try switching things off and see what changes!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px"><h3 style="margin:0"><i data-icon="groups"></i> 100 new applicants, who gets in?</h3>
+          <div class="btn-row"><button class="btn ghost small" id="newp"><i data-icon="shuffle"></i> New applicants</button></div></div>
+        <div class="gbars" id="gbars"></div>
+        <p class="muted" style="margin:10px 0 4px; font-weight:700; font-size:.88rem">Each dot is a person. Coloured = the robot says yes. A red ring = really a good member, but the robot said no.</p>
+        <div class="people" id="pa" aria-label="Group A applicants"></div>
+        <div class="people" id="pb" aria-label="Group B applicants" style="margin-top:6px"></div>
+        <div class="gapnote" id="gapnote" style="margin-top:12px" role="status"></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Try a fix</h3>
+          <div class="tog" id="feat"></div>
+          <div class="tog"><button type="button" id="rw" aria-pressed="false"><span>Reweight the examples</span><span class="st" id="rw-st">off</span></button></div>
+          <label for="thr" style="font-weight:800; font-size:.88rem">Bar for Group B to get in: <b data-for="thr">0.50</b> <span class="muted">(A stays 0.50)</span></label>
+          <input id="thr" type="range" min="0.2" max="0.6" step="0.01" value="0.5" aria-label="Approval bar for group B">
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Scoreboard</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Right about real skill</div><div class="v" id="acc">0%</div></div>
+            <div class="stat"><div class="k">Copies old unfair choices</div><div class="v" id="agree">0%</div></div>
+            <div class="stat"><div class="k">Good-member gap</div><div class="v" id="tprgap" style="color:var(--bad)">0</div></div>
+          </div>
+          <p class="muted" style="margin:0; font-size:.82rem; font-weight:700">Good-member gap: of people who really are good members, how many more in A get a yes than in B (points).</p>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What the robot leans on</h3>
+          <div id="weights"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-see"><span class="tick"></span><span>See it: with everything switched on, find a gap of 20 points or more between the groups.</span></div>
+      <div class="chal" id="c-proxy"><span class="tick"></span><span>Sneaky clue: switch off the Group column, and notice the gap is still 10 points or more.</span></div>
+      <div class="chal" id="c-rw"><span class="tick"></span><span>Reweight: turn on reweighting and see the gap shrink compared with before.</span></div>
+      <div class="chal" id="c-fair"><span class="tick"></span><span>Fairer: get the good-member gap to 5 points or less, while staying 80% right about real skill.</span></div>
+      <div class="chal" id="c-thr"><span class="tick"></span><span>Try the bar: move Group B's bar and watch both the gap and the score change.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The robot learned from old choices that marked Group B down, so it copied that unfairness. Nobody told it to.</li>
+      <li>Deleting the Group column did not fix it. The neighbourhood code is a stand-in (a proxy) for the group, so the robot found the group again.</li>
+      <li>Fixes help in different ways: drop proxy clues, reweight the examples, or set different bars. Each one trades something.</li>
+      <li>There is no single button for "fair". People have to choose what fair means, and check each group's results.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Applicants are synthetic. A hidden ground truth <code>q</code> depends only on skill and effort. The "historical" label subtracts a penalty for group B (<span class="term">label bias</span>), and group B also has a slightly lower mean score and lives mostly in area 1 (<span class="term">proxy variable</span>, ~85% vs ~15%). A logistic regression is trained by weighted gradient descent on the historical labels only.</p>
+        <ul>
+          <li><span class="term">Demographic parity gap</span>: difference in approval rates between groups. <span class="term">Equal opportunity gap</span>: difference in true positive rate (<code>P(yes | really qualified)</code>). Both are shown; they can disagree, and known results show that several fairness criteria cannot all hold at once when base rates differ.</li>
+          <li><span class="term">Fairness through unawareness</span> (dropping the protected column) fails when other features correlate with it. Look at the weight on neighbourhood code after you drop Group.</li>
+          <li><span class="term">Reweighing</span> (Kamiran and Calders) gives each example weight <code>P(g)P(y) / P(g, y)</code> so group and label look independent in training.</li>
+          <li><span class="term">Group-specific thresholds</span> post-process the scores. They can equalise a metric but treat people differently by group, which can be legally or ethically contested.</li>
+          <li>"Right about real skill" uses the hidden truth, which real systems never see. Real accuracy is measured against the same biased labels, which makes biased models look good.</li>
+        </ul>
+        <p>Further reading: Hardt, Price and Srebro, <i>Equality of Opportunity in Supervised Learning</i> (2016) · Barocas, Hardt and Narayanan, <i>Fairness and Machine Learning</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ethics-bias-core.js"></script>
+  <script src="js/ethics-bias.js"></script>
+</body>
+</html>

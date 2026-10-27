@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why Did It Say That? · Explore ML</title>
+  <meta name="description" content="Ask a cat-or-dog robot to explain its answers, poke one clue at a time, and catch it using a silly shortcut.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .photo { display: grid; grid-template-columns: minmax(0, 220px) 1fr; gap: 14px; align-items: start; }
+    @media (max-width: 560px) { .photo { grid-template-columns: 1fr; } }
+    #pic { width: 100%; border-radius: 14px; border: 2px solid var(--line); display: block; }
+    .sl { display: grid; grid-template-columns: 112px 1fr; gap: 8px; align-items: center; font-weight: 800; font-size: .86rem; margin: 6px 0; }
+    .sl input { width: 100%; } input[type=range]:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .verdict { font-family: var(--font-head); font-size: 1.3rem; font-weight: 600; }
+    .meter { height: 18px; border-radius: 9px; border: 2px solid var(--line); background: var(--bg-2); position: relative; overflow: hidden; }
+    .meter i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent); transition: width .25s; }
+    .meter span { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .4; }
+    .ends { display: flex; justify-content: space-between; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .crow { display: grid; grid-template-columns: 120px 1fr 52px; gap: 6px; align-items: center; font-size: .84rem; font-weight: 700; margin: 4px 0; }
+    .cbar { height: 12px; background: var(--bg-2); border-radius: 6px; position: relative; }
+    .cbar i { position: absolute; top: 0; bottom: 0; border-radius: 6px; transition: width .25s; }
+    .cbar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; background: var(--line); }
+    .ibar { height: 12px; background: var(--bg-2); border-radius: 6px; overflow: hidden; } .ibar i { display: block; height: 100%; background: var(--warn); transition: width .25s; }
+    .crow.top .nm { color: var(--bad); }
+    @media (max-width: 420px) { .crow { grid-template-columns: 90px 1fr 44px; } .sl { grid-template-columns: 96px 1fr; } }
+    @media (prefers-reduced-motion: reduce) { .meter i, .cbar i, .ibar i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ethics" data-demo="ethics-explain">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="heart"></i> Ethics, Safety &amp; Alignment</span>
+      <h1>Why Did It <span class="em">Say That?</span></h1>
+      <p class="hero-sub">A robot says "cat" or "dog". Ask it to show its reasons, change one clue, and catch it cheating with a silly shortcut.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">These photos are pretend measurements. Slide the clues around and watch the bars. Which clue pushes hardest?</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px"><h3 style="margin:0"><i data-icon="camera"></i> Edit a photo</h3>
+          <div class="btn-row"><button class="btn small" id="rnd"><i data-icon="shuffle"></i> Another photo</button></div></div>
+        <div class="photo">
+          <svg id="pic" viewBox="0 0 200 200" role="img" aria-label="A drawn pet in front of a wall"></svg>
+          <div id="sliders"></div>
+        </div>
+        <div style="margin-top:12px">
+          <div class="verdict" id="verdict" role="status">...</div>
+          <div class="meter" aria-hidden="true"><i id="mbar"></i><span></span></div>
+          <div class="ends"><span>cat</span><span>dog</span></div>
+        </div>
+        <h3 style="margin:14px 0 4px"><i data-icon="search"></i> Why? Each clue's push for this photo</h3>
+        <div id="why"></div>
+        <p class="muted" style="margin:4px 0 0; font-size:.84rem; font-weight:700">Green pushes to "dog", red pushes to "cat", compared with an average photo.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="trophy"></i> How good is it, really?</h3>
+          <div class="two">
+            <div class="stat"><div class="k">Familiar photos</div><div class="v" id="acc1">0%</div></div>
+            <div class="stat"><div class="k">New places</div><div class="v" id="acc2">0%</div></div>
+          </div>
+          <p class="muted" style="margin:0; font-size:.82rem; font-weight:700">Familiar: photos like the ones it practised on. New places: the walls are random.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="layers"></i> What matters overall</h3>
+          <div id="imp"></div>
+          <p class="muted" style="margin:0; font-size:.82rem; font-weight:700">Shuffle one clue among many photos. The more mistakes it causes, the more the robot relied on it.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Fix it</h3>
+          <div class="btn-row" style="flex-direction:column">
+            <button class="btn small" id="hide"><i data-icon="eye"></i> Hide the wall colour</button>
+            <button class="btn small" id="mix"><i data-icon="shuffle"></i> Retrain with mixed-up walls</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Back to the cheater</button>
+          </div>
+          <p class="muted" id="mode" style="margin:0; font-weight:700; font-size:.88rem"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-edit"><span class="tick"></span><span>Poke it: move any clue slider and watch the bars move.</span></div>
+      <div class="chal" id="c-flip"><span class="tick"></span><span>Flip it: change only the wall colour so the robot changes its answer, while the animal stays the same.</span></div>
+      <div class="chal" id="c-fix"><span class="tick"></span><span>Fix it: get 75% or more on New places.</span></div>
+      <div class="chal" id="c-honest"><span class="tick"></span><span>Honest robot: make familiar and new places within 8 points of each other, with both at 70% or more.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The robot showed its reasons: each clue pushed the answer towards cat or dog.</li>
+      <li>In the practice photos most dogs happened to stand in front of a blue wall. The robot found that easier than looking at ears and noses.</li>
+      <li>On familiar photos it looked brilliant. On new places it was nearly guessing. Only the explanation exposed why.</li>
+      <li>Fixing it meant removing the shortcut or giving it better practice data. Explanations help people spot that kind of problem.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The model is a logistic regression on standardised features. Because it is linear in the log-odds, the <span class="term">local explanation</span> is exact: for photo <code>x</code>, clue <code>j</code> contributes <code>w<sub>j</sub> (x<sub>j</sub> − mean<sub>j</sub>) / sd<sub>j</sub></code>, and the contributions plus the bias add up to the log-odds. For non-linear models, methods such as SHAP and LIME approximate this idea.</p>
+        <ul>
+          <li><span class="term">Permutation importance</span> is a global, model-agnostic measure: shuffle one feature on held-out data and record the accuracy drop (averaged over a few shuffles with a fixed seed).</li>
+          <li>The wall colour is a <span class="term">spurious correlation</span> (shortcut learning): 95% aligned with the label in training, but unrelated in new places. This is why <span class="term">distribution shift</span> breaks models that looked fine on the test set.</li>
+          <li>Explanations show what the model uses, not what is causally true. Correlated features can share or steal credit, and an explanation can reassure while the model is still wrong.</li>
+          <li>The two fixes are <span class="term">feature removal</span> and <span class="term">data augmentation or balancing</span> (decorrelating the shortcut from the label).</li>
+        </ul>
+        <p>Further reading: Ribeiro et al., <i>Why Should I Trust You?</i> (LIME, 2016) · Lundberg and Lee, <i>A Unified Approach to Interpreting Model Predictions</i> (2017) · Geirhos et al., <i>Shortcut Learning in Deep Neural Networks</i> (2020).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ethics-explain-core.js"></script>
+  <script src="js/ethics-explain.js"></script>
+</body>
+</html>

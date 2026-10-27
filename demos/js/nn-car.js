@@ -623,10 +623,8 @@
       return;
     }
     // Save one lesson: what the eyes saw (and how fast we were going) → which keys were held.
-    const x = h.car.sensor.readings.map((r) => (r ? 1 - r.offset : 0));
-    if (state.cross) x.push(h.env.lightAt(h.car.y));
-    x.push(h.car.speed / h.car.maxSpeed);
-    if (h.steps > 0 && state.recorded.length < 30000) state.recorded.push({ x, y: [keys.forward, keys.left, keys.right, keys.reverse].map(Number) });
+    const x = window.CarCore.lessonInput(h.car.sensor.readings, state.cross, state.cross ? h.env.lightAt(h.car.y) : 0, h.car.speed / h.car.maxSpeed);
+    if (h.steps > 0 && state.recorded.length < 30000) state.recorded.push({ x, y: window.CarCore.lessonLabel(keys) });
     h.step();
     if (h.car.damaged && !h.car.ranRed) {
       h.waitRelease = keys.forward;
@@ -665,46 +663,12 @@
   // the same keys the player pressed when its eyes saw the same thing.
   async function trainCopycat() {
     const data = state.recorded;
-    const nIn = data[0].x.length;
-    const net = new NeuralNetwork([nIn, 8, 4]);
-    net.soft = true;
-    net.useSpeed = true;
-    const [L1, L2] = net.levels;
-    const sig = (z) => 1 / (1 + Math.exp(-z));
+    const net = window.CarCore.makeCopycat(data[0].x.length);
     const lr = 0.3, epochs = 60, batch = 32;
     const btn = document.getElementById("copy");
     btn.disabled = true;
-    const h = new Array(8), o = new Array(4), dO = new Array(4), dH = new Array(8);
     for (let ep = 0; ep < epochs; ep++) {
-      let loss = 0;
-      const order = data.map((_, i) => i).sort(() => Math.random() - 0.5);
-      for (let b0 = 0; b0 < order.length; b0 += batch) {
-        const gW1 = L1.weights.map((r) => r.map(() => 0)), gB1 = new Array(8).fill(0);
-        const gW2 = L2.weights.map((r) => r.map(() => 0)), gB2 = new Array(4).fill(0);
-        const idx = order.slice(b0, b0 + batch);
-        for (const k of idx) {
-          const { x, y } = data[k];
-          for (let j = 0; j < 8; j++) { let s = -L1.biases[j]; for (let i = 0; i < nIn; i++) s += x[i] * L1.weights[i][j]; h[j] = sig(s); }
-          for (let j = 0; j < 4; j++) { let s = -L2.biases[j]; for (let i = 0; i < 8; i++) s += h[i] * L2.weights[i][j]; o[j] = sig(s); }
-          for (let j = 0; j < 4; j++) {
-            dO[j] = o[j] - y[j];
-            loss -= y[j] * Math.log(o[j] + 1e-7) + (1 - y[j]) * Math.log(1 - o[j] + 1e-7);
-          }
-          for (let i = 0; i < 8; i++) {
-            let s = 0;
-            for (let j = 0; j < 4; j++) { s += L2.weights[i][j] * dO[j]; gW2[i][j] += h[i] * dO[j]; }
-            dH[i] = s * h[i] * (1 - h[i]);
-          }
-          for (let j = 0; j < 4; j++) gB2[j] -= dO[j];
-          for (let j = 0; j < 8; j++) { gB1[j] -= dH[j]; for (let i = 0; i < nIn; i++) gW1[i][j] += x[i] * dH[j]; }
-        }
-        const m = lr / idx.length;
-        for (let i = 0; i < nIn; i++) for (let j = 0; j < 8; j++) L1.weights[i][j] -= m * gW1[i][j];
-        for (let j = 0; j < 8; j++) L1.biases[j] -= m * gB1[j];
-        for (let i = 0; i < 8; i++) for (let j = 0; j < 4; j++) L2.weights[i][j] -= m * gW2[i][j];
-        for (let j = 0; j < 4; j++) L2.biases[j] -= m * gB2[j];
-      }
-      const avg = loss / data.length / 4;
+      const avg = window.CarCore.trainEpoch(net, data, lr, batch);
       if (ep % 5 === 0 || ep === epochs - 1) {
         btn.innerHTML = `${ML.icon("cpu")} Practising… ${Math.round(((ep + 1) / epochs) * 100)}%`;
         ML.say(`Practice round ${ep + 1}: the copycat's <b>oopsie score</b> is ${avg.toFixed(3)}. ${ep > 10 ? "Going down, so it's learning your style!" : "It starts by guessing randomly…"}`);

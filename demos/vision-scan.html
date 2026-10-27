@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pattern Scanners · Explore ML</title>
+  <meta name="description" content="Slide a tiny 3 by 3 scanner over a picture, then watch a robot learn the scanner's nine numbers by itself. The building block of CNNs.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    canvas.sc { width: 100%; border-radius: 10px; display: block; touch-action: none; }
+    #pic { cursor: crosshair; }
+    #kcv { cursor: ns-resize; max-width: 210px; margin: 0 auto; }
+    .maps { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    .maps figcaption, .cap { font-weight: 800; font-size: .8rem; color: var(--muted); text-align: center; margin-top: 4px; }
+    .maps figure { margin: 0; }
+    .prods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; font-family: var(--font-mono); font-size: .78rem; margin: 6px 0; }
+    .prods span { background: var(--bg-2); border: 2px solid var(--line); border-radius: 8px; padding: 3px 2px; text-align: center; }
+    .prods span.pos { border-color: var(--good); } .prods span.neg { border-color: var(--bad); }
+    .sumline { font-family: var(--font-head); font-size: 1.2rem; font-weight: 600; text-align: center; }
+    .big-num { font-family: var(--font-head); font-size: 2.2rem; font-weight: 600; line-height: 1; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .chal { display: grid; gap: 8px; }
+    .chal .item { display: flex; gap: 10px; align-items: center; font-weight: 700; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg-2); }
+    .chal .item.done { border-color: var(--good); }
+    .chal .item .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal .item.done .tag { color: var(--good); }
+    .tgl { display: inline-flex; gap: 8px; align-items: center; font-weight: 800; cursor: pointer; }
+    .tgl input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .chip.on { background: var(--accent); color: #fff; }
+  </style>
+</head>
+<body data-page="demo" data-topic="vision" data-demo="vision-scan">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="eye"></i> Computer Vision</span>
+      <h1>Pattern <span class="em">Scanners</span></h1>
+      <p class="hero-sub">A tiny window slides over a picture and gives every spot a score for how much it looks like a pattern. The scanner's nine numbers decide the pattern, and a robot can learn them all by itself.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I scan with a little <b>3 by 3 window</b>. Each spot gets <b>multiply, then add</b>. Draw on the picture, then drag the scanner's numbers up and down to light up the <b>target map</b>!</p>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> Part 1 · Play with the scanner</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="pic" class="sc" aria-label="Picture you can paint on"></canvas>
+        <div class="cap">The picture. Tap or drag to paint. Orange box = where the scanner is now.</div>
+        <div class="maps">
+          <figure><canvas id="map" class="sc" aria-label="Score map"></canvas><figcaption id="map-cap">Score map (yours)</figcaption></figure>
+          <figure><canvas id="tmap" class="sc" aria-label="Target map"></canvas><figcaption>Target map (the answer)</figcaption></figure>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="btn-row">
+            <button class="btn primary" id="scan"><i data-icon="play"></i> Scan!</button>
+            <button class="btn" id="stepbtn"><i data-icon="step"></i> One spot</button>
+            <label class="tgl"><input type="checkbox" id="pool"> Squash the map (2x2 max)</label>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn small" data-preset="stripes">Stripes</button>
+          <button class="btn small" data-preset="hstripes">Flat stripes</button>
+          <button class="btn small" data-preset="corner">Corner box</button>
+          <button class="btn small" data-preset="plus">Plus</button>
+          <button class="btn small" data-preset="x">X</button>
+          <button class="btn small" data-preset="noise">Random</button>
+          <button class="btn small ghost" data-preset="blank">Clear</button>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="eye"></i> The scanner</h3>
+          <canvas id="kcv" class="sc" aria-label="Scanner numbers, drag up or down to change"></canvas>
+          <div class="cap">Drag a square up or down. Tap to jump to the next number. Green = likes bright, red = dislikes bright.</div>
+          <div class="btn-row" style="justify-content:center; margin-top:8px">
+            <button class="btn small" id="k-zero">All zero</button>
+            <button class="btn small" id="k-rand">Random</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Match with the target</h3>
+          <div class="big-num" id="match">0%</div>
+          <div class="muted" style="font-weight:700; font-size:.85rem">How much your score map looks like the answer map.</div>
+          <div class="btn-row" style="margin-top:10px" id="targets">
+            <button class="chip on" data-target="vertical">Vertical lines</button>
+            <button class="chip" data-target="horizontal">Horizontal lines</button>
+            <button class="chip" data-target="corners">Corners</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="zap"></i> Multiply and add</h3>
+          <div class="prods" id="prods"></div>
+          <div class="sumline" id="sumline"></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="network"></i> Part 2 · Watch it learn</h2>
+    <section class="stage">
+      <div class="card">
+        <h3><i data-icon="gauge"></i> Mistake size over time</h3>
+        <div class="chart-box"><canvas id="loss" class="sc"></canvas></div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn primary" id="learn"><i data-icon="play"></i> Robot, learn the scanner!</button>
+          <button class="btn" id="lstep"><i data-icon="step"></i> One step</button>
+          <button class="btn ghost" id="lreset"><i data-icon="repeat"></i> Forget it</button>
+        </div>
+        <div class="two" style="margin-top:12px">
+          <div class="stat"><div class="k">Steps</div><div class="v" id="steps">0</div></div>
+          <div class="stat"><div class="k">Mistake</div><div class="v" id="mse">–</div></div>
+        </div>
+        <label class="tgl" style="margin-top:10px"><input type="checkbox" id="noise"> Add noise to the pictures</label>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <div class="two">
+            <div><canvas id="lk" class="sc" aria-label="Learned scanner"></canvas><div class="cap">Robot's scanner</div></div>
+            <div><canvas id="hk" class="sc" aria-label="Hidden true scanner"></canvas><div class="cap">Secret answer</div></div>
+          </div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="trophy"></i> Challenges</h2>
+    <section class="card">
+      <p class="muted" style="margin:0 0 10px; font-weight:700">Each win puts a flag on the chart above. The last two use the buttons below.</p>
+      <div class="chal" id="chal"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn small" id="shift"><i data-icon="shuffle"></i> Shift the picture</button>
+        <button class="btn small" id="bigger"><i data-icon="zap"></i> Bigger picture</button>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Slide a window</h3><p>A 3 by 3 window visits every spot of the picture.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Multiply and add</h3><p>Pixel times scanner number, nine times, then add them up. That is the spot's score.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gauge"></i></div><h3>Compare to the answer</h3><p>The robot checks how far its score map is from the right one.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Nudge the nine numbers</h3><p>Small nudges, again and again, until the maps match.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>A scanner is just nine numbers that slide over the picture, the same everywhere.</li>
+      <li>Where the picture looks like the scanner's pattern, the score is high.</li>
+      <li>Nobody told the robot what a vertical line is. It only saw the answer map and nudged its numbers.</li>
+      <li>Squashing the map keeps the strongest hits and makes it smaller.</li>
+      <li>Because the same scanner slides everywhere, it finds the pattern even when the picture moves.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a single 2D <span class="term">convolution</span> layer with one <span class="term">kernel</span> (filter). Like most deep-learning libraries, it actually computes <span class="term">cross-correlation</span>: <code>y[i,j] = Σₐ Σ_b x[i+a, j+b]·w[a,b]</code>, without flipping the kernel. The output grid is a <span class="term">feature map</span>. Here there is no padding (a "valid" convolution, so 12x12 becomes 10x10) and the <span class="term">stride</span> is 1.</p>
+        <ul>
+          <li>Training minimises <code>MSE = mean (y − t)²</code> over every position of several random pictures. The gradient is <code>∂MSE/∂w[a,b] = mean 2(y−t)·x[i+a, j+b]</code>, and the update is plain <span class="term">gradient descent</span>: <code>w ← w − η∇</code>. The loss is quadratic in w, so a small enough η gives a steady decrease (the chart is on a log scale).</li>
+          <li>The hidden kernels are Sobel-style edge detectors and a corner detector. A real CNN is not told the answer; it learns kernels that reduce a task loss, and the kernels often end up looking like edges.</li>
+          <li><span class="term">Max pooling</span> (2x2, stride 2) keeps the strongest response in each block, shrinking the map and making it tolerant of small shifts.</li>
+          <li><span class="term">Weight sharing</span> gives <span class="term">translation equivariance</span>: shift the input and the feature map shifts with it. Pooling and a final classifier turn this into approximate invariance.</li>
+          <li>A <span class="term">CNN</span> stacks many such layers (with many kernels per layer, a nonlinearity such as ReLU, and pooling). Early layers find edges, later layers combine them into shapes and objects. This lesson is one kernel from one layer.</li>
+        </ul>
+        <p>Further reading: <i>Deep Learning</i> (Goodfellow et al.), ch. 9 · CS231n notes on convolutional networks.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/vision-scan-core.js"></script>
+  <script src="js/vision-scan.js"></script>
+</body>
+</html>

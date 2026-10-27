@@ -173,11 +173,7 @@
     if (state.pending) { const r = state.pending; state.pending = false; rescore(r === true ? undefined : r); }
   }
 
-  function dot(a, b) {
-    let s = 0;
-    for (let i = 0; i < a.length; i++) s += a[i] * b[i];
-    return s;
-  }
+  const dot = MatchCore.dot;
 
   // ---------- drawing: patch grid over the picture ----------
   let patchAnim = 0;
@@ -274,30 +270,7 @@
   // ---------- word map ----------
   const MW = 420, MH = 320;
   const mapCtx = ML.setupCanvas($("map"), MW, MH).ctx;
-  function pca2(vecs) {
-    // Top-2 principal directions via power iteration on the small n×n Gram matrix.
-    const n = vecs.length, d = vecs[0].length;
-    const mean = new Float32Array(d);
-    vecs.forEach((v) => { for (let k = 0; k < d; k++) mean[k] += v[k] / n; });
-    const X = vecs.map((v) => v.map((x, k) => x - mean[k]));
-    const G = X.map((a) => X.map((b) => dot(a, b)));
-    const coords = X.map(() => [0, 0]);
-    const used = [];
-    for (let c = 0; c < 2; c++) {
-      let u = Array.from({ length: n }, (_, i) => Math.sin(i * 1.7 + c * 3.1 + 1));
-      let lambda = 0;
-      for (let it = 0; it < 80; it++) {
-        let w = G.map((row) => row.reduce((s, g, j) => s + g * u[j], 0));
-        used.forEach(([uu, ll]) => { const p = uu.reduce((s, x, j) => s + x * u[j], 0); w = w.map((x, j) => x - ll * p * uu[j]); });
-        const norm = Math.hypot(...w) || 1;
-        lambda = norm;
-        u = w.map((x) => x / norm);
-      }
-      used.push([u, lambda]);
-      u.forEach((x, i) => (coords[i][c] = x * Math.sqrt(lambda)));
-    }
-    return coords;
-  }
+  const pca2 = MatchCore.pca2;
   function drawMap() {
     const ctx = mapCtx, r = state.result;
     ctx.clearRect(0, 0, MW, MH);

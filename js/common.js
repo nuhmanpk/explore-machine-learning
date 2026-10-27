@@ -93,6 +93,8 @@
     maze: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h6M15 3v6M9 15h12M9 9v6M15 15v6"/>',
     candy: '<circle cx="12" cy="12" r="4"/><path d="M8.5 10 3.5 7v10l5-3M15.5 10l5-3v10l-5-3"/>',
     slot: '<rect x="2" y="5" width="16" height="15" rx="2"/><path d="M6 9v7M10 9v7M14 9v7"/><circle cx="21" cy="5" r="1.5"/><path d="M21 6.5V13h-3"/>',
+    linkedin: '<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/><circle cx="4" cy="4" r="2"/>',
+    settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
     github: '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 3.5c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 10c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>',
     kaggle: '<path d="M7 3v18"/><path d="M17.5 4 9 12.5"/><path d="m11 11 7 9.5"/>',
     hf: '<circle cx="12" cy="11" r="8"/><path d="M9 9.5h.01M15 9.5h.01"/><path d="M8.5 13a4 4 0 0 0 7 0"/><path d="M5 17.5 3.5 21l3.5-1M19 17.5l1.5 3.5-3.5-1"/>',
@@ -141,21 +143,145 @@
     set(k, v) { try { localStorage.setItem("exploreml:" + k, JSON.stringify(v)); } catch (e) {} },
   };
 
-  // ---------- theme ----------
+  // ---------- progress (lessons marked done, kept in localStorage) ----------
+  const progress = {
+    _set() { const a = store.get("done", []); return new Set(Array.isArray(a) ? a : []); },
+    isDone(id) { return this._set().has(id); },
+    set(id, on) { const s = this._set(); if (on) s.add(id); else s.delete(id); store.set("done", [...s]); },
+    reset() { store.set("done", []); },
+    // { done, total } for a chapter (a CATALOG entry) or the whole course (no argument).
+    count(t) {
+      const s = this._set();
+      const ids = (t ? [t] : window.CATALOG).flatMap((c) => c.demos.map((d) => d.id));
+      return { done: ids.filter((id) => s.has(id)).length, total: ids.length };
+    },
+    // Accessible bar + words ("3 of 7 done"); never colour alone.
+    bar(label, done, total) {
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      return `<div class="prog" data-complete="${total > 0 && done === total}"><div class="prog-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}" aria-valuetext="${done} of ${total} done"><i style="width:${pct}%"></i></div><span class="prog-txt">${done} of ${total} done</span></div>`;
+    },
+    badge(id) { return progress.isDone(id) ? `<span class="done-badge" title="You finished this lesson">${icon("check")}<span>Done</span></span>` : ""; },
+    resetLink() {
+      return `<button type="button" class="reset-link" data-reset-progress>Reset my progress</button>`;
+    },
+  };
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest || !e.target.closest("[data-reset-progress]")) return;
+    if (confirm("Clear all your finished lessons on this device? This cannot be undone.")) { progress.reset(); location.reload(); }
+  });
+
+  // "Mark as done" button on a lesson page, plus auto-complete when every challenge is ticked.
+  function buildDoneButton() {
+    const host = document.getElementById("next-nav");
+    const id = document.body.dataset.demo;
+    if (!host || !id || !findDemo(id)) return;
+    const wrap = document.createElement("div");
+    wrap.className = "done-row";
+    wrap.innerHTML = `<button type="button" class="btn done-btn" aria-pressed="false"></button>${progress.resetLink()}`;
+    host.parentNode.insertBefore(wrap, host);
+    const btn = wrap.firstChild;
+    const paint = () => {
+      const on = progress.isDone(id);
+      btn.setAttribute("aria-pressed", on);
+      btn.classList.toggle("on", on);
+      btn.innerHTML = on ? `${icon("check")} Done! Tap to undo` : `${icon("flag")} Mark as done`;
+    };
+    paint();
+    btn.addEventListener("click", () => {
+      const on = !progress.isDone(id);
+      progress.set(id, on);
+      paint();
+      if (on) { toast("Lesson complete! Great job."); confetti(40); }
+    });
+    const check = () => {
+      const c = document.querySelectorAll(".chal");
+      if (c.length && document.querySelectorAll(".chal.done").length === c.length && !progress.isDone(id)) {
+        progress.set(id, true); paint(); toast("All challenges done. Lesson complete!");
+      }
+    };
+    const mo = new MutationObserver(check);
+    document.querySelectorAll(".chal").forEach((el) => mo.observe(el, { attributes: true, attributeFilter: ["class"] }));
+    check();
+  }
+
+  // ---------- theme + preferences ----------
+  // theme: "light" | "dark" | "auto" (follow the device). text: "normal" | "large" | "xl". motion: "auto" | "reduce".
+  const sysDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  const realMatchMedia = window.matchMedia ? window.matchMedia.bind(window) : null;
+  const prefs = {
+    get theme() { return store.get("theme") || "light"; },
+    get text() { return store.get("text") || "normal"; },
+    get motion() { return store.get("motion") || "auto"; },
+  };
   function applyTheme(t) {
-    if (t) document.documentElement.setAttribute("data-theme", t);
-    else document.documentElement.removeAttribute("data-theme");
+    const dark = t === "dark" || (t === "auto" && sysDark && sysDark.matches);
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   }
-  applyTheme(store.get("theme"));
+  function applyPrefs() {
+    applyTheme(prefs.theme);
+    document.documentElement.setAttribute("data-text", prefs.text);
+    document.documentElement.setAttribute("data-motion", prefs.motion);
+  }
+  // Lessons ask matchMedia("(prefers-reduced-motion: reduce)"); the Reduce motion setting answers yes for them too.
+  if (realMatchMedia) window.matchMedia = (q) => {
+    const r = realMatchMedia(q);
+    if (prefs.motion === "reduce" && /prefers-reduced-motion:\s*reduce/.test(q)) return { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false };
+    return r;
+  };
+  applyPrefs();
+  if (sysDark && sysDark.addEventListener) sysDark.addEventListener("change", () => { if (prefs.theme === "auto") { applyTheme("auto"); document.dispatchEvent(new CustomEvent("themechange")); } });
   function isDark() {
-    const t = document.documentElement.getAttribute("data-theme");
-    return t === "dark";
+    return document.documentElement.getAttribute("data-theme") === "dark";
   }
-  function toggleTheme() {
-    const next = isDark() ? "light" : "dark";
-    applyTheme(next);
-    store.set("theme", next);
+  function setTheme(t) {
+    store.set("theme", t);
+    applyTheme(t);
     document.dispatchEvent(new CustomEvent("themechange"));
+  }
+  function toggleTheme() { setTheme(isDark() ? "light" : "dark"); }
+
+  // ---------- settings dialog ----------
+  function buildSettings() {
+    const btn = document.getElementById("settings-btn");
+    if (!btn || document.getElementById("settings-dlg")) return;
+    const dlg = document.createElement("dialog");
+    dlg.id = "settings-dlg"; dlg.className = "settings";
+    dlg.setAttribute("aria-labelledby", "settings-title");
+    const seg = (name, label, opts) => `<fieldset class="set-row"><legend>${label}</legend><div class="seg" role="radiogroup">${opts.map(([v, t]) => `<label><input type="radio" name="${name}" value="${v}"><span>${t}</span></label>`).join("")}</div></fieldset>`;
+    dlg.innerHTML = `<form method="dialog" class="set-body">
+      <div class="set-head"><h2 id="settings-title">${icon("settings")} Settings</h2><button class="icon-btn" value="close" aria-label="Close settings">${icon("x")}</button></div>
+      ${seg("theme", "Colours", [["light", "Light"], ["dark", "Dark"], ["auto", "Same as my device"]])}
+      ${seg("text", "Text size", [["normal", "Normal"], ["large", "Large"], ["xl", "Extra large"]])}
+      ${seg("motion", "Movement", [["auto", "Normal"], ["reduce", "Calm (less motion)"]])}
+      <div class="set-row"><div class="set-lbl">Your progress</div>
+        <p class="muted" id="set-prog"></p>
+        <div class="btn-row"><button type="button" class="btn small" id="set-reset-prog">${icon("reset")} Reset my progress</button><button type="button" class="btn small ghost" id="set-reset-all">${icon("shuffle")} Restore default settings</button></div>
+      </div>
+      <p class="muted set-note">Everything is saved only on this device, in your browser.</p>
+    </form>`;
+    document.body.appendChild(dlg);
+    const sync = () => {
+      for (const k of ["theme", "text", "motion"]) { const r = dlg.querySelector(`input[name="${k}"][value="${prefs[k]}"]`); if (r) r.checked = true; }
+      const c = progress.count();
+      dlg.querySelector("#set-prog").textContent = `${c.done} of ${c.total} lessons marked done.`;
+      dlg.querySelector("#set-reset-prog").disabled = c.done === 0;
+    };
+    dlg.addEventListener("change", (e) => {
+      const r = e.target; if (!r.name) return;
+      if (r.name === "theme") { setTheme(r.value); const t = document.getElementById("theme-btn"); if (t) t.innerHTML = icon(isDark() ? "sun" : "moon"); }
+      else { store.set(r.name, r.value); applyPrefs(); if (r.name === "motion") toast(r.value === "reduce" ? "Calm mode on. Reload a lesson to apply it fully." : "Normal movement."); }
+    });
+    dlg.querySelector("#set-reset-prog").addEventListener("click", () => {
+      if (confirm("Clear all your finished lessons on this device? This cannot be undone.")) { progress.reset(); sync(); toast("Progress cleared."); setTimeout(() => location.reload(), 600); }
+    });
+    dlg.querySelector("#set-reset-all").addEventListener("click", () => {
+      store.set("theme", "light"); store.set("text", "normal"); store.set("motion", "auto"); applyPrefs();
+      document.dispatchEvent(new CustomEvent("themechange"));
+      const t = document.getElementById("theme-btn"); if (t) t.innerHTML = icon(isDark() ? "sun" : "moon");
+      sync(); toast("Settings restored.");
+    });
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+    btn.addEventListener("click", () => { sync(); dlg.showModal(); });
   }
 
   // ---------- canvas ----------
@@ -273,6 +399,13 @@
       <a class="brand" href="${BASE}index.html">Explore ML</a>
       <nav class="crumbs" aria-label="Breadcrumb">${crumbs}</nav>
       <span class="spacer"></span>
+      <nav class="social" aria-label="Links">
+        <a class="icon-btn" href="https://github.com/nuhmanpk" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">${icon("github")}</a>
+        <a class="icon-btn" href="https://www.linkedin.com/in/nuhmanpk" target="_blank" rel="noopener" title="LinkedIn" aria-label="LinkedIn">${icon("linkedin")}</a>
+        <a class="icon-btn" href="https://www.kaggle.com/nuhmanpk" target="_blank" rel="noopener" title="Kaggle" aria-label="Kaggle">${icon("kaggle")}</a>
+        <a class="icon-btn sponsor" href="https://www.buymeacoffee.com/nuhmanpk" target="_blank" rel="noopener" title="Sponsor" aria-label="Sponsor this project">${icon("heart")}</a>
+      </nav>
+      <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Open settings" aria-haspopup="dialog">${icon("settings")}</button>
       <button class="icon-btn" id="theme-btn" title="Light / dark" aria-label="Toggle light or dark theme"></button>
     </div>`;
     const tb = document.getElementById("theme-btn");
@@ -377,15 +510,17 @@
     buildLessonPath();
     buildMeetModel();
     buildTopbar();
+    buildSettings();
     buildRobos();
     buildNextNav();
+    buildDoneButton();
     buildFooter();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 
   window.ML = {
-    ticks, BASE, clamp, lerp, rand, randInt, randn, seeded, $, $$, cssVar, store,
+    ticks, BASE, progress, clamp, lerp, rand, randInt, randn, seeded, $, $$, cssVar, store,
     setupCanvas, canvasPoint, say, toast, confetti, bindRange, isDark, roboSVG, icon, hydrateIcons, ICONS,
   };
 })();

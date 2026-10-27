@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto-Parking · Explore ML</title>
+  <meta name="description" content="A fleet of little self-parking cars with tiny brains learns to steer into a bay and stop, then adapts to parked neighbours, a tight bay, concrete posts, random starts and a moving car.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on .tag { color: var(--accent); }
+    .fly-pad { display: none; grid-template-columns: repeat(4, 52px); grid-template-rows: 48px; gap: 8px; justify-content: center; margin-top: 10px; }
+    .fly-pad.show { display: grid; }
+    .fly-pad .btn { padding: 0; font-size: 20px; }
+    #arena { background: #7d8499; }
+    #babies { width: 100%; flex-wrap: nowrap; }
+    #babies button { flex: 1; white-space: nowrap; font-size: .85rem; padding: 7px 6px; }
+    .assist { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: .88rem; cursor: pointer; }
+    .assist input { width: 18px; height: 18px; accent-color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-parking">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="car"></i> Game Lab · Neuroevolution</span>
+      <h1>Auto-<span class="em">Parking</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Sixty baby cars, sixty random brains. Each must roll into the <b>green bay</b> and stop inside the lines. Press <b>Play</b>!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <button class="btn" id="drive"><i data-icon="gamepad"></i> I'll park a car</button>
+          <p class="muted" style="margin:0;font-size:.85rem">↑ forward, ↓ reverse, ← → steer (or the buttons under the lot). Park with <b>all</b> of the car inside the green lines, then stop. Try it before the robots do: it is harder than it looks!</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.88rem">Make parking harder. Watch the drivers struggle, then adapt.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="neighbours"><i data-icon="car"></i> Parked neighbours <span class="tag">don't bump!</span></button>
+            <button class="btn small" data-c="tight"><i data-icon="ruler"></i> Tight bay <span class="tag">little room</span></button>
+            <button class="btn small" data-c="pillars"><i data-icon="target"></i> Concrete posts <span class="tag">steer around</span></button>
+            <button class="btn small" data-c="random"><i data-icon="shuffle"></i> Random start <span class="tag">any spot, any way</span></button>
+            <button class="btn small" data-c="moving"><i data-icon="gauge"></i> Moving car <span class="tag">a shopper drives by</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> The fleet</h3>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.3">
+            <div class="hint">Small = careful copies. Big = wild new ideas.</div>
+          </div>
+          <div class="seg" id="babies"><button data-v="1" class="on">Show the babies</button><button data-v="0">Leader only</button></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="arena"></canvas>
+          <div class="fly-pad" id="pad">
+            <button class="btn" data-k="left" aria-label="Steer left"><i data-icon="arrow-left"></i></button>
+            <button class="btn" data-k="up" aria-label="Forward"><i data-icon="arrow-up"></i></button>
+            <button class="btn" data-k="down" aria-label="Reverse"><i data-icon="arrow-down"></i></button>
+            <button class="btn" data-k="right" aria-label="Steer right"><i data-icon="arrow-right"></i></button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the best half did, round by round</h3>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--lang)"></i>Got near the bay (%)</span><span><i style="background:var(--accent)"></i>Parked and stopped (%)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip"><i data-icon="step"></i> Next round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed"><button data-v="0.5">0.5×</button><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Round</div><div class="v" id="st-round">1</div></div>
+            <div class="stat"><div class="k">Driving now</div><div class="v" id="st-alive">60</div></div>
+            <div class="stat"><div class="k">Parked now</div><div class="v" id="st-parked">0</div></div>
+            <div class="stat"><div class="k">Parked (best half)</div><div class="v" id="st-top">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside"><span class="muted">Press Play to peek inside the leading car's brain.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion car from each round. Tap to watch it park in today's lot.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Thirteen senses</h3><p>Each car feels where the bay is, which way it points, how fast it is rolling, and has six distance sensors like a real car's parking beeper: three in front, three behind.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>Those numbers go into a small brain with two answers: how far to turn the steering wheel, and whether to push forward or reverse.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Best parkers win</h3><p>Getting close, lining up with the bay, being inside the lines, and stopping all earn points. Crashing loses points. The best cars become parents.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Copy with changes</h3><p>Babies get their parents' brains with small random changes. Some changes help. Those babies park better next time.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Make the lot harder</h3><p>Add parked neighbours or posts. Old tricks stop working, scores drop, and the cars have to find new tricks.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In round 1 the cars drove in circles, hit the wall or shot past the bay. Nobody told them how to steer into a parking spot.</li>
+        <li>Round after round, cars that happened to head for the bay and slow down had more babies, so the whole fleet learned to park.</li>
+        <li>Challenges changed the lot. Scores fell, then climbed again as the cars found new tricks. That is <b>adapting</b>.</li>
+        <li>Real self-parking cars use cameras and distance sensors too. Most use a hand-designed planner plus a controller; some research systems learn to park from reward alone, like this.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: a population of 60 small feed-forward networks <code>[13 &rarr; 12 &rarr; 2]</code> (tanh) improved by a genetic algorithm, with no gradients and no labelled data. The car is a <span class="term">kinematic bicycle model</span>, so it can't slide sideways: it must plan a curved path, which is why parking is a classic motion-planning problem.</p>
+        <ul>
+          <li><b>Physics:</b> speed follows throttle with drag, braking is stronger than accelerating, and the heading changes by <code>v / L &middot; tan(steer)</code> each step (wheel-base <code>L</code>). Steering turns the front wheels up to about 31&deg;. At speed 0 the car cannot turn, so the brain has to roll while steering.</li>
+          <li><b>Inputs (13):</b> the bay's position in the car's own frame (ahead / to the side), sine and cosine of the angle between the car and the bay's axis, speed, the bay's position in the lot's frame (left/right, up/down), and six range sensors (ray-casts, like ultrasonic parking sensors) at 0&deg;, &plusmn;40&deg;, 180&deg; and 180&deg; &plusmn; 40&deg;.</li>
+          <li><b>Parked means:</b> every sampled point on the car body inside the bay (2.5 px tolerance), the car within about 17&deg; of straight, and speed below 0.2 for two-thirds of a second. Forward-in and reverse-in both count.</li>
+          <li><b>Fitness:</b> shaped reward, summed over two random lots per round (one shown, one scored in the background): how far it got toward the bay, the best moment of &quot;close, lined up, inside, and slow&quot; during the drive, where it ends up, a large bonus for parking (more if quick) and a penalty for crashing that is bigger the closer it got (so ramming the back wall is not rewarded). Without the slow-down term, cars learn to speed into the bay and hit the wall.</li>
+          <li><b>Genetic algorithm:</b> the top 8% are kept unchanged (elitism); the rest are children of the top quarter (30% uniform crossover) with Gaussian mutation whose size is spread from small to large.</li>
+          <li><b>Why the default bay is open:</b> in my Node tests, evolving a parker among parked neighbours from scratch was much slower than learning in an open bay first, then adding neighbours. The same is true of many learned controllers: <span class="term">curriculum learning</span> starts easy and makes the task harder as the skill improves, which is what the Challenges buttons let you do.</li>
+          <li><b>The classic alternative:</b> real parking assist plans a path with geometry (for example arcs and clothoids, or Reeds&ndash;Shepp curves, which are the shortest paths for a car that can drive forward and backward) and follows it with a controller. Reinforcement-learning parking systems exist in research and use far more data and compute than this demo.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-parking-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-parking.js"></script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tidy the Mess · Explore ML</title>
+  <meta name="description" content="Fix a messy table with blanks, typos and wild values, and watch a model's score jump. Garbage in, garbage out.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #chart,#chart2 { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); touch-action: none; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .seg button { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .seg button:focus-visible, .tbl button:focus-visible, .feat input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .lab { display: block; font-weight: 800; font-size: .86rem; margin: 10px 0 6px; }
+    .bars { display: grid; gap: 6px; }
+    .bar { display: grid; grid-template-columns: 7.5em 1fr 3.4em; gap: 8px; align-items: center; font-size: .82rem; font-weight: 800; }
+    .bar .t { height: 12px; border-radius: 6px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar .t i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+    .bar b { font-family: var(--font-mono); text-align: right; }
+    @media (prefers-reduced-motion: reduce) { .bar .t i { transition: none; } }
+    .tbl { max-height: 330px; overflow: auto; border: 2px solid var(--line); border-radius: 12px; background: var(--card); }
+    .tbl table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .tbl th, .tbl td { padding: 4px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    .tbl th { position: sticky; top: 0; background: var(--bg-2); font-weight: 800; }
+    .tbl th:first-child, .tbl td:first-child { text-align: left; }
+    .tbl td { font-family: var(--font-mono); font-weight: 700; }
+    .tbl td.bad-missing { background: color-mix(in srgb, var(--warn) 30%, var(--card)); }
+    .tbl td.bad-wild { background: color-mix(in srgb, var(--bad) 22%, var(--card)); }
+    .tbl tr.gone td { opacity: .35; text-decoration: line-through; }
+    .tbl .fix { color: var(--good); font-size: .75rem; margin-left: 4px; }
+    .big { font-family: var(--font-head); font-size: 1.6rem; font-weight: 600; }
+  </style>
+</head>
+<body data-page="demo" data-topic="data" data-demo="data-clean">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="layers"></i> Data &amp; Features</span>
+      <h1>Tidy the <span class="em">Mess</span></h1>
+      <p class="hero-sub">A robot guesses a dog's weight from its height, but the table is full of blanks, typos and silly numbers. Clean it up and watch the score.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Here is the dog table, straight from a messy notebook. I will learn from it exactly as it is. Press a clean-up button and see what happens to my score!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="book"></i> The dog notebook <span class="muted" id="rowcount"></span></h3>
+          <div class="btn-row"><button class="btn ghost small" id="reset"><i data-icon="shuffle"></i> New notebook</button></div>
+        </div>
+        <div class="tbl" tabindex="0" role="region" aria-label="Dog table, scrollable"><table><thead><tr><th>Dog</th><th>Height (cm)</th><th>Weight (kg)</th></tr></thead><tbody id="rows"></tbody></table></div>
+        <p class="muted" style="margin:8px 4px 0; font-size:.88rem; font-weight:700"><span style="background:color-mix(in srgb, var(--warn) 30%, var(--card));padding:0 6px;border-radius:6px">yellow</span> = blank, <span style="background:color-mix(in srgb, var(--bad) 22%, var(--card));padding:0 6px;border-radius:6px">red</span> = wild value. Green text shows what the robot sees after your clean-up.</p>
+        <div class="chart-box" style="margin-top:10px"><canvas id="chart" role="img" aria-label="Scatter plot of height and weight with the robot's fitted line"></canvas></div>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>good dog</span><span><i style="background:var(--warn)"></i>was blank</span><span><i style="background:var(--bad)"></i>wild</span><span><i style="background:var(--good)"></i>robot's line</span></div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Score on 80 clean test dogs</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Score</div><div class="v big" id="score">0%</div></div>
+            <div class="stat"><div class="k">Typical miss</div><div class="v" id="mae">0 kg</div></div>
+            <div class="stat"><div class="k">Rows kept</div><div class="v" id="kept">0</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="eraser"></i> Blank cells</h3>
+          <div class="seg" id="g-missing" role="group" aria-label="What to do with blank cells">
+            <button type="button" data-v="leave" aria-pressed="true">Leave (read as 0)</button>
+            <button type="button" data-v="drop" aria-pressed="false">Drop the row</button>
+            <button type="button" data-v="mean" aria-pressed="false">Fill with mean</button>
+            <button type="button" data-v="median" aria-pressed="false">Fill with median</button>
+            <button type="button" data-v="predict" aria-pressed="false">Predict it</button>
+          </div>
+          <span class="lab">Typos and wild values</span>
+          <div class="seg" id="g-wild" role="group" aria-label="What to do with wild values">
+            <button type="button" data-v="leave" aria-pressed="true">Leave them</button>
+            <button type="button" data-v="drop" aria-pressed="false">Drop the row</button>
+            <button type="button" data-v="clip" aria-pressed="false">Clip to normal range</button>
+          </div>
+          <p class="muted" id="note" style="margin:8px 0 0; font-weight:700; font-size:.9rem"></p>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-bad"><span class="tick"></span><span>Garbage in: leave everything messy and see the score fall under 30%.</span></div>
+      <div class="chal" id="c-good"><span class="tick"></span><span>Clean it up: reach a score of 85% or more.</span></div>
+      <div class="chal" id="c-keep"><span class="tick"></span><span>Waste not: reach 85% while still keeping at least 50 of the 60 rows.</span></div>
+      <div class="chal" id="c-both"><span class="tick"></span><span>Mean or median? Try both fill options (with any wild-value setting).</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The robot learns only from the table it is given. A blank read as 0 or a height of 450 cm pulls its line far away from the truth.</li>
+      <li>The test dogs were clean and hidden, so the score shows how the line works on real dogs.</li>
+      <li>Dropping bad rows works but throws away data. Filling blanks keeps rows, and predicting a blank from the other column is usually the smartest fill.</li>
+      <li>The mean is dragged by wild values, the median is not. That is why outliers and fills are best handled together.</li>
+      <li>Clipping squeezes wild values into the normal range, but a typo is still a wrong number. Sometimes dropping it is more honest.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The model is <span class="term">ordinary least squares</span> simple linear regression: <code>weight = a · height + b</code> with <code>a = cov(x,y)/var(x)</code>. Score is <span class="term">R²</span> = <code>1 − SSres/SStot</code> on held-out rows, clamped at 0, and the typical miss is the <span class="term">mean absolute error</span>.</p>
+        <ul>
+          <li><span class="term">Wild values</span> are found with <span class="term">Tukey fences</span>: values beyond <code>Q1 − 1.5·IQR</code> or <code>Q3 + 1.5·IQR</code>. Clipping to the fences is called <span class="term">winsorising</span>.</li>
+          <li>The typos here are decimal slips (a height ×10 or a weight ÷10); outliers are weights ×3 to ×6. Both are injected with a seeded random generator, so the same notebook is deterministic.</li>
+          <li><span class="term">Mean imputation</span> shrinks variance and pulls toward the centre; <span class="term">median imputation</span> is robust to outliers; <span class="term">regression imputation</span> fills a blank from the other column, which keeps the relationship but makes data look tidier than it is.</li>
+          <li>Leaving blanks as 0 is a classic silent bug: it is a legal number, so nothing crashes, but it is wrong.</li>
+          <li>Dropping rows is fine when blanks are random (<span class="term">missing completely at random</span>). If blanks are linked to the answer, dropping them biases the model.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/data-clean-core.js"></script>
+  <script src="js/data-clean.js"></script>
+</body>
+</html>

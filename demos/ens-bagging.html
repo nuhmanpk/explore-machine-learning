@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vote of Many Trees · Explore ML</title>
+  <meta name="description" content="Train many small decision trees on shuffled copies of the data and let them vote. See why the vote is steadier than one tree.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.35rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .gridmaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+    .gridmaps figure { margin: 0; min-width: 0; }
+    .gridmaps figcaption { font-weight: 800; font-size: .85rem; margin-bottom: 4px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ensemble" data-demo="ens-bagging">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Ensembles &amp; Boosting</span>
+      <h1>Vote of Many <span class="em">Trees</span></h1>
+      <p class="hero-sub">One tree memorises every wrong label. Many trees, each shown a shuffled copy of the data, vote and cancel out each other’s quirks.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Orange and purple dots, but some labels are wrong on purpose. The left map is one tree. The middle map is a crowd of trees voting. Slide <b>number of trees</b> up!</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="map"></i> Decision maps</h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="peek"><i data-icon="eye"></i> Peek at the next tree</button>
+            <button class="btn ghost small" id="newdata"><i data-icon="shuffle"></i> New data</button>
+          </div>
+        </div>
+        <div class="gridmaps">
+          <figure><figcaption>One tree, all the data</figcaption><canvas id="m-one" class="cv" role="img" aria-label="Decision map of a single tree"></canvas></figure>
+          <figure><figcaption id="cap-bag">Vote of 25 trees</figcaption><canvas id="m-bag" class="cv" role="img" aria-label="Decision map of the voting crowd of trees"></canvas></figure>
+          <figure><figcaption id="cap-peek">One tree of the crowd</figcaption><canvas id="m-peek" class="cv" role="img" aria-label="Decision map of one tree in the crowd and the sample it saw"></canvas></figure>
+        </div>
+        <p class="cap">Colours are what the model would say for a dot placed there (orange or purple, paler when the vote is close). Right map: big dots were picked more than once, hollow dots were left out of that tree's shuffled copy.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="trees">Number of trees <span class="val"><b data-for="trees">25</b></span></label>
+            <input type="range" id="trees" min="1" max="60" step="1" value="25">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="depth">How deep each tree grows <span class="val"><b data-for="depth">6</b></span></label>
+            <input type="range" id="depth" min="1" max="8" step="1" value="6">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="noise">Wrong labels <span class="val"><b data-for="noise">15%</b></span></label>
+            <input type="range" id="noise" min="0" max="35" step="1" value="15">
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Score on fresh dots</h3>
+          <div class="three">
+            <div class="stat"><div class="k">One tree</div><div class="v" id="a-one">0%</div></div>
+            <div class="stat"><div class="k">The vote</div><div class="v" id="a-bag" style="color:var(--accent)">0%</div></div>
+            <div class="stat"><div class="k">Out-of-bag</div><div class="v" id="a-oob" style="color:var(--good)">0%</div></div>
+          </div>
+          <p class="cap">The best possible score is about 100% minus the wrong labels, because the fresh dots have wrong labels too.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Score as trees are added</h3>
+          <canvas id="chart" class="cv" role="img" aria-label="Chart of accuracy against number of trees"></canvas>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>vote on fresh dots</span><span><i style="background:var(--good)"></i>out-of-bag</span><span><i style="background:var(--muted)"></i>one tree</span></div>
+        </div>
+      </aside>
+    </section>
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-peek"><span class="tick"></span><span>Peek inside: look at 3 different trees of the crowd.</span></div>
+      <div class="chal" id="c-beat"><span class="tick"></span><span>Teamwork: use 25 or more trees and have the vote beat the single tree by at least 2 points.</span></div>
+      <div class="chal" id="c-oob"><span class="tick"></span><span>Free exam: with 30 or more trees, get the out-of-bag score within 4 points of the fresh-dots score.</span></div>
+      <div class="chal" id="c-stump"><span class="tick"></span><span>Too simple: set the depth to 1 (one cut per tree) with 40+ trees. The vote cannot bend around the curves.</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Each tree got its own shuffled copy of the data (bootstrap: draw dots at random with repeats), so each tree saw a slightly different puzzle.</li>
+      <li>Every tree memorised its own copy, noise and all, but they memorised different mistakes.</li>
+      <li>When the trees vote, the odd mistakes get outvoted and the smooth pattern stays.</li>
+      <li>Each tree never saw about a third of the dots. Testing the tree on those left-out dots gives a free honest score, called out-of-bag.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>Draw a bootstrap sample: pick as many dots as the data has, at random, with repeats.</li>
+      <li>Grow a decision tree on that sample.</li>
+      <li>Repeat for every tree.</li>
+      <li>To classify a new dot, every tree votes and the majority wins.</li>
+      <li>To score the training data honestly, each dot is judged only by the trees that never saw it.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">bagging</span> (bootstrap aggregating, Breiman 1996). Each tree is a CART tree grown with weighted Gini impurity <code>1 − Σ p<sub>k</sub>²</code> on a <span class="term">bootstrap sample</span>; a sample of size n leaves out each row with probability <code>(1 − 1/n)<sup>n</sup> ≈ 36.8%</code>.</p>
+        <ul>
+          <li>Deep trees have low <span class="term">bias</span> but high <span class="term">variance</span>: they chase label noise. Averaging B roughly independent trees divides the variance part by about B, so the vote is smoother and generalises better.</li>
+          <li>The trees are not fully independent, since they share the same data, so gains flatten after a few dozen trees.</li>
+          <li><span class="term">Out-of-bag (OOB) error</span> is a nearly free estimate of test error: each row is scored by only the trees whose bootstrap sample missed it. Here it is measured against the noisy labels, just like the fresh dots.</li>
+          <li>Shallow stumps have high bias. Voting many does not fix that, because averaging cuts variance, not bias. Random forests add a random choice of features at each split to decorrelate the trees further; with only two features here, this is plain bagging.</li>
+        </ul>
+        <p>Data: two interleaved half-moons in the unit square with Gaussian jitter; a chosen fraction of labels is flipped. 120 training dots, 400 fresh dots, seeded.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ens-bagging-core.js"></script>
+  <script src="js/ens-bagging.js"></script>
+</body>
+</html>

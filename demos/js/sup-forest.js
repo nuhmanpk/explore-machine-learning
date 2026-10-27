@@ -35,25 +35,10 @@
     el.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14"><g fill="var(${CV[c]})" stroke="var(--ink)" stroke-width="1.5">${d}</g></svg>`;
   });
 
-  // ---------- data ----------
-  const GEN = {
-    blobs() {
-      const C = [[0.25, 0.7], [0.72, 0.72], [0.5, 0.25]];
-      const c = ML.randInt(0, 2);
-      return { x: C[c][0] + ML.randn() * 0.09, y: C[c][1] + ML.randn() * 0.09, c };
-    },
-    checks() {
-      const x = Math.random(), y = Math.random();
-      const c = (Math.floor(x * 3) + Math.floor(y * 3)) % 2 === 0 ? 0 : 1;
-      return { x, y, c: Math.random() < 0.06 ? 1 - c : c };
-    },
-    messy() {
-      const C = [[0.3, 0.65], [0.68, 0.6], [0.5, 0.28]];
-      const c = ML.randInt(0, 2);
-      return { x: C[c][0] + ML.randn() * 0.13, y: C[c][1] + ML.randn() * 0.13, c };
-    },
-  };
-  const clampP = (p) => ({ x: ML.clamp(p.x, 0.02, 0.98), y: ML.clamp(p.y, 0.02, 0.98), c: p.c });
+  // ---------- data + tree maths (see sup-forest-core.js) ----------
+  const FC = window.ForestCore;
+  const { clampP, leaves, newTree, leafAt, probs, argmax, forestProbs, acc, cloneTree } = FC;
+  const growOne = (T, pts, maxDepth, randomAxis) => FC.growOne(T, pts, maxDepth, randomAxis, ML);
 
   const state = {
     pts: [], test: [], gen: "blobs",
@@ -63,68 +48,12 @@
     hist: [], fhist: [], growing: false, planting: false,
   };
 
-  // ---------- tree ----------
-  const gini = (cnt, n) => (n ? 1 - cnt.reduce((s, c) => s + (c / n) ** 2, 0) : 0);
-  function counts(pts, idx) { const c = [0, 0, 0]; idx.forEach((i) => c[pts[i].c]++); return c; }
-  function makeLeaf(pts, idx, depth, box) {
-    const cnt = counts(pts, idx);
-    return { idx, depth, box, cnt, n: idx.length, g: gini(cnt, idx.length), leaf: true };
-  }
-  function bestSplit(pts, node, randomAxis) {
-    const axes = randomAxis ? [Math.random() < 0.5 ? "x" : "y"] : ["x", "y"];
-    let best = null;
-    for (const ax of axes) {
-      const s = node.idx.slice().sort((a, b) => pts[a][ax] - pts[b][ax]);
-      const L = [0, 0, 0], R = node.cnt.slice();
-      for (let j = 0; j < s.length - 1; j++) {
-        const p = pts[s[j]]; L[p.c]++; R[p.c]--;
-        const v1 = p[ax], v2 = pts[s[j + 1]][ax];
-        if (v2 - v1 < 1e-9) continue;
-        const nl = j + 1, nr = s.length - nl;
-        const g = (nl * gini(L, nl) + nr * gini(R, nr)) / s.length;
-        if (!best || g < best.g) best = { g, ax, t: (v1 + v2) / 2, li: s.slice(0, nl), ri: s.slice(nl), gl: gini(L, nl), gr: gini(R, nr) };
-      }
-    }
-    return best && best.g < node.g - 1e-9 ? best : null;
-  }
-  function leaves(n, out = []) { if (n.leaf) out.push(n); else { leaves(n.l, out); leaves(n.r, out); } return out; }
-  function growOne(T, pts, maxDepth, randomAxis) {
-    let pick = null;
-    for (const lf of leaves(T)) {
-      if (lf.depth >= maxDepth || lf.g === 0 || lf.n < 2) continue;
-      if (lf.cand === undefined) lf.cand = bestSplit(pts, lf, randomAxis);
-      if (!lf.cand) continue;
-      const gain = lf.n * (lf.g - lf.cand.g);
-      if (!pick || gain > pick.gain) pick = { lf, gain };
-    }
-    if (!pick) return null;
-    const lf = pick.lf, s = lf.cand;
-    const [x0, y0, x1, y1] = lf.box;
-    const bl = s.ax === "x" ? [x0, y0, s.t, y1] : [x0, y0, x1, s.t];
-    const br = s.ax === "x" ? [s.t, y0, x1, y1] : [x0, s.t, x1, y1];
-    Object.assign(lf, { leaf: false, ax: s.ax, t: s.t, l: makeLeaf(pts, s.li, lf.depth + 1, bl), r: makeLeaf(pts, s.ri, lf.depth + 1, br) });
-    return lf;
-  }
-  function newTree(pts, idx) { return makeLeaf(pts, idx || pts.map((_, i) => i), 0, [0, 0, 1, 1]); }
-  function leafAt(T, x, y) { let n = T; while (!n.leaf) n = (n.ax === "x" ? x : y) < n.t ? n.l : n.r; return n; }
-  function probs(T, x, y) { const lf = leafAt(T, x, y); return lf.n ? lf.cnt.map((c) => c / lf.n) : [1 / 3, 1 / 3, 1 / 3]; }
-  const argmax = (a) => a.indexOf(Math.max(...a));
-  function forestProbs(F, x, y) {
-    const s = [0, 0, 0];
-    F.forEach((t) => probs(t.T, x, y).forEach((v, i) => (s[i] += v)));
-    return s.map((v) => v / (F.length || 1));
-  }
   function predictor() {
     if (state.viewing) return state.viewing.pred;
     if (state.mode === "forest" && state.forest.length) { const F = state.forest.slice(); return (x, y) => forestProbs(F, x, y); }
     if (state.tree) { const T = state.tree; return (x, y) => probs(T, x, y); }
     return null;
   }
-  function acc(pred, set) {
-    if (!pred || !set.length) return null;
-    return set.filter((p) => argmax(pred(p.x, p.y)) === p.c).length / set.length;
-  }
-  function cloneTree(n) { return n.leaf ? { ...n, cand: undefined } : { ...n, l: cloneTree(n.l), r: cloneTree(n.r) }; }
 
   // ---------- checkpoints ----------
   const TREE_MS = [1, 2, 4, 8, 16, -1], FOREST_MS = [1, 3, 5, 10, 25];
@@ -174,8 +103,8 @@
   function loadPreset(name, msg) {
     state.gen = name;
     state.pts = []; state.test = [];
-    for (let i = 0; i < 60; i++) state.pts.push(clampP(GEN[name]()));
-    for (let i = 0; i < 90; i++) state.test.push(clampP(GEN[name]()));
+    for (let i = 0; i < 60; i++) state.pts.push(clampP(FC.GEN[name](ML)));
+    for (let i = 0; i < 90; i++) state.test.push(clampP(FC.GEN[name](ML)));
     resetModels();
     if (msg) ML.say(msg);
   }
@@ -281,11 +210,7 @@
         if (last) ML.say(`My forest of ${state.forest.length} trees scores <b>${pct(last.test)}</b> on the test shapes. One deep tree got <b>${pct(singleDeepTest())}</b>. Point at the map to see the trees vote!`);
         return;
       }
-      const n = state.pts.length;
-      const sample = Array.from({ length: n }, () => state.pts[ML.randInt(0, n - 1)]);
-      const T = newTree(sample);
-      while (growOne(T, sample, state.depth, true));
-      state.forest.push({ T, sample });
+      state.forest.push(FC.plantTree(state.pts, state.depth, ML));
       renderForestGrid();
       mapDirty = true;
       const pred = predictor();

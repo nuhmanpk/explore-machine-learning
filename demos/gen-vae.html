@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Make New Pictures · Explore ML</title>
+  <meta name="description" content="Train a variational autoencoder, then pick random points to make brand-new pictures. Too little regularisation leaves holes, too much blurs everything.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .three { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cp-head h3 { margin: 0; }
+    .cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; touch-action: none; }
+    .cv.pick { cursor: crosshair; }
+    .cv:focus-visible { outline: 3px solid var(--accent); }
+    .note { margin: 8px 4px 0; font-size: .88rem; font-weight: 700; color: var(--muted); }
+    .kchips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .kbtn { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px; min-height: 36px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .kbtn[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--card)); }
+    .kbtn:focus-visible { outline: 3px solid var(--accent); }
+    .kbtn i.sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .tag { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+    input[type=range] { width: 100%; }
+  </style>
+</head>
+<body data-page="demo" data-topic="gen" data-demo="gen-vae">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="palette"></i> Generative Models</span>
+      <h1>Make <span class="em">New Pictures</span></h1>
+      <p class="hero-sub">Pick random spots on the map and the network draws brand-new pictures. A tidy-up slider decides whether the map is full of holes or a blurry mush.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I will draw pictures from <b>random spots</b>. If the map has holes I draw junk. Slide the <b>tidy-up weight</b> and watch the junk and the blur change!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3><i data-icon="map"></i> The map <span class="muted" id="state"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="gen"><i data-icon="sparkles"></i> Make 12 new pictures</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <canvas class="cv" id="map" role="img" aria-label="Map of pictures with the area where random spots usually land drawn as a circle"></canvas>
+        <div class="legend" id="legend" style="margin-top:8px"></div>
+        <p class="note">Faint tiles are what the network draws at each spot. Dots are real pictures. The dashed circle is where random spots usually land. White rings are your new pictures.</p>
+        <div class="field" style="margin-top:12px">
+          <label for="beta">Tidy-up weight (KL) <b class="val" data-for="beta"></b></label>
+          <input type="range" id="beta" min="0" max="6" step="1" value="3">
+          <div class="hint">0 = no rule about the map. Higher = it must keep the dots packed in the circle, at the cost of detail.</div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> Brand-new pictures</h3>
+          <canvas class="cv" id="gal" role="img" aria-label="Twelve new pictures drawn from random spots. Junk ones have a red frame."></canvas>
+          <p class="note" style="margin:0">A red frame means junk: it looks like none of the pictures it learned from.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Report card <span class="muted" style="font-size:.8rem">(200 random spots)</span></h3>
+          <div class="three"><div class="stat"><div class="k">Junk</div><div class="v" id="s-junk">-</div></div><div class="stat"><div class="k">Sharp</div><div class="v" id="s-sharp">-</div></div><div class="stat"><div class="k">Spread</div><div class="v" id="s-kl">-</div></div></div>
+          <p class="note" style="margin:0">Junk = % of new pictures unlike any real one. Sharp = how crisp (not grey) they are. Spread = how far the dots stretch (KL).</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-holes"><span class="tick"></span><span>No rules: set the weight to 0 and let it train until Spread is over 20. The dots sprawl far outside the circle, leaving holes.</span></div>
+      <div class="chal" id="c-sweet"><span class="tick"></span><span>Sweet spot: find a weight where junk is 30% or less and the pictures stay sharp (0.7 or more).</span></div>
+      <div class="chal" id="c-blur"><span class="tick"></span><span>Too much tidying: set the weight to 3 and see sharpness drop to 0.65 or less.</span></div>
+      <div class="chal" id="c-tour"><span class="tick"></span><span>Experimenter: train with 4 different weights.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>This network is a <b>variational</b> autoencoder. Instead of one exact spot, it describes each picture as a fuzzy blob (a centre plus some random wobble), then rebuilds the picture from a random point inside that blob.</li>
+      <li>The tidy-up weight pulls all blobs towards the middle, so random spots land on something real. It is a trade: too little leaves holes and junk, too much makes every picture a grey, blurry average.</li>
+      <li>New pictures come from picking a random spot in the circle and decoding it. Nobody drew those pictures.</li>
+      <li>The junk and sharp numbers are measured by comparing each new picture with every real one, so they are not faked.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>A <span class="term">variational autoencoder (VAE)</span> has an encoder that outputs a mean <code>μ</code> and log-variance <code>log σ²</code> for a 2-D Gaussian, and a decoder (<code>2 → 32 → 64</code>). Training minimises <code>‖x − x̂‖² + β · KL</code>.</p>
+        <ul>
+          <li><span class="term">Reparameterisation trick</span>: <code>z = μ + σ · ε</code> with <code>ε ~ N(0, 1)</code>, so gradients flow through the sampling step into the encoder. This is implemented by hand here.</li>
+          <li><span class="term">KL divergence</span> to the prior <code>N(0, I)</code>: <code>−½ Σ (1 + log σ² − μ² − σ²)</code>. It is the regulariser. With β = 0 it is a plain autoencoder: the codes spread far outside the prior, so sampling from <code>N(0, I)</code> often lands in untrained gaps (junk).</li>
+          <li>Large β causes <span class="term">posterior collapse</span> in the limit: the encoder ignores the input, and the decoder outputs the average picture.</li>
+          <li>This is a β-VAE view: the weight is on the KL term relative to the squared-error reconstruction term (a Gaussian likelihood with a fixed variance).</li>
+          <li>"Junk" = nearest training picture has per-pixel mean squared difference above 0.05. "Sharp" = mean of <code>|pixel − 0.5| × 2</code>: 1 for pure black and white, 0 for mid grey.</li>
+        </ul>
+        <p>Further reading: Kingma and Welling, <i>Auto-Encoding Variational Bayes</i> (2014); Higgins et al., <i>β-VAE</i> (2017).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/gen-vae-core.js"></script>
+  <script src="js/gen-vae.js"></script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Search Engine · Explore ML</title>
+  <meta name="description" content="Type a search into a tiny search engine and see exactly why each page ranked where it did.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #q { width: 100%; font: inherit; font-weight: 700; font-size: 1.05rem; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+    #q:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .qchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .qchips button { font: inherit; font-weight: 800; font-size: .8rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 10px; min-height: 32px; cursor: pointer; }
+    .qchips button:focus-visible { outline: 3px solid var(--accent); }
+    .toggles { display: flex; flex-wrap: wrap; gap: 8px 16px; font-weight: 800; font-size: .9rem; margin-top: 4px; }
+    .toggles label { display: inline-flex; gap: 6px; align-items: center; min-height: 32px; cursor: pointer; }
+    .toggles input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .res { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+    .res li { background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 8px 10px; display: grid; gap: 4px; }
+    .res li:first-child { border-color: var(--accent); }
+    .rt { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-weight: 800; }
+    .rt .rk { color: var(--accent); font-family: var(--font-head); margin-right: 6px; }
+    .rt .sc { font-family: var(--font-mono); font-size: .85rem; color: var(--muted); }
+    .rx { font-size: .9rem; font-weight: 600; }
+    mark { background: color-mix(in srgb, var(--warn) 55%, transparent); color: var(--ink); border-radius: 4px; padding: 0 2px; }
+    .why { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: .78rem; font-weight: 800; }
+    .why .wc { border-radius: 8px; padding: 1px 7px; background: color-mix(in srgb, var(--accent) 18%, var(--card)); border: 1.5px solid var(--accent); }
+    .why .wc small { font-family: var(--font-mono); margin-left: 3px; }
+    .why .pp { border-radius: 8px; padding: 1px 7px; background: color-mix(in srgb, var(--warn) 25%, var(--card)); border: 1.5px solid var(--warn); }
+    .stackbar { display: flex; height: 8px; border-radius: 5px; overflow: hidden; background: var(--line); }
+    .stackbar i { display: block; height: 100%; }
+    .empty { color: var(--muted); font-weight: 700; padding: 10px 2px; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .ctl { display: grid; gap: 4px; margin: 8px 0 0; font-weight: 800; font-size: .9rem; }
+    .ctl input[type=range] { width: 100%; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+  </style>
+</head>
+<body data-page="demo" data-topic="graphs" data-demo="graph-search">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="network"></i> Graphs, Ranking &amp; Search</span>
+      <h1>Search <span class="em">Engine</span></h1>
+      <p class="hero-sub">Thirty tiny pages, one search box. Type a few words and see exactly which words pushed each page up the list.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Try searching for <b>cat</b>. Rare words count for more than common ones, and I will show you the maths.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <h3 style="margin:0 0 8px"><i data-icon="search"></i> Search the library</h3>
+        <input id="q" type="search" maxlength="60" placeholder="Try: cats chasing" autocomplete="off" aria-label="Search words" value="">
+        <div class="qchips" id="qchips" role="group" aria-label="Example searches"></div>
+        <ol class="res" id="res" aria-live="polite"></ol>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Tune the engine</h3>
+          <div class="toggles">
+            <label><input type="checkbox" id="stop"> Ignore tiny words (the, of, a)</label>
+            <label><input type="checkbox" id="stem"> Match word endings (cats = cat)</label>
+          </div>
+          <div class="ctl">
+            <label for="mix">Mix in popularity (PageRank): <b data-for="mix"></b></label>
+            <input type="range" id="mix" min="0" max="100" step="5" value="0">
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> This search</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Pages found</div><div class="v" id="nres">0</div></div>
+            <div class="stat"><div class="k">Best score</div><div class="v" id="best">-</div></div>
+            <div class="stat"><div class="k">Library</div><div class="v">30</div></div>
+          </div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-search"><span class="tick"></span><span>First search: type any word and get results.</span></div>
+      <div class="chal" id="c-stem"><span class="tick"></span><span>Word endings: search something like "running dogs" so that matching endings changes which pages are found.</span></div>
+      <div class="chal" id="c-stop"><span class="tick"></span><span>Tiny words: search "the of a" so that ignoring tiny words changes the results.</span></div>
+      <div class="chal" id="c-pop"><span class="tick"></span><span>Popularity shuffle: mix in PageRank until a different page becomes number one. Try "park".</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Every page became a list of numbers: one number per word. Common words like "the" get tiny numbers, rare words get big ones.</li>
+      <li>Your search became a list of numbers in the same way. A page ranks high when its numbers point the same way as yours.</li>
+      <li>The coloured chips show each word's share of a page's score, so you can always see why something ranked where it did.</li>
+      <li>Ignoring tiny words and matching word endings changes which pages count as a match.</li>
+      <li>Mixing in popularity lets pages that many others link to climb, even if they match your words a little less.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a miniature <span class="term">vector space model</span> retrieval system. Each document is a sparse vector of <span class="term">TF-IDF</span> weights and the query is scored by <span class="term">cosine similarity</span>.</p>
+        <ul>
+          <li><span class="term">Term frequency</span>: <code>tf = 1 + ln(count)</code> (sublinear, so repeating a word 10 times is not 10 times better).</li>
+          <li><span class="term">Inverse document frequency</span>: <code>idf = ln((N + 1) / (df + 1)) + 1</code>. A word in nearly every document says little; a rare word is a strong clue.</li>
+          <li>Both vectors are <span class="term">L2-normalised</span>, so the cosine is just the dot product. It is the sum over query words of <code>q<sub>w</sub> · d<sub>w</sub></code>, which is exactly the chip shown for each word. That is why this model is easy to <span class="term">explain</span>.</li>
+          <li><span class="term">Stop words</span> are dropped, and a crude <span class="term">stemmer</span> strips endings (real engines use Porter or lemmatisers, and it makes mistakes such as merging unrelated words).</li>
+          <li>The final score is <code>(1 − m) · cosine + m · popularity</code>, where popularity is <span class="term">PageRank</span> (scaled to 0 to 1) over invisible "see also" links between the pages. Only pages that match at least one query word are ranked.</li>
+          <li>Real engines add inverted indexes for speed, BM25 (a refined TF-IDF), hundreds of other signals, and learned neural re-rankers. They also match meaning, not just words, which this model cannot do: "puppy" will never find "dog".</li>
+        </ul>
+        <p>Further reading: Manning, Raghavan and Schütze, <i>Introduction to Information Retrieval</i>, ch. 6 · Robertson and Zaragoza, <i>The probabilistic relevance framework: BM25 and beyond</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/graph-search-core.js"></script>
+  <script src="js/graph-search.js"></script>
+</body>
+</html>

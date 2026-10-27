@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smooth the Wiggles · Explore ML</title>
+  <meta name="description" content="Ice-cream sales jump around every day. Average the last few days to see the real trend, and find the size that is not too wiggly and not too late.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.plot { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.15rem; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .seg { display: inline-flex; border: 2px solid var(--line); border-radius: 999px; overflow: hidden; }
+    .seg button { font: inherit; font-weight: 800; font-size: .82rem; border: 0; background: var(--card); color: var(--ink); padding: 6px 12px; min-height: 36px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    .seg button:focus-visible, .chk input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .chk { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: .9rem; min-height: 32px; }
+    .chk input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .field input[type=range] { width: 100%; }
+    .note { margin: 8px 4px 0; font-size: .88rem; font-weight: 700; }
+    .meter { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; margin-top: 4px; }
+    .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+    .sw { display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:-1px; margin-right:4px; }
+    @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="time" data-demo="time-trend">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="clock"></i> Time Series &amp; Forecasting</span>
+      <h1>Smooth the <span class="em">Wiggles</span></h1>
+      <p class="hero-sub">Ice-cream sales bounce up and down every day. Average a few days together and the real pattern shows through, but average too many and you arrive late.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Each dot is one day of sales. Slide <b>Days to average</b> up and watch the line calm down. Which size follows the pattern best?</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="trend"></i> Ice-cream cones sold per day</h3>
+          <div class="btn-row"><button class="btn ghost small" id="newdata"><i data-icon="shuffle"></i> New shop</button></div>
+        </div>
+        <div class="chart-box"><canvas class="plot" id="chart" role="img" aria-label="Chart of daily ice cream sales with a smoothed line"></canvas></div>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--muted)"></i>daily sales</span><span><i style="background:var(--accent)"></i>moving average</span><span><i style="background:var(--warn)"></i>trend line</span><span><i style="background:var(--good)"></i>real pattern (hidden)</span></div>
+        <p class="muted note">Around the middle a heat wave makes sales jump up. See how quickly your line notices it.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="win">Days to average <span class="val" id="win-v">1</span></label>
+            <input type="range" id="win" min="1" max="41" step="1" value="1">
+            <div class="hint">1 means no smoothing at all. Bigger means calmer, but slower to react.</div>
+          </div>
+          <div class="field" style="margin-top:8px"><span class="muted" style="font-weight:800;font-size:.85rem">Which days does it use?</span>
+            <div class="seg" role="group" aria-label="Averaging style" style="margin-top:4px">
+              <button type="button" id="m-trail" aria-pressed="true">Past days only</button>
+              <button type="button" id="m-cent" aria-pressed="false">Past and future</button>
+            </div>
+            <div class="hint" id="mode-hint"></div>
+          </div>
+          <label class="chk" style="margin-top:8px"><input type="checkbox" id="t-line"> Draw the straight trend line</label>
+          <label class="chk"><input type="checkbox" id="t-truth"> Peek at the real hidden pattern</label>
+          <div class="btn-row" style="margin-top:8px"><button class="btn small" id="best"><i data-icon="target"></i> Best size for me</button></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How is the line doing?</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Off by</div><div class="v" id="s-err">0</div></div>
+            <div class="stat"><div class="k">Wiggle</div><div class="v" id="s-wig">0</div></div>
+            <div class="stat"><div class="k">Late by</div><div class="v" id="s-lag">0 d</div></div>
+          </div>
+          <p class="muted note" id="s-note"></p>
+          <p class="muted note" id="s-slope"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-sweet"><span class="tick"></span><span>Sweet spot: with past days only, get within 15% of the smallest possible error.</span></div>
+      <div class="chal" id="c-lag"><span class="tick"></span><span>Too slow: use 30 or more days and see the line arrive 8 or more days late.</span></div>
+      <div class="chal" id="c-cent"><span class="tick"></span><span>Peek ahead: switch to past and future, and find a size within 15% of its best.</span></div>
+      <div class="chal" id="c-line"><span class="tick"></span><span>Straight on: draw the straight trend line to see how fast sales grow.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Each dot is noisy: some random luck each day on top of the real pattern.</li>
+      <li>A moving average replaces every day with the average of its neighbours. Luck goes up and down, so it mostly cancels out.</li>
+      <li>Too few days: the line still wiggles. Too many days: it smooths away real changes and arrives late after the heat-wave jump.</li>
+      <li>Using only past days is what a live shop can do, but it always lags. Using future days too removes the lag, but only works when you look back afterwards.</li>
+      <li>The straight line ignores bumps and just asks: on average, how fast are sales rising?</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>A <span class="term">moving average</span> is a <span class="term">low-pass filter</span>: <code>s<sub>t</sub> = (1/w) Σ y<sub>t−j</sub></code>. It trades <span class="term">variance</span> (noise left in the line, which shrinks about like 1/w) against <span class="term">bias</span> (real changes smeared out, which grows with w). The best window sits where the two balance.</p>
+        <ul>
+          <li><span class="term">Trailing</span> windows use only the past, so they are causal and lag by about (w−1)/2 steps. <span class="term">Centered</span> windows use past and future, so they have no lag but cannot be used for live forecasting.</li>
+          <li>The <b>Off by</b> number is the root-mean-square distance between the smoothed line and the hidden true pattern, which a real analyst would not know. The simulator knows it, so it can show the bias-variance trade-off honestly. Lag is the shift of the true pattern that best matches the smoothed line.</li>
+          <li>The trend line is an <span class="term">ordinary least-squares</span> fit <code>y = a + b·t</code>, which minimises squared error. It cannot follow the jump, which shows why one straight line is a model with strong assumptions.</li>
+          <li>Next steps: exponential smoothing, LOESS and Savitzky-Golay filters use weighted windows that react better.</li>
+        </ul>
+        <p>Further reading: Hyndman and Athanasopoulos, <i>Forecasting: Principles and Practice</i>, ch. 3 (time series decomposition and moving averages).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/time-trend-core.js"></script>
+  <script src="js/time-trend.js"></script>
+</body>
+</html>

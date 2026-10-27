@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cool Down to Solve · Explore ML</title>
+  <meta name="description" content="Find a short route through 20 cities with simulated annealing and compare it with a greedy hill climber that gets stuck.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .pair { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .pair figure { margin: 0; text-align: center; font-weight: 800; font-size: .9rem; }
+    .pair canvas, .cv { width: 100%; max-width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+    .three > *, .four > * { min-width: 0; }
+    .four { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .ctl { display: grid; gap: 4px; margin-bottom: 10px; }
+    .ctl label { font-weight: 800; font-size: .9rem; display: flex; justify-content: space-between; gap: 8px; }
+    .ctl input[type=range] { width: 100%; }
+    .ctl .hint { font-size: .82rem; color: var(--muted); font-weight: 700; }
+    .note { font-weight: 700; font-size: .9rem; color: var(--muted); margin: 6px 0 0; }
+    .tbl { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .tbl th, .tbl td { text-align: left; padding: 4px 6px; border-bottom: 2px solid var(--line); font-weight: 700; }
+    .tbl td.n { font-family: var(--font-mono); }
+    input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+    button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="optim" data-demo="opt-anneal">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="target"></i> Optimisation &amp; Search</span>
+      <h1>Cool Down to <span class="em">Solve</span></h1>
+      <p class="hero-sub">A salesman must visit 20 towns by the shortest route. A hot robot tries wild changes, then calms down. A greedy robot never goes backwards.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Both of us start with the same messy route. Press <b>Run</b>. I will sometimes accept a <i>worse</i> route while I am hot. That is my secret!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="map"></i> Two robots, one map <span class="muted" id="prog"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="run"><i data-icon="play"></i> Run</button>
+            <button class="btn small" id="again"><i data-icon="reset"></i> Same cities, again</button>
+            <button class="btn ghost small" id="newc"><i data-icon="shuffle"></i> New cities</button>
+          </div>
+        </div>
+        <div class="pair">
+          <figure style="flex:1 1 150px;max-width:300px"><canvas id="cv-h" aria-label="Hill climber route"></canvas>Greedy climber</figure>
+          <figure style="flex:1 1 150px;max-width:300px"><canvas id="cv-s" aria-label="Annealer route"></canvas>Annealer</figure>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Cooling plan</h3>
+          <div class="ctl"><label for="t0">Start temperature <b data-for="t0">40</b></label><input id="t0" type="range" min="1" max="100" step="1" value="40" aria-label="Start temperature"><span class="hint">Hot = accepts big mistakes. Try 1 for a robot that is already cold.</span></div>
+          <div class="ctl"><label for="steps">Cooling time <b data-for="steps">8000 steps</b></label><input id="steps" type="range" min="1000" max="30000" step="500" value="8000" aria-label="Cooling time in steps"></div>
+          <div class="ctl"><label>Temperature now <b id="tnow">40</b></label><div class="pbar" style="height:10px;border-radius:6px;background:var(--bg-2);border:2px solid var(--line);overflow:hidden"><i id="tbar" style="display:block;height:100%;background:var(--bad);width:100%"></i></div></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Route length (shorter is better)</h3>
+          <div class="four">
+            <div class="stat"><div class="k">Greedy</div><div class="v" id="lh">0</div></div>
+            <div class="stat"><div class="k">Annealer</div><div class="v" id="ls">0</div></div>
+            <div class="stat"><div class="k">Best known</div><div class="v" id="lb">0</div></div>
+            <div class="stat"><div class="k">Worse moves taken</div><div class="v" id="wa">0</div></div>
+          </div>
+          <div class="chart-box" style="margin-top:8px"><canvas id="chart" class="cv" aria-label="Route length over time"></canvas></div>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--bad)"></i>greedy</span><span><i style="background:var(--accent)"></i>annealer (now)</span><span><i style="background:var(--good)"></i>best known</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-near"><span class="tick"></span><span>Near perfect: let the annealer finish within 5% of the best known route.</span></div>
+      <div class="chal" id="c-beat"><span class="tick"></span><span>Beat the climber: finish a run where the annealer is shorter than the greedy robot (try New cities if it ties).</span></div>
+      <div class="chal" id="c-stuck"><span class="tick"></span><span>Stuck climber: finish a run where the greedy robot ends 3% or more above the best known.</span></div>
+      <div class="chal" id="c-worse"><span class="tick"></span><span>Brave moves: let the annealer accept 100 worse routes on purpose.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Both robots use the same move: pick a stretch of the route and reverse it. If the route gets shorter, keep it.</li>
+      <li>The greedy robot refuses every bad move, so it gets stuck in a dip where any single change makes things worse.</li>
+      <li>The annealer sometimes accepts a worse route. That lets it climb out of dips. As it cools, it accepts fewer and fewer.</li>
+      <li>Cooling too fast freezes it in a poor route. Too hot at the end and it just wanders.</li>
+      <li>Neither is guaranteed to be perfect. The "best known" is the shortest of three long annealing runs.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li><b>Start</b> with a random route.</li>
+      <li><b>Propose</b> a small change: reverse a stretch of the route.</li>
+      <li><b>If shorter</b>, accept it.</li>
+      <li><b>If longer</b>, accept with chance <code>e^(−extra / temperature)</code>. Hot means likely.</li>
+      <li><b>Cool</b> the temperature slowly towards zero.</li>
+      <li><b>Keep the best route</b> seen along the way.</li>
+    </ol></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p><span class="term">Simulated annealing</span> is a <span class="term">stochastic local search</span> inspired by cooling metal. It samples from a <span class="term">Boltzmann distribution</span> over routes whose temperature <code>T</code> shrinks over time.</p>
+        <ul>
+          <li>Move: <span class="term">2-opt</span> (reverse the segment between two cut points). Acceptance: the <span class="term">Metropolis rule</span>, accept with probability <code>min(1, e<sup>−Δ/T</sup>)</code>, where <code>Δ</code> is the change in route length.</li>
+          <li>Schedule: <span class="term">geometric cooling</span> <code>T(t) = T₀ (T_end / T₀)<sup>t/N</sup></code>. With a logarithmically slow schedule, annealing provably converges to the global optimum, but that is too slow to use; practical schedules are a trade-off.</li>
+          <li>The greedy robot is <span class="term">hill climbing</span> (here, descending): it stops at a <span class="term">local optimum</span>, a route that no single 2-opt move can improve.</li>
+          <li>The travelling salesman problem is <span class="term">NP-hard</span>: the number of routes grows factorially, so we rely on heuristics. Here the reference value is only a very good heuristic answer, not a proof of optimality.</li>
+        </ul>
+        <p>Further reading: Kirkpatrick, Gelatt and Vecchi, <i>Optimization by Simulated Annealing</i>, Science (1983).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/opt-anneal-core.js"></script>
+  <script src="js/opt-anneal.js"></script>
+</body>
+</html>

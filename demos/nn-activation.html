@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why Brains Need a Bend · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .twin { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 560px) { .twin { grid-template-columns: 1fr; } }
+    .twin h4, .sub-h { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; font-family: var(--font-body); font-weight: 800; }
+    .twin .score { display: flex; justify-content: space-between; font-weight: 800; font-size: 0.9rem; margin-top: 6px; }
+    .twin .score .v { font-family: var(--font-mono); color: var(--accent); }
+    #chart, #curve { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .counter { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 800; }
+    .counter .ctl { display: flex; align-items: center; gap: 8px; }
+    .counter .num { font-family: var(--font-head); font-size: 1.5rem; min-width: 1.4em; text-align: center; color: var(--accent); }
+    .counter .btn { width: 40px; height: 40px; padding: 0; font-size: 1.2rem; }
+    .predict { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .predict .btn.on { background: var(--accent-soft); }
+    .lines { display: grid; gap: 6px; font-size: 0.92rem; }
+    .lines p { margin: 0; padding: 6px 10px; border-radius: 10px; background: var(--bg-2); }
+    .collapse-box { font-family: var(--font-mono); font-size: 0.85rem; background: var(--bg-2); border-radius: 12px; padding: 10px 12px; overflow-x: auto; line-height: 1.6; }
+    .collapse-box .big { font-weight: 800; color: var(--accent); }
+    .two-col { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+    @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+    .chal { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .chal .card h3 { margin-top: 0; }
+    .chal .btn { margin-top: 8px; }
+    .sec-gap { margin-top: 18px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="nn" data-demo="nn-activation">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="zap"></i> Neural Networks</span>
+      <h1>Why brains need <span class="em">a bend</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Two robot brains, same dots, same size. One has <b>no bend</b>. One has a bend. Pick a shape and guess: <b>can the bendy one draw it?</b></p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="twin">
+          <div><h4 id="hA"><i data-icon="ruler"></i> No bend</h4><canvas id="bA"></canvas>
+            <div class="score"><span>Right: <span class="v" id="accA">–</span></span><span>Oops: <span class="v" id="lossA">–</span></span></div></div>
+          <div><h4 id="hB"><i data-icon="wand"></i> With a bend</h4><canvas id="bB"></canvas>
+            <div class="score"><span>Right: <span class="v" id="accB">–</span></span><span>Oops: <span class="v" id="lossB">–</span></span></div></div>
+        </div>
+        <div class="legend sec-gap"><span><i style="background:var(--bad)"></i>red dots</span><span><i style="background:var(--sup)"></i>blue dots</span><span>Background = what the brain paints</span></div>
+        <h4 class="sub-h sec-gap"><i data-icon="trend"></i> Oops-meter over time (lower is better)</h4>
+        <canvas id="chart"></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--rl)" id="kA"></i><span id="nA">No bend</span></span><span><i style="background:var(--accent)"></i><span id="nB">With a bend</span></span><span>Flags = big moments</span></div>
+        <div class="overlay-msg" id="msg"></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="target"></i> Pick the dots</h3>
+          <div class="seg" id="ds"><button data-d="line" class="on">Line</button><button data-d="circle">Circle</button><button data-d="xor">Corners</button><button data-d="spiral">Swirl</button></div>
+          <div class="field sec-gap"><span class="lbl">Pick the bend</span>
+            <div class="seg" id="act"><button data-a="linear">None</button><button data-a="relu" class="on">ReLU</button><button data-a="tanh">tanh</button><button data-a="sigmoid">Sigmoid</button><button data-a="step">Step</button></div></div>
+          <div class="counter sec-gap"><span>Thinking layers</span><span class="ctl"><button class="btn small" id="l-">−</button><span class="num" id="layers">2</span><button class="btn small" id="l+">+</button></span></div>
+          <div class="counter"><span>Neurons per layer</span><span class="ctl"><button class="btn small" id="n-">−</button><span class="num" id="neurons">6</span><button class="btn small" id="n+">+</button></span></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="question"></i> Your guess</h3>
+          <p style="margin:0 0 8px">Can the <b id="gName">bendy</b> brain draw this shape?</p>
+          <div class="predict"><button class="btn small" id="gYes"><i data-icon="check"></i> Yes</button><button class="btn small" id="gNo"><i data-icon="x"></i> No</button></div>
+          <p class="muted" id="gRes" style="margin:8px 0 0;font-size:.9rem"></p>
+        </div>
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="go"><i data-icon="play"></i> Robot, learn!</button>
+            <button class="btn ghost" id="reset"><i data-icon="reset"></i> Forget</button>
+          </div>
+          <div class="stats"><div class="stat"><div class="k">Rounds</div><div class="v" id="epoch">0</div></div></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="lines" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="layers"></i> Stacking with no bend: still one cut</h2>
+    <div class="card">
+      <p style="margin-top:0">Many layers, but without a bend they melt into <b>one</b> straight cut. Here's the left brain squashed into one rule, live:</p>
+      <div class="collapse-box" id="collapse"></div>
+      <div class="btn-row sec-gap"><button class="btn small" id="stack1">1 layer</button><button class="btn small" id="stack2">2 layers</button><button class="btn small" id="stack3">3 layers</button></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="gauge"></i> One neuron, one bend</h2>
+    <div class="card two-col">
+      <div>
+        <canvas id="curve"></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>output</span><span><i style="background:var(--rl)"></i>slope (how much the knob feels a nudge)</span></div>
+      </div>
+      <div style="display:grid;gap:12px">
+        <div class="field"><label for="inx">Input <span class="val" data-for="inx"></span></label><input type="range" id="inx" min="-3" max="3" step="0.05" value="-1"></div>
+        <div class="field"><label for="inw">Knob (weight) <span class="val" data-for="inw"></span></label><input type="range" id="inw" min="-2" max="2" step="0.05" value="1"></div>
+        <div class="field"><label for="inb">Mood (bias) <span class="val" data-for="inb"></span></label><input type="range" id="inb" min="-4" max="4" step="0.05" value="0"></div>
+        <div class="lines" id="oneSay"></div>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="trophy"></i> Challenges</h2>
+    <div class="chal">
+      <div class="card"><h3>1. Deeper, still no bend</h3><p>3 layers, no bend, versus ReLU on the circle. Does more depth save the left brain?</p><button class="btn small primary" data-ch="deep"><i data-icon="play"></i> Try it</button></div>
+      <div class="card"><h3>2. Sigmoid sinks, ReLU swims</h3><p>A 4-layer net with sigmoid on the left and ReLU on the right. Watch the left oops-meter barely move.</p><button class="btn small primary" data-ch="vanish"><i data-icon="play"></i> Try it</button></div>
+      <div class="card"><h3>3. Dead ReLU</h3><p>Learn a while, then push every neuron's mood far below zero. Can it ever wake up?</p><button class="btn small primary" data-ch="dead"><i data-icon="play"></i> Try it</button></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="plus"></i></div><h3>Add up</h3><p>Every neuron multiplies inputs by knobs and adds them: that is a straight-line kind of math.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>Bend it</h3><p>Then the bend squashes or clips the total. ReLU chops off negatives. Sigmoid squeezes to 0 to 1.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Stack</h3><p>Bent neurons give the next layer new shapes to mix: corners, rings, swirls.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Learn</h3><p>The robot nudges each knob using the slope of every bend. Flat bend means no nudge.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Without a bend, any number of layers is just <b>one straight cut</b>.</li>
+      <li>With a bend, the same brain painted rings, corners and swirls.</li>
+      <li>Sigmoid goes flat at the ends, so in deep nets the blame signal fades away.</li>
+      <li>A ReLU neuron stuck below zero stays silent and stops learning.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Two identical MLPs (same seed, data, learning rate 0.5, full-batch gradient descent, sigmoid output with cross-entropy) differ only in the hidden activation.</p>
+        <ul>
+          <li><b>Linearity:</b> a composition of linear (affine) maps is one affine map: <code>W₃(W₂(W₁x + b₁) + b₂) + b₃ = Wx + b</code>. The collapse box multiplies the real weight matrices. The decision boundary <code>w·x + b = 0</code> is a line, so circle, XOR and spiral data cannot be separated.</li>
+          <li><b>Non-linear activations</b> break this. With enough hidden units a one-hidden-layer net with a non-polynomial activation can approximate any continuous function on a compact set: the <span class="term">universal approximation theorem</span>.</li>
+          <li><span class="term">ReLU</span> <code>max(0, z)</code>: cheap, slope 1 for z &gt; 0, gives piecewise-linear boundaries. <span class="term">tanh</span> is zero-centred, range (−1, 1). <span class="term">Sigmoid</span> <code>1/(1+e^−z)</code> has slope at most 0.25.</li>
+          <li><span class="term">Vanishing gradients:</span> backprop multiplies one activation slope per layer; with sigmoid each factor is at most 0.25, so early-layer gradients shrink geometrically with depth (the first-layer gradient size is smaller by several orders of magnitude in challenge 2).</li>
+          <li><span class="term">Dying ReLU:</span> if a unit's pre-activation is negative for all inputs its gradient is exactly 0, so its weights never change. Remedies: lower learning rate, leaky ReLU, careful init.</li>
+          <li><b>Step</b> has zero slope almost everywhere, so we train it with a surrogate gradient (a hard-tanh-style slope), a trick used for binary and spiking networks.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/nn-activation-core.js"></script>
+  <script src="js/nn-activation.js"></script>
+</body>
+</html>

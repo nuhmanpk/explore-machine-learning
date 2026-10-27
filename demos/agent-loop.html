@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Think, Act, Look · Explore ML</title>
+  <meta name="description" content="Watch an agent think, use a tool, look at the result, and repeat. Then break a tool and see if it recovers.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    @media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cp-head h3 { margin: 0; }
+    .toy { font-size: .8rem; font-weight: 800; color: var(--muted); background: var(--bg-2); border: 2px dashed var(--line); border-radius: 10px; padding: 4px 8px; margin: 8px 0 0; }
+    .opt { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 10px; min-height: 34px; cursor: pointer; }
+    .opt:focus-visible, .sel:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .opt.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sel { font: inherit; font-weight: 700; padding: 6px 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); max-width: 100%; }
+    .txt { width: 100%; font: inherit; font-weight: 700; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+    .mono { font-family: var(--font-mono); }
+    .pill { display: inline-block; font-family: var(--font-mono); font-weight: 700; font-size: .82rem; background: var(--bg-2); border: 2px solid var(--line); border-radius: 8px; padding: 1px 6px; overflow-wrap: anywhere; }
+    .pill.bad { border-color: var(--bad); color: var(--bad); } .pill.good { border-color: var(--good); color: var(--good); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+    .tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+    .tool { background: var(--bg-2); border: 2px solid var(--line); border-radius: 12px; padding: 6px 8px; display: grid; gap: 4px; font-weight: 800; font-size: .86rem; }
+    .tool.broken { border-color: var(--bad); } .tool.flaky { border-color: var(--warn); }
+    .turn { border: 2px solid var(--line); border-radius: 14px; background: var(--card); padding: 8px 10px; display: grid; gap: 4px; margin-bottom: 8px; }
+    .turn.fail { border-color: var(--bad); } .turn.final { border-color: var(--good); background: color-mix(in srgb, var(--good) 10%, var(--card)); }
+    .turn.final.bad { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--card)); }
+    .turn .row { display: grid; grid-template-columns: 74px 1fr; gap: 6px; align-items: baseline; font-size: .92rem; }
+    .turn .lab { font-weight: 800; color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+    .turn .n { font-family: var(--font-head); font-weight: 600; }
+    .ttl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="agents" data-demo="agent-loop">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="robot"></i> Agents &amp; Tools</span>
+      <h1>Think, <span class="em">Act</span>, Look</h1>
+      <p class="hero-sub">An agent is a helper that works in little loops: think, do something with a tool, look at what happened. Break a tool and see what it does!</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Press <b>Step</b> to watch one loop at a time. I am a <b>toy</b> brain made of simple rules, not a real language model, but the loop is real!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="robot"></i> The agent's diary <span class="muted" id="goal"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="step"><i data-icon="step"></i> Step</button>
+            <button class="btn small" id="runall"><i data-icon="play"></i> Run all</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Restart</button>
+          </div>
+        </div>
+        <div class="ttl" id="tasks" role="group" aria-label="Pick a task"></div>
+        <div id="trace" aria-live="polite"></div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Scoreboard</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Turns</div><div class="v" id="s-turns">0 / 8</div></div>
+            <div class="stat"><div class="k">Tool errors</div><div class="v" id="s-err" style="color:var(--bad)">0</div></div>
+            <div class="stat"><div class="k">Outcome</div><div class="v" id="s-out" style="font-size:1rem">working</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Break a tool</h3>
+          <div class="tools" id="tools"></div>
+          <p class="muted" style="margin:8px 0 0;font-size:.86rem;font-weight:700"><b>Broken</b> always fails. <b>Flaky</b> fails only the first time it is used.</p>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+          <p class="toy">Toy brain: the thoughts come from simple if-then rules, not a real language model.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-solve"><span class="tick"></span><span>Finish a task with every tool working.</span></div>
+      <div class="chal" id="c-flaky"><span class="tick"></span><span>Make a tool flaky and watch the agent retry and still get the right answer.</span></div>
+      <div class="chal" id="c-backup"><span class="tick"></span><span>Break the <b>clock</b> and watch the agent find the date another way.</span></div>
+      <div class="chal" id="c-honest"><span class="tick"></span><span>Break <b>lookup</b>. The agent has no way around it, so see it stop and say so, not make something up.</span></div>
+      <div class="chal" id="c-all"><span class="tick"></span><span>Solve all three tasks.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>An agent works in a loop: it <b>thinks</b>, <b>acts</b> by calling a tool, then <b>looks</b> at what came back.</li>
+      <li>What it sees changes what it does next. A tool error made it retry or use a backup.</li>
+      <li>When nothing worked it stopped and said so. That honesty is a feature.</li>
+      <li>A turn limit stops loops that never end.</li>
+      <li>The thinking here is a toy made of rules. In real agents a language model writes the thoughts, but the loop around it works the same way.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is the <span class="term">ReAct</span> pattern (Yao et al., 2022): interleave <span class="term">reasoning</span> (a thought), an <span class="term">action</span> (a tool call with arguments) and an <span class="term">observation</span> (the tool's output), appended to the transcript the next thought is conditioned on.</p>
+        <ul>
+          <li><b>Toy stand-in:</b> the thought is chosen by a hand-written policy over a list of steps, not by a language model. The loop, tool calls, error handling and turn budget are real code. A real agent asks a model for the next thought and action given the transcript so far.</li>
+          <li><span class="term">Error handling</span>: on a failed observation the policy retries once (transient fault), then switches to a <span class="term">fallback tool</span>, then gives up. Giving up honestly beats <span class="term">hallucinating</span> an answer.</li>
+          <li>A <span class="term">max-turns</span> budget bounds cost and prevents infinite loops. Real systems also add timeouts, retries with backoff, and validation of tool arguments.</li>
+          <li>Tools return strings; the agent parses them. Dates are counted as whole UTC days between two ISO dates.</li>
+        </ul>
+        <p>Further reading: Yao et al., <i>ReAct: Synergizing Reasoning and Acting in Language Models</i> (2022).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/agent-loop-core.js"></script>
+  <script src="js/agent-loop.js"></script>
+</body>
+</html>

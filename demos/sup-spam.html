@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spam Filter · Explore ML</title>
+  <meta name="description" content="Sort messages into spam and fine, and watch a robot learn which words are suspicious.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .pile { max-height: 560px; overflow-y: auto; display: grid; gap: 6px; padding: 2px 4px 2px 2px; }
+    .msg { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 6px 8px; }
+    .msg.sel { border-color: var(--accent); }
+    .msg.l-spam { background: color-mix(in srgb, var(--bad) 10%, var(--card)); }
+    .msg.l-fine { background: color-mix(in srgb, var(--good) 10%, var(--card)); }
+    .mtxt { all: unset; cursor: pointer; font-weight: 700; font-size: .92rem; line-height: 1.25; padding: 2px; border-radius: 8px; overflow-wrap: anywhere; }
+    .mtxt:focus-visible { outline: 3px solid var(--accent); }
+    .mbtns { display: flex; gap: 4px; }
+    .mbtns button { font: inherit; font-weight: 800; font-size: .78rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 10px; min-height: 32px; cursor: pointer; }
+    .mbtns button.on.sp { background: var(--bad); border-color: var(--bad); color: #fff; }
+    .mbtns button.on.fn { background: var(--good); border-color: var(--good); color: #fff; }
+    .pmeter { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .pbar { flex: 1; height: 8px; border-radius: 6px; background: color-mix(in srgb, var(--good) 35%, var(--line)); overflow: hidden; }
+    .pbar i { display: block; height: 100%; background: var(--bad); width: 50%; transition: width .25s; }
+    .pp { min-width: 5.5em; text-align: right; font-family: var(--font-mono); }
+    .newtag { font-size: .65rem; background: var(--warn); color: #000; border-radius: 6px; padding: 0 5px; margin-right: 4px; font-weight: 800; }
+    .cloud { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-height: 70px; line-height: 1.15; }
+    .cloud span { font-family: var(--font-head); font-weight: 600; }
+    .cloud.empty::before { content: "No clues yet. Mark a message as Spam or Fine!"; color: var(--muted); font-weight: 700; font-size: .9rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .wchip { border-radius: 10px; padding: 3px 8px; font-weight: 800; font-size: .86rem; border: 2px solid transparent; }
+    .wchip small { font-family: var(--font-mono); font-weight: 700; margin-left: 4px; }
+    .wchip.unk { background: var(--bg-2); border-color: var(--line); color: var(--muted); }
+    #chart { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    #own { width: 100%; font: inherit; font-weight: 700; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    @media (prefers-reduced-motion: reduce) { .pbar i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="sup" data-demo="sup-spam">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="teacher"></i> Supervised Learning</span>
+      <h1>Spam <span class="em">Filter</span></h1>
+      <p class="hero-sub">Junk messages use sneaky words. Sort a few messages by hand and watch a robot work out which words are the suspicious ones.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Here is a pile of messages. Tap <b>Spam</b> or <b>Fine</b> on a few of them. I will tell you which words you were looking at, and start learning too!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="chat"></i> The message pile <span class="muted" id="pilecount"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="robot"><i data-icon="play"></i> Robot, learn from all</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <div class="pile" id="pile"></div>
+        <p class="muted" style="margin:8px 4px 0; font-size:.88rem; font-weight:700">The bar under each message is the robot's guess, how likely it is spam. Tap a message to peek inside the robot's head.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="pencil"></i> Type your own message</h3>
+          <input id="own" type="text" maxlength="90" placeholder="Try: free candy click now" autocomplete="off" aria-label="Type a message to score">
+          <div class="row" style="margin-top:8px"><div class="pbar"><i id="own-bar"></i></div><b class="pp" id="own-p">50%</b></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Held-out test <span class="muted" style="font-size:.8rem">(40 secret messages)</span></h3>
+          <div class="three">
+            <div class="stat"><div class="k">Right</div><div class="v" id="acc">50%</div></div>
+            <div class="stat"><div class="k">False alarms</div><div class="v" id="fa" style="color:var(--bad)">0</div></div>
+            <div class="stat"><div class="k">Missed spam</div><div class="v" id="miss" style="color:var(--warn)">0</div></div>
+          </div>
+          <div class="chart-box" style="margin-top:8px"><canvas id="chart"></canvas></div>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>accuracy as it learns</span><span><i style="background:var(--warn)"></i>marks a challenge</span></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="search"></i> Word scores <span class="muted" style="font-size:.8rem">(<span style="color:var(--bad)">spam</span> / <span style="color:var(--good)">fine</span>)</span></h3>
+          <div class="cloud empty" id="cloud"></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-teach"><span class="tick"></span><span>Teach it well: get 90% right on the secret test messages.</span></div>
+      <div class="chal" id="c-tiny"><span class="tick"></span><span>Tiny teacher: get 75% or more with only 2 to 5 labelled messages. Pick them wisely!</span></div>
+      <div class="chal" id="c-sneak"><span class="tick"></span><span>Sneaky spammer: after training, switch it on. Spam with fake spellings fools the robot!</span></div>
+      <div class="chal" id="c-retrain"><span class="tick"></span><span>Fight back: label the new sneaky messages (or press Robot) until it catches 80% again.</span></div>
+      <div class="chal" id="c-topic"><span class="tick"></span><span>New topic: normal chat that uses words like FREE. Watch the false alarms climb to 3 or more.</span></div>
+      <div class="chal" id="c-fix"><span class="tick"></span><span>Fix the false alarms: teach it the new messages are Fine until there are 2 or fewer.</span></div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn small" id="m-sneaky"><i data-icon="bug"></i> Sneaky spammer</button>
+        <button class="btn small" id="m-topic"><i data-icon="gift"></i> New topic with FREE words</button>
+        <button class="btn small" id="m-plain"><i data-icon="shuffle"></i> Back to normal test</button>
+        <button class="btn small" id="m-tiny"><i data-icon="minus"></i> Forget everything (tiny set)</button>
+      </div>
+      <p class="muted" id="mode-note" style="margin:8px 0 0; font-weight:700; font-size:.9rem"></p>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Every time you marked a message, the robot counted which words showed up in spam and which in fine messages.</li>
+      <li>Words like FREE and CLICK got a high spam score. Words like HOMEWORK and LUNCH got a high fine score.</li>
+      <li>To judge a message it adds up the scores of its words. Big total means probably spam.</li>
+      <li>The test messages were hidden, so the accuracy line is honest, just like a real exam.</li>
+      <li>Sneaky spellings and new topics fooled it, because it only knows the words it has seen. More labelled examples fix that.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a <span class="term">multinomial Naive Bayes</span> classifier on a <span class="term">bag of words</span>: each message becomes a list of lowercase word counts and word order is ignored. "Naive" because it assumes words are independent given the class: <code>P(spam | words) ∝ P(spam) · ∏ P(word | spam)</code>.</p>
+        <ul>
+          <li>It is trained <span class="term">incrementally</span>: each label just updates counts, so it is exact and instant. Un-marking a message subtracts its counts.</li>
+          <li><span class="term">Laplace (add-one) smoothing</span>: <code>P(w | c) = (count(w, c) + 1) / (total words in c + V)</code>, so a word never seen in one class does not zero the whole product. <code>V</code> is the vocabulary size so far.</li>
+          <li>We work in <span class="term">log-odds</span>: <code>log P(spam)/P(fine) + Σ log P(w|spam)/P(w|fine)</code>. Sums are stable and each word's term is its colour-coded score. Probability = <code>1 / (1 + e<sup>−total</sup>)</code>. Words never seen are skipped.</li>
+          <li>Accuracy is measured on <span class="term">held-out</span> messages. Misspellings and <span class="term">distribution shift</span> (a new topic) break the word statistics; retraining on fresh labels repairs them.</li>
+          <li>Accuracy hides the kinds of error. <span class="term">Precision</span> = of messages flagged spam, how many really were (false alarms hurt this). <span class="term">Recall</span> = of real spam, how many were caught (misses hurt this). The next lesson digs into both.</li>
+        </ul>
+        <p>Further reading: Jurafsky and Martin, <i>Speech and Language Processing</i>, ch. 4 (Naive Bayes) · Paul Graham, <i>A Plan for Spam</i> (2002).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/sup-spam-core.js"></script>
+  <script src="js/sup-spam.js"></script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Random Surfer · Explore ML</title>
+  <meta name="description" content="Send a random surfer around a tiny web and watch the pages she visits most turn out to be the most important ones: that is PageRank.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #web { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); cursor: pointer; touch-action: manipulation; }
+    .people { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .people button { font: inherit; font-weight: 800; font-size: .78rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 3px 9px; min-height: 30px; cursor: pointer; }
+    .people button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 2px 0 var(--accent); }
+    .people button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .four { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .rows { display: grid; gap: 5px; }
+    .rrow { display: grid; grid-template-columns: 6.2em 1fr; gap: 2px 8px; align-items: center; font-weight: 800; font-size: .8rem; }
+    .rrow.mine { color: var(--accent); }
+    .rrow .bars { display: grid; gap: 2px; }
+    .bar { height: 8px; border-radius: 5px; background: var(--bg-2); position: relative; overflow: hidden; }
+    .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+    .bar.pr i { background: var(--warn); }
+    .rrow .n { text-align: right; font-family: var(--font-mono); color: var(--muted); font-weight: 700; }
+    .ctl { display: grid; gap: 4px; margin: 6px 0; font-weight: 800; font-size: .9rem; }
+    .ctl input[type=range] { width: 100%; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+  </style>
+</head>
+<body data-page="demo" data-topic="graphs" data-demo="graph-pagerank">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="network"></i> Graphs, Ranking &amp; Search</span>
+      <h1>The Random <span class="em">Surfer</span></h1>
+      <p class="hero-sub">A surfer clicks random links around a tiny web. The pages she lands on most often are the ones the web "votes" as important.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Press <b>Surf</b> and watch the surfer hop from page to page. Can you spot which page she keeps coming back to?</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="map"></i> A tiny web</h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="play"><i data-icon="play"></i> Surf</button>
+            <button class="btn small" id="burst"><i data-icon="zap"></i> +1000 steps</button>
+            <button class="btn ghost small" id="resetc"><i data-icon="reset"></i> Reset counts</button>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="web" role="img" aria-label="A small web of 8 pages joined by one-way links, with a random surfer moving along them. Use the page buttons below to edit links."></canvas></div>
+        <p class="muted" id="hint" style="margin:8px 4px 0; font-size:.88rem; font-weight:700">Edit the web: tap a page, then tap another page to add (or remove) a link from the first to the second. Node size is its PageRank.</p>
+        <div class="people" id="pages" role="group" aria-label="Pick a page"></div>
+        <div class="ctl">
+          <label for="damp">Chance she keeps clicking links: <b data-for="damp"></b></label>
+          <input type="range" id="damp" min="0.5" max="0.95" step="0.05" value="0.85">
+          <label for="speed">Surfer speed: <b data-for="speed"></b></label>
+          <input type="range" id="speed" min="1" max="40" step="1" value="6">
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Surfer vs. maths</h3>
+          <div class="four">
+            <div class="stat"><div class="k">Surfer steps</div><div class="v" id="steps">0</div></div>
+            <div class="stat"><div class="k">Gap to PageRank</div><div class="v" id="gap">-</div></div>
+            <div class="stat"><div class="k">Iteration</div><div class="v" id="iter">0</div></div>
+            <div class="stat"><div class="k">Your Bike Shop</div><div class="v" id="myrank">-</div></div>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn small" id="it1"><i data-icon="step"></i> Iterate once</button>
+            <button class="btn small" id="settle"><i data-icon="play"></i> Run until settled</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Share of visits</h3>
+          <div class="legend" style="margin-bottom:6px"><span><i style="background:var(--accent)"></i>surfer</span><span><i style="background:var(--warn)"></i>power iteration</span></div>
+          <div class="rows" id="rows"></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="bug"></i> Cheat: a link farm</h3>
+          <p class="muted" style="margin:0 0 8px; font-weight:700; font-size:.9rem">Make 6 junk pages whose only job is to link to the Bike Shop.</p>
+          <button class="btn small" id="farm" aria-pressed="false"><i data-icon="plus"></i> Add the link farm</button>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-surf"><span class="tick"></span><span>Let her surf: reach 1000 steps with the surfer within 6% of the true PageRank.</span></div>
+      <div class="chal" id="c-iter"><span class="tick"></span><span>Do the maths: press "Run until settled" and watch the orange bars stop moving.</span></div>
+      <div class="chal" id="c-damp"><span class="tick"></span><span>Make her restless: slide the click chance to 0.55 or below and watch the pages even out.</span></div>
+      <div class="chal" id="c-boost"><span class="tick"></span><span>Boost your page: use links alone to make the Bike Shop the number one page.</span></div>
+      <div class="chal" id="c-farm"><span class="tick"></span><span>Try the cheat: add the link farm and watch the Bike Shop's PageRank jump by a quarter or more.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The surfer follows a random link, but now and then gets bored and jumps to any page. Pages with many good pages linking to them are visited more.</li>
+      <li>The visit counts settle towards a fixed set of shares. Those shares are the PageRank of each page.</li>
+      <li>The orange bars get the same answer without any surfer: each page repeatedly shares its score among its links until nothing changes.</li>
+      <li>Adding links to a page raised its score. A link from an important page is worth more than one from a nobody.</li>
+      <li>A link farm helps for a while, which is why real search engines work hard to spot and ignore these tricks.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>PageRank (Brin and Page, 1998) is the <span class="term">stationary distribution</span> of a <span class="term">Markov chain</span> on the link graph. With damping factor <code>d</code> and <code>N</code> pages: <code>PR(j) = (1 − d)/N + d · Σ<sub>i→j</sub> PR(i) / outdeg(i)</code>.</p>
+        <ul>
+          <li>The random surfer follows a uniformly random out-link with probability <code>d</code> and <span class="term">teleports</span> to a uniformly random page otherwise. Teleporting makes the chain <span class="term">ergodic</span>, so a unique answer exists.</li>
+          <li><span class="term">Power iteration</span> multiplies the current score vector by the transition matrix repeatedly. It converges geometrically at a rate of about <code>d</code>, which is why smaller damping settles faster. Pages with no out-links (<span class="term">dangling</span> nodes) spread their score evenly over all pages.</li>
+          <li>The surfer's visit frequencies converge to the same vector by the <span class="term">ergodic theorem</span>, with error shrinking like <code>1/√steps</code>. This is a <span class="term">Monte Carlo</span> estimate of the exact answer.</li>
+          <li>A <span class="term">link farm</span> manufactures in-links. Real engines combine PageRank with hundreds of other signals, <span class="term">TrustRank</span>-style seeds of trusted pages, and spam detection, so this simple version is easy to game and real ones are not.</li>
+          <li>The same idea ranks nodes in any graph: papers, accounts, roads, even proteins.</li>
+        </ul>
+        <p>Further reading: Brin and Page, <i>The anatomy of a large-scale hypertextual web search engine</i> · Langville and Meyer, <i>Google's PageRank and Beyond</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/graph-pagerank-core.js"></script>
+  <script src="js/graph-pagerank.js"></script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Learning Rate Race · Explore ML</title>
+  <meta name="description" content="Roll a ball downhill with different step sizes. Too tiny crawls, too big flies away. Then race four balls and add momentum.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .big-chip { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
+    .preset-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .stage .canvas-box canvas { cursor: crosshair; }
+    #chart { margin-top: 6px; border-radius: 10px; }
+    .chart-head { font-size: .78rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 12px 0 0; }
+    .board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .board li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; background: var(--bg-2); font-weight: 700; font-size: .9rem; }
+    .board li i, .lines .ln i { width: 14px; height: 14px; border-radius: 50%; flex: none; display: inline-block; }
+    .board .rk { font-family: var(--font-head); font-weight: 700; width: 1.2em; color: var(--muted); }
+    .board .nm small { color: var(--muted); font-weight: 700; }
+    .board .rs { margin-left: auto; white-space: nowrap; }
+    .lines { display: grid; gap: 6px; font-size: .9rem; }
+    .lines .ln { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: 10px; background: var(--bg-2); }
+    .lines .ln i { margin-top: 4px; }
+    .chals { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+    .chal-card { display: grid; gap: 10px; align-content: start; }
+    .chal-card h3 { display: flex; gap: 8px; align-items: center; margin: 0; }
+    .chal-card p { margin: 0; color: var(--ink-2); font-size: .92rem; }
+    .chal-card.done { border-color: var(--good); }
+    .chal-card.done h3 .ic { color: var(--good); }
+    .chal-card .btn { justify-self: start; }
+    .race-robo { margin: 0 0 14px; }
+    @media (max-width: 900px) { .stage .panel { order: 2; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="nn" data-demo="nn-lr">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="zap"></i> Neural Networks</span>
+      <h1>Learning <span class="em">Rate Race</span></h1>
+      <p class="hero-sub">A ball rolls downhill to find the lowest spot. How big should each step be? Too tiny and it crawls. Too big and it flies away!</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Drag the ball anywhere (or tap the map), pick a <b>step size</b>, then press <b>Roll</b>.</p>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="gamepad"></i> Play: roll a ball</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv" role="img" aria-label="A hilly map with a ball that rolls downhill. Darker colors are higher ground."></canvas>
+        <div class="legend" style="margin-top:10px">
+          <span><i style="background:#ffe9a0"></i>Yellow = low (good)</span>
+          <span><i style="background:#5b3fa0"></i>Purple = high (bad)</span>
+          <span>Dashed ring = start</span>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="lr">Step size <span class="val" data-for="lr"></span></label>
+            <input type="range" id="lr" min="-3" max="0.6" step="0.01" value="-1">
+            <div class="hint">tiny ← → giant. "Just right" depends on the hill!</div>
+          </div>
+          <div class="preset-row" id="p-presets">
+            <button class="btn small" data-p="tiny">Tiny</button><button class="btn small" data-p="right">Just right</button><button class="btn small" data-p="big">Big</button><button class="btn small" data-p="giant">Giant</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="roll"><i data-icon="play"></i> Roll!</button>
+            <button class="btn ghost" id="p-reset"><i data-icon="reset"></i> Back to start</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="field"><span class="lbl">The hill</span>
+            <div class="seg" id="p-land"><button data-l="bumpy" class="on">Bumpy</button><button data-l="valley">Valley</button><button data-l="plateau">Plateau</button></div></div>
+          <div class="field"><span class="lbl">View</span>
+            <div class="seg" id="p-view"><button data-m="top" class="on">From above</button><button data-m="side">Side view</button></div></div>
+        </div>
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><div class="k">Steps</div><div class="v" id="p-steps">0</div></div>
+            <div class="stat"><div class="k">Height</div><div class="v" id="p-loss">0</div></div>
+          </div>
+          <div><span class="big-chip" id="p-state">Ready</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title" id="race"><i data-icon="trend"></i> Watch it learn: the race</h2>
+    <div class="robo-say race-robo">
+      <div class="robo"></div>
+      <p class="bubble" id="say2">Four balls, one hill, four step sizes. Press <b>Race!</b> and watch who gets home first.</p>
+    </div>
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv2" role="img" aria-label="Four colored balls racing downhill on the same map."></canvas>
+        <div class="chart-head">How high up the hill each ball is, step by step (lower is better)</div>
+        <canvas id="chart" role="img" aria-label="Line chart of each ball's height against steps."></canvas>
+        <div class="legend" style="margin-top:8px"><span><i style="background:var(--good)"></i>Challenge done</span><span>Big dot = reached the bottom</span><span>x = flew away</span></div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="r-go"><i data-icon="flag"></i> Race!</button>
+            <button class="btn ghost" id="r-reset"><i data-icon="reset"></i> Reset</button>
+          </div>
+          <div class="field"><span class="lbl">Add more racers</span>
+            <div class="preset-row">
+              <button class="btn small" id="x-mom" aria-pressed="false"><i data-icon="rocket"></i> Heavy ball</button>
+              <button class="btn small" id="x-decay" aria-pressed="false"><i data-icon="clock"></i> Slowing down</button>
+              <button class="btn small" id="x-adam" aria-pressed="false"><i data-icon="sparkles"></i> Adam-lite</button>
+            </div>
+          </div>
+          <div class="field"><span class="lbl">The hill</span>
+            <div class="seg" id="r-land"><button data-l="bumpy" class="on">Bumpy</button><button data-l="valley">Valley</button><button data-l="plateau">Plateau</button></div></div>
+          <div class="field"><span class="lbl">View</span>
+            <div class="seg" id="r-view"><button data-m="top" class="on">From above</button><button data-m="side">Side view</button></div></div>
+          <div class="field"><span class="lbl">Speed</span>
+            <div class="seg" id="r-speed"><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button></div></div>
+          <div class="stat"><div class="k">Steps</div><div class="v" id="r-steps">0</div></div>
+        </div>
+        <div class="card"><h3><i data-icon="trophy"></i> Leaderboard</h3><ol class="board" id="board"></ol></div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="lines" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="zap"></i> Challenges</h2>
+    <p class="muted" style="margin-top:-6px">Each one loads the race above. When you win, the chart marks the exact step with a dashed line.</p>
+    <div class="chals" id="chals"></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Feel the slope</h3><p>The ball checks which way is downhill and how steep it is right where it stands.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="footprints"></i></div><h3>Take a step</h3><p>It moves downhill. The <b>step size</b> decides how far: steeper ground means a longer hop.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Repeat</h3><p>Look, step, look, step. Every step should put it a little lower.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="rocket"></i></div><h3>Add some speed</h3><p>A heavy ball keeps some of its old speed, so it can zoom along valleys and roll over small dips.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The ball always stepped <b>downhill</b>. The only thing we changed was how big the step was.</li>
+      <li><b>Tiny</b> steps are safe but slow. <b>Giant</b> steps overshoot, bounce, or even fly away.</li>
+      <li>In a narrow valley plain balls <b>zig-zag</b>. A heavy ball, with a bit of speed, goes straight along it.</li>
+      <li>Starting big and getting smaller lets a ball move fast first, then settle gently.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The landscape is a <span class="term">loss function</span> <code>L(w)</code>; the ball position is the parameter vector <code>w</code>, and each step is <span class="term">gradient descent</span>: <code>w ← w − η∇L(w)</code>.</p>
+        <ul>
+          <li><b>Learning rate η:</b> the slider. On a quadratic with curvature λ the iteration is stable only for <code>η &lt; 2/λ</code>; above that each step overshoots by more than it started (<span class="term">divergence</span>). That is the "flew away" ball. Below it, convergence speed is roughly <code>1 − ηλ</code> per step, so a tiny η crawls.</li>
+          <li><b>Narrow valley:</b> the demo valley has curvature about 0.1 along the floor and 3 across it (<span class="term">ill-conditioned</span>, condition number ~30). η is capped by the steep direction, so the flat direction is slow, and large η zig-zags.</li>
+          <li><b>Momentum (heavy ball):</b> <code>v ← βv − η∇L; w ← w + v</code> with β = 0.9 to 0.95. Gradients that agree accumulate (speed along the valley); ones that flip sign cancel (less zig-zag). It can also carry the ball through shallow <span class="term">local minima</span>, as in the bumpy field.</li>
+          <li><b>Schedules:</b> "Slowing down" uses <code>η_t = η₀ / (1 + 0.04t)</code> (inverse-time decay). Large early steps for progress, small late steps to settle; cosine and step decay are common alternatives.</li>
+          <li><b>Adam-lite:</b> keeps running averages of the gradient (<code>m</code>) and its square (<code>v</code>) with bias correction, stepping <code>η·m̂/(√v̂+ε)</code>. Each parameter gets its own effective step size. Real Adam is the same idea.</li>
+          <li><b>SGD noise:</b> here gradients are exact (full batch). With mini-batches the gradient is noisy; the noise helps escape sharp minima but means a constant η never fully settles, hence decay schedules.</li>
+          <li><b>Real losses</b> have far more dimensions, with <span class="term">saddle points</span> (flat but not minima) more common than bad local minima. The step-size lesson is the same: tune η first.</li>
+          <li>Further reading: Goh, <a href="https://distill.pub/2017/momentum/" target="_blank" rel="noopener">Why Momentum Really Works</a> · Ruder, <a href="https://www.ruder.io/optimizing-gradient-descent/" target="_blank" rel="noopener">An overview of gradient descent optimization algorithms</a>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/nn-lr-core.js"></script>
+  <script src="js/nn-lr.js"></script>
+</body>
+</html>

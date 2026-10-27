@@ -28,26 +28,7 @@
   const M = 22;
   const clampPt = (x, y) => [ML.clamp(x, M, W - M), ML.clamp(y, M, H - M)];
   function add(x, y) { const [cx, cy] = clampPt(x, y); state.houses.push({ x: cx, y: cy, c: -1, pc: -1 }); }
-  const presets = {
-    blobs() {
-      const n = ML.randInt(3, 4), centers = [];
-      let guard = 0;
-      while (centers.length < n && guard++ < 500) {
-        const c = [ML.rand(90, W - 90), ML.rand(80, H - 80)];
-        if (centers.every((d) => Math.hypot(d[0] - c[0], d[1] - c[1]) > 170)) centers.push(c);
-      }
-      centers.forEach((c) => { for (let i = 0; i < 32; i++) add(c[0] + ML.randn() * 34, c[1] + ML.randn() * 34); });
-    },
-    random() { for (let i = 0; i < 110; i++) add(ML.rand(M, W - M), ML.rand(M, H - M)); },
-    ring() {
-      const cx = W / 2, cy = H / 2;
-      for (let i = 0; i < 80; i++) { const a = ML.rand(0, Math.PI * 2), r = 180 + ML.randn() * 10; add(cx + Math.cos(a) * r * 1.2, cy + Math.sin(a) * r); }
-    },
-    moons() {
-      for (let i = 0; i < 60; i++) { const a = ML.rand(0, Math.PI); add(250 + Math.cos(a) * 140 + ML.randn() * 10, 260 - Math.sin(a) * 140 + ML.randn() * 10); }
-      for (let i = 0; i < 60; i++) { const a = ML.rand(0, Math.PI); add(390 - Math.cos(a) * 140 + ML.randn() * 10, 200 + Math.sin(a) * 140 + ML.randn() * 10); }
-    },
-  };
+  const presets = KMeansCore.makePresets(W, H, add, { rand: ML.rand, randInt: ML.randInt, randn: ML.randn, random: Math.random });
   function loadPreset(name, msg) {
     stopAuto();
     state.houses = [];
@@ -76,16 +57,8 @@
     updateUI();
     setInside("start");
   }
-  function nearest(x, y, shops = state.shops) {
-    let best = 0, bd = Infinity;
-    for (let i = 0; i < shops.length; i++) { const d = (shops[i].x - x) ** 2 + (shops[i].y - y) ** 2; if (d < bd) { bd = d; best = i; } }
-    return best;
-  }
-  function avgTrip() {
-    let s = 0, n = 0;
-    for (const h of state.houses) if (h.c >= 0) { s += Math.hypot(h.x - state.shops[h.c].x, h.y - state.shops[h.c].y); n++; }
-    return n ? s / n / BLOCK : null;
-  }
+  const nearest = (x, y, shops = state.shops) => KMeansCore.nearest(x, y, shops);
+  const avgTrip = () => KMeansCore.avgTrip(state.houses, state.shops, BLOCK);
   const allAssigned = () => state.houses.length && state.houses.every((h) => h.c >= 0);
 
   function doAssign() {
@@ -110,9 +83,9 @@
   function doMove() {
     cps.unpick();
     state.shops.forEach((m, i) => {
-      const mine = state.houses.filter((h) => h.c === i);
       m.fx = m.x; m.fy = m.y;
-      if (mine.length) { m.tx = mine.reduce((s, h) => s + h.x, 0) / mine.length; m.ty = mine.reduce((s, h) => s + h.y, 0) / mine.length; }
+      const cen = KMeansCore.centroid(state.houses, i);
+      if (cen) { m.tx = cen.x; m.ty = cen.y; }
       else { m.tx = m.x; m.ty = m.y; }
     });
     state.anim = { type: "move", t: 0 };
@@ -138,30 +111,7 @@
   }
   function step() { if (state.anim) return; state.next === "assign" ? doAssign() : doMove(); }
 
-  function runKMeans(k, restarts = 4) {
-    let best = Infinity;
-    const P = state.houses;
-    for (let r = 0; r < restarts; r++) {
-      const C = [{ x: P[ML.randInt(0, P.length - 1)].x, y: P[ML.randInt(0, P.length - 1)].y }];
-      while (C.length < k) {
-        const d = P.map((p) => { let m = Infinity; for (const c of C) m = Math.min(m, (p.x - c.x) ** 2 + (p.y - c.y) ** 2); return m; });
-        let u = Math.random() * d.reduce((a, b) => a + b, 0), i = 0;
-        while (u > d[i] && i < d.length - 1) { u -= d[i]; i++; }
-        C.push({ x: P[i].x, y: P[i].y });
-      }
-      const asg = new Array(P.length).fill(0);
-      for (let it = 0; it < 40; it++) {
-        P.forEach((p, i) => (asg[i] = nearest(p.x, p.y, C)));
-        C.forEach((c, j) => {
-          let sx = 0, sy = 0, n = 0;
-          P.forEach((p, i) => { if (asg[i] === j) { sx += p.x; sy += p.y; n++; } });
-          if (n) { c.x = sx / n; c.y = sy / n; }
-        });
-      }
-      best = Math.min(best, P.reduce((a, p, i) => a + Math.hypot(p.x - C[asg[i]].x, p.y - C[asg[i]].y), 0) / P.length / BLOCK);
-    }
-    return best;
-  }
+  const runKMeans = (k, restarts = 4) => KMeansCore.runKMeans(state.houses, k, restarts, BLOCK, { rand: ML.rand, randInt: ML.randInt, randn: ML.randn, random: Math.random });
 
   // ---------- auto ----------
   let autoTimer = null;

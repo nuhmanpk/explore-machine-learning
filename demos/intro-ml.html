@@ -50,7 +50,7 @@
       <h1>What is <span class="em">machine learning?</span></h1>
       <div class="robo-say">
         <div class="robo"></div>
-        <p class="bubble" id="say">Normal programs follow rules a person wrote. I'm different: <b>show me examples</b> and I'll figure out the rule myself. Let's try it!</p>
+        <p class="bubble" id="say">Normal programs follow rules a person wrote. I'm different: <b>show me examples</b> and I'll figure out the rule myself. A crowd of monsters just arrived. <b>Tap one</b> to teach me!</p>
       </div>
     </section>
 
@@ -91,13 +91,13 @@
             <option value="bigblue">Big AND blue = friendly</option>
             <option value="me">I'll decide myself (you be the teacher)</option>
           </select>
-          <div class="hint muted" style="font-size:.85rem">Robo can't see this rule. It only sees monsters and the answers.</div>
+          <div class="hint muted" style="font-size:.85rem">Robo can't see this rule. Tap a monster and the teacher tells Robo only that monster's answer. Then watch the whole crowd change its mind!</div>
         </div>
 
         <div class="card">
-          <h3><i data-icon="play"></i> 2. Show examples</h3>
+          <h3><i data-icon="play"></i> 2. Tap monsters to teach me</h3>
           <div class="btn-row">
-            <button class="btn primary" id="next"><i data-icon="step"></i> Next monster</button>
+            <button class="btn primary" id="next"><i data-icon="step"></i> Teach one for me</button>
             <button class="btn" id="auto"><i data-icon="play"></i> Auto</button>
             <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget</button>
           </div>
@@ -107,14 +107,14 @@
           </div>
           <div class="stats">
             <div class="stat"><div class="k">Examples</div><div class="v" id="st-n">0</div></div>
-            <div class="stat"><div class="k">Last 10 right</div><div class="v" id="st-last">–</div></div>
+            <div class="stat"><div class="k">Crowd right</div><div class="v" id="st-last">–</div></div>
             <div class="stat"><div class="k">Test score</div><div class="v" id="st-test">–</div></div>
           </div>
         </div>
 
         <div class="card inside">
           <h3><i data-icon="cpu"></i> What's happening inside</h3>
-          <div class="flow" id="inside"><span class="muted">Press <b>Next monster</b> to see Robo think.</span></div>
+          <div class="flow" id="inside"><span class="muted">Tap any monster in the crowd to see Robo think.</span></div>
         </div>
 
         <div class="card">
@@ -132,7 +132,7 @@
 
     <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
     <div class="steps">
-      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Look</h3><p>Robo sees a monster: how big, how blue, how spiky, how many eyes. Just numbers!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Look</h3><p>Robo sees the monster you tapped: how big, how blue, how spiky, how many eyes. Just numbers!</p></div>
       <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Guess</h3><p>It multiplies each number by how much it cares about it, adds them up, and guesses.</p></div>
       <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Check</h3><p>Then it gets the real answer and sees how wrong it was.</p></div>
       <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Tweak</h3><p>It nudges its "how much I care" numbers a little, so next time it would be less wrong.</p></div>
@@ -142,7 +142,7 @@
     <div class="card recap">
       <ul>
         <li>Robo started knowing <b>nothing</b>, so its first guesses were coin flips.</li>
-        <li>Every example taught it a tiny bit: the bars on the right grew toward the secret rule.</li>
+        <li>Every example taught it a tiny bit: the bars on the right grew toward the secret rule. And the <b>whole crowd</b> changed faces, even monsters Robo never saw.</li>
         <li>Nobody told Robo the rule. It <b>learned it from examples</b>. That's machine learning!</li>
         <li>The tricky "big AND blue" rule takes more examples, because Robo must notice two things at once.</li>
       </ul>
@@ -170,6 +170,7 @@
 
   <script src="../js/catalog.js"></script>
   <script src="../js/common.js"></script>
+  <script src="js/intro-ml-core.js"></script>
   <script src="js/intro-ml.js"></script>
 </body>
 </html>

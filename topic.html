@@ -37,6 +37,10 @@
     .word { background: var(--card); border: 3px solid var(--line); border-radius: 18px; padding: 14px 16px; }
     .word b { font-family: var(--font-head); font-size: 1.1rem; color: var(--accent); display: block; }
     .word span { color: var(--ink-2); font-weight: 600; }
+    .lesson-tiles .tile { min-height: 0; }
+    .lesson-search { position: relative; max-width: 420px; margin: 0 0 16px; }
+    .lesson-search [data-icon], .lesson-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+    .lesson-search input { width: 100%; padding-left: 44px; }
     .path { display: grid; gap: 14px; position: relative; }
     .path-item {
       display: grid; grid-template-columns: 64px 1fr auto; gap: 16px; align-items: center; text-decoration: none;
@@ -74,13 +78,14 @@
     <h2 class="section-title"><i data-icon="book"></i> Words to know</h2>
     <div class="words" id="words"></div>
 
-    <h2 class="section-title"><i data-icon="gamepad"></i> Lessons, in order</h2>
-    <div class="path" id="demo-tiles"></div>
-
-    <div id="also" class="hidden">
-      <h2 class="section-title"><i data-icon="trophy"></i> More learning games from earlier chapters</h2>
-      <div class="path" id="also-tiles"></div>
+    <div id="chap-prog"></div>
+    <h2 class="section-title"><i data-icon="gamepad"></i> Explore with Games <span class="chip accent" id="games-count" style="font-size:.85rem; vertical-align:middle"></span></h2>
+    <div class="lesson-search">
+      <i data-icon="search"></i>
+      <input type="text" id="lesson-search" placeholder="Search games by name or description" aria-label="Search games by name or description" autocomplete="off">
     </div>
+    <div class="tiles lesson-tiles" id="demo-tiles"></div>
+    <p class="muted hidden" id="no-match" style="text-align:center;font-weight:800">No game matches that name. Try another word!</p>
 
     <div id="chapter-nav"></div>
   </main>
@@ -116,23 +121,38 @@
     document.getElementById("t-tag").textContent = t.tagline;
     document.getElementById("t-analogy").textContent = t.analogy;
     document.getElementById("say").textContent = t.kid;
-    document.getElementById("demo-tiles").innerHTML = t.demos.map((d, i) => `
-      <a class="path-item" href="demos/${d.id}.html">
-        <div class="num"><b>${ti}.${i + 1}</b>${ML.icon(d.icon)}</div>
-        <div><h3>${d.name}</h3><p>${d.kid}</p>
-          <div class="t-meta" style="margin-top:8px"><span class="chip">${ML.icon("clock")} ${d.time}</span>${d.star ? '<span class="chip accent">Most fun</span>' : ""}</div></div>
-        <span class="go">${ML.icon("arrow-right")}</span>
+    // One list in lesson-number order. Chapters that also feature games from earlier chapters
+    // (alsoPlay) fold them in, so the page shows a single sequence.
+    const items = t.demos.map((d, i) => ({ d, chapter: ti, no: i + 1 }));
+    (t.alsoPlay || []).forEach((id) => {
+      const f = findDemo(id);
+      items.push({ d: f.demo, chapter: f.chapter, no: f.index + 1 });
+    });
+    items.sort((x, y) => x.chapter - y.chapter || x.no - y.no);
+    document.getElementById("games-count").textContent = items.length;
+    document.getElementById("demo-tiles").innerHTML = items.map(({ d, chapter, no }) => `
+      <a class="tile" href="demos/${d.id}.html" style="--c:${CATALOG[chapter].color}">
+        <span class="ribbon">${chapter}.${no}</span>${ML.progress.badge(d.id)}
+        <div class="t-emoji">${ML.icon(d.icon)}</div>
+        <h3>${d.name}</h3>
+        <p>${d.kid}</p>
+        <div class="t-meta"><span class="chip accent">${ML.icon("clock")} ${d.time}</span></div>
+        <div class="go">Start lesson <span>${ML.icon("arrow-right")}</span></div>
       </a>`).join("");
-    if (t.alsoPlay) {
-      document.getElementById("also").classList.remove("hidden");
-      document.getElementById("also-tiles").innerHTML = t.alsoPlay.map((id) => {
-        const f = findDemo(id);
-        return `<a class="path-item" href="demos/${id}.html">
-          <div class="num"><b>${f.chapter}.${f.index + 1}</b>${ML.icon(f.demo.icon)}</div>
-          <div><h3>${f.demo.name}</h3><p>${f.demo.kid}</p></div>
-          <span class="go">${ML.icon("arrow-right")}</span></a>`;
-      }).join("");
+    {
+      const c = ML.progress.count(t);
+      document.getElementById("chap-prog").innerHTML = ML.progress.bar(`Progress in ${t.name}`, c.done, c.total).replace('class="prog"', 'class="prog big"') + `<p style="margin:0">${ML.progress.resetLink()}</p>`;
     }
+    document.getElementById("lesson-search").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      let shown = 0;
+      document.querySelectorAll("#demo-tiles .tile").forEach((el) => {
+        const hit = !q || el.textContent.toLowerCase().includes(q);
+        el.classList.toggle("hidden", !hit);
+        if (hit) shown++;
+      });
+      document.getElementById("no-match").classList.toggle("hidden", shown > 0);
+    });
     const prev = CATALOG[ti - 1], next = CATALOG[ti + 1];
     const nav = document.getElementById("chapter-nav");
     nav.className = "next-nav";

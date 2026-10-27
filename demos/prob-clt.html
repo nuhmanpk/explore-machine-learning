@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Averages Get Bell-Shaped · Explore ML</title>
+  <meta name="description" content="Take averages of random numbers from weird distributions and watch a bell curve appear, then build a confidence interval with a formula or the bootstrap.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .st3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .st3 .stat .v { font-size: 1.3rem; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cv { width: 100%; display: block; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .panel .card, .canvas-box { min-width: 0; }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .bar { height: 14px; border-radius: 8px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tags span { background: var(--bg-2); border: 2px solid var(--line); border-radius: 10px; padding: 2px 8px; font-weight: 800; font-size: .82rem; font-family: var(--font-mono); }
+    .tags span.p { border-color: var(--bad); } .tags span.n { border-color: var(--good); }
+
+    @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="prob" data-demo="prob-clt">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="dice"></i> Probability &amp; Uncertainty</span>
+      <h1>Averages Get <span class="em">Bell-Shaped</span></h1>
+      <p class="hero-sub">Pick a lumpy, lopsided source of random numbers. Average a few at a time and watch a smooth bell curve appear.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Start with <b>1 number per average</b> and collect some. Then slide it up and watch the lumps melt into a bell!</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="noise"></i> The weird source</h3>
+          <div class="seg" role="group" aria-label="Pick a source distribution">
+            <button type="button" data-src="flat" class="on" aria-pressed="true">Flat</button>
+            <button type="button" data-src="skewed" aria-pressed="false">Skewed</button>
+            <button type="button" data-src="humps" aria-pressed="false">Two humps</button>
+          </div>
+        </div>
+        <canvas id="src" class="cv" aria-label="Histogram of the source distribution."></canvas>
+        <h3 style="margin:14px 0 8px"><i data-icon="trend"></i> Averages of <span id="n-lbl">1</span> draws</h3>
+        <canvas id="means" class="cv" aria-label="Histogram of many sample averages, with a bell curve for comparison."></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>your averages</span><span><i style="background:var(--warn)"></i>perfect bell curve</span></div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn primary small" id="m100"><i data-icon="plus"></i> 100 averages</button>
+          <button class="btn small" id="m2k"><i data-icon="zap"></i> 2,000 averages</button>
+          <button class="btn ghost small" id="mreset"><i data-icon="reset"></i> Clear</button>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="n">How many numbers in each average? <span class="val"><b data-for="n"></b></span></label>
+            <input type="range" id="n" min="1" max="100" step="1" value="1">
+            <div class="hint">Each average takes this many random draws and finds their middle.</div>
+          </div>
+          <div class="st3" style="margin-top:10px">
+            <div class="stat"><div class="k">Averages</div><div class="v" id="cnt">0</div></div>
+            <div class="stat"><div class="k">Spread</div><div class="v" id="spr">-</div></div>
+            <div class="stat"><div class="k">Lopsided</div><div class="v" id="skw">-</div></div>
+          </div>
+          <p class="muted" id="spr-note" style="margin:8px 0 0; font-size:.86rem; font-weight:700"></p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="ruler"></i> How sure is one sample?</h3>
+          <div class="seg" role="group" aria-label="Interval method" style="margin-bottom:8px">
+            <button type="button" data-m="formula" class="on" aria-pressed="true">Formula</button>
+            <button type="button" data-m="boot" aria-pressed="false">Bootstrap</button>
+          </div>
+          <canvas id="ci" class="cv" aria-label="One sample with its confidence interval."></canvas>
+          <p class="muted" id="ci-txt" style="margin:6px 0; font-weight:700; font-size:.9rem" aria-live="polite">Take one sample to build an interval.</p>
+          <div class="btn-row">
+            <button class="btn small primary" id="one"><i data-icon="dice"></i> Take one sample</button>
+            <button class="btn small" id="cov"><i data-icon="repeat"></i> Try 200 times</button>
+          </div>
+          <p class="muted" id="cov-txt" style="margin:6px 0 0; font-weight:700; font-size:.9rem"></p>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-narrow"><span class="tick"></span><span>Shrink the spread: collect 500 averages of at least 5 numbers. The bell gets half as wide as the source.</span></div>
+      <div class="chal" id="c-bell"><span class="tick"></span><span>Tame the skew: pick Skewed, use 60+ numbers per average and collect 1,000 averages. The lopsidedness drops under 0.4.</span></div>
+      <div class="chal" id="c-humps"><span class="tick"></span><span>Fill the valley: pick Two humps, use 10+ numbers, and 500 averages. The averages pile up in the middle where the source has nothing!</span></div>
+      <div class="chal" id="c-boot"><span class="tick"></span><span>Pull yourself up: switch to Bootstrap and take a sample of 10 or more.</span></div>
+      <div class="chal" id="c-ci"><span class="tick"></span><span>Keep the promise: with 30+ numbers, press Try 200 times. A 95% interval should catch the truth 85% to 99% of the time.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Flat, skewed or two-humped, the source can look any way. The averages of many draws still form the same bell shape.</li>
+      <li>One average is noisy. Averages of bigger groups are steadier: the bell gets narrower as the group grows.</li>
+      <li>That is why a poll of 1,000 people tells you a lot even though the country has millions.</li>
+      <li>A confidence interval says "the truth is probably in here", and the claim really comes true about 95 times out of 100.</li>
+      <li>The bootstrap gets an interval with no formula: pretend your sample is the whole world and redraw from it again and again.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The <span class="term">central limit theorem</span>: for independent draws with finite mean μ and variance σ², the sample mean of n draws is approximately <code>Normal(μ, σ² / n)</code> for large n, whatever the source. The spread of the averages (the <span class="term">standard error</span>) is <code>σ / √n</code>, the same 1/√n as in the Monte Carlo lesson.</p>
+        <ul>
+          <li>"Lopsided" is the sample <span class="term">skewness</span>. A skewed source with skewness γ gives averages with skewness about <code>γ / √n</code>, so the lopsidedness shrinks as n grows. Heavy-tailed sources (infinite variance) break the theorem.</li>
+          <li>The formula interval is <code>x̄ ± 1.96 · s / √n</code>. Its claim is about the <i>procedure</i>: over many samples about 95% of such intervals contain μ. It does not say "95% chance for this one interval". At small n with a skewed source it under-covers slightly, because s is itself noisy.</li>
+          <li>The <span class="term">bootstrap</span> (Efron, 1979) resamples the observed sample with replacement 1,000 times (here 300 in the 200-trial test), and takes the 2.5th and 97.5th percentiles of the resampled means (<span class="term">percentile interval</span>). It needs no formula, which helps for medians, ratios and other messy statistics.</li>
+          <li>The bell curve overlay is the CLT prediction using the source's true mean and sd, measured from a fixed sample of 60,000 draws.</li>
+        </ul>
+        <p>Further reading: Efron and Tibshirani, <i>An Introduction to the Bootstrap</i> · Seeing Theory (Brown University), <i>Central Limit Theorem</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/prob-clt-core.js"></script>
+  <script src="js/prob-clt.js"></script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Map of Pictures · Explore ML</title>
+  <meta name="description" content="A neural network arranges pictures on a 2-D map. Click anywhere to draw a new picture, and slide between two pictures.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .three { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cp-head h3 { margin: 0; }
+    .cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; touch-action: none; }
+    .cv.pick { cursor: crosshair; }
+    .cv:focus-visible { outline: 3px solid var(--accent); }
+    .note { margin: 8px 4px 0; font-size: .88rem; font-weight: 700; color: var(--muted); }
+    .kchips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .kbtn { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px; min-height: 36px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .kbtn[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--card)); }
+    .kbtn:focus-visible { outline: 3px solid var(--accent); }
+    .kbtn i.sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .tag { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+    input[type=range] { width: 100%; }
+  </style>
+</head>
+<body data-page="demo" data-topic="gen" data-demo="gen-latent">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="palette"></i> Generative Models</span>
+      <h1>Map of <span class="em">Pictures</span></h1>
+      <p class="hero-sub">Squeeze every picture into just two numbers and you can plot it on a map. Click anywhere on the map and the network draws what lives there.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I am learning a little map. Similar pictures should end up close together. When the dots settle, <b>click or drag</b> on the map and I will draw that spot!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3><i data-icon="map"></i> The map <span class="muted" id="state"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="play"><i data-icon="pause"></i> Pause</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> New map</button>
+          </div>
+        </div>
+        <canvas class="cv pick" id="map" tabindex="0" role="img" aria-label="Map of pictures. Click or drag, or use the arrow keys, to choose a spot to draw."></canvas>
+        <div class="legend" id="legend" style="margin-top:8px"></div>
+        <p class="note">Faint tiles show what the network draws at each spot. Dots are the pictures it learned from. Arrow keys move the spot too.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="eye"></i> What lives at your spot?</h3>
+          <div class="two"><canvas class="cv" id="out" role="img" aria-label="The picture drawn at your spot"></canvas>
+          <div class="inside-body" id="info" style="font-weight:700;font-size:.92rem"></div></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Is the map tidy?</h3>
+          <div class="three"><div class="stat"><div class="k">Tidy</div><div class="v" id="s-tidy">-</div></div><div class="stat"><div class="k">Error</div><div class="v" id="s-err">-</div></div><div class="stat"><div class="k">Steps</div><div class="v" id="s-steps">-</div></div></div>
+          <p class="note" style="margin:0">Tidy = how often a dot's 5 nearest dots are the same shape.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="shuffle"></i> Slide between two pictures</h3>
+          <div class="btn-row"><button class="btn small" id="pa"><i data-icon="dice"></i> New A</button><button class="btn small" id="pb"><i data-icon="dice"></i> New B</button></div>
+          <div class="field">
+            <label for="mix">From A to B <b class="val" data-for="mix"></b></label>
+            <input type="range" id="mix" min="0" max="100" step="1" value="0">
+          </div>
+          <canvas class="cv" id="strip" role="img" aria-label="Pictures along the path from A to B, drawn by the network (top) and by plain cross-fading (bottom)"></canvas>
+          <p class="note" style="margin:0">Top row: walk across the map. Bottom row: just fade one picture into the other.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-tidy"><span class="tick"></span><span>Tidy map: train until at least 65% of dots have neighbours of the same shape.</span></div>
+      <div class="chal" id="c-kinds"><span class="tick"></span><span>Explorer: click spots on the map that the network says look like 4 different shapes.</span></div>
+      <div class="chal" id="c-blend"><span class="tick"></span><span>Blend: press New A and New B until the two kinds differ, then slide the mix to the middle.</span></div>
+      <div class="chal" id="c-gap"><span class="tick"></span><span>Empty land: click a spot far from every dot and see what the network invents there.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Each picture became just <b>two numbers</b>, so it could be a dot on a flat map. Nobody told the network which shapes exist, but similar shapes still landed near each other.</li>
+      <li>The second half of the network turns any spot on the map back into a picture, even a spot where no real picture was.</li>
+      <li>Sliding along the map gives a smooth change of shape. Plain cross-fading just makes a ghostly double image.</li>
+      <li>Far from the dots the drawings get odd, because the network never practised there. That is exactly the problem the next lesson fixes.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The 2-unit bottleneck of this <span class="term">autoencoder</span> (<code>64 → 32 → 2 → 32 → 64</code>) is a <span class="term">latent space</span>: a learned low-dimensional coordinate system for the data. The encoder maps a picture to a point; the decoder maps any point back to a picture.</p>
+        <ul>
+          <li>It is trained only to reconstruct. Clustering by shape is a side-effect: the encoder must give different pictures different codes, and similar pictures need similar codes to be rebuilt similarly.</li>
+          <li>"Tidy" is a leave-one-out <span class="term">k-nearest-neighbours</span> check (k = 5) on the 360 training points. With 6 overlapping classes and only 2 dimensions, perfect is not expected.</li>
+          <li><span class="term">Interpolation</span>: decoding points on a straight line between two codes gives smooth in-betweens. Pixel cross-fading is linear in pixel space and just blends the two images.</li>
+          <li>A plain autoencoder places no rule on empty areas of the map, so decoded pictures there can be junk. <span class="term">Variational</span> autoencoders add such a rule.</li>
+        </ul>
+        <p>Further reading: Bengio, Courville and Vincent, <i>Representation Learning: A Review and New Perspectives</i> (2013).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/gen-latent-core.js"></script>
+  <script src="js/gen-latent.js"></script>
+</body>
+</html>

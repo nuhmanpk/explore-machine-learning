@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Update Your Belief · Explore ML</title>
+  <meta name="description" content="Count a crowd of 1000 dots to see why a positive test is often a false alarm, then update your belief with every new result.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .st3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .st3 .stat .v { font-size: 1.3rem; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cv { width: 100%; display: block; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    .panel .card, .canvas-box { min-width: 0; }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .bar { height: 14px; border-radius: 8px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tags span { background: var(--bg-2); border: 2px solid var(--line); border-radius: 10px; padding: 2px 8px; font-weight: 800; font-size: .82rem; font-family: var(--font-mono); }
+    .tags span.p { border-color: var(--bad); } .tags span.n { border-color: var(--good); }
+
+    @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="prob" data-demo="prob-bayes">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="dice"></i> Probability &amp; Uncertainty</span>
+      <h1>Update Your <span class="em">Belief</span></h1>
+      <p class="hero-sub">A test says positive. Should you panic? Count the dots to find out, then test again and watch your belief move.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Slide the sliders and watch the dots. <b>Red</b> are real, <b>orange</b> are false alarms. A positive is only as good as that ratio!</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="groups"></i> <span id="crowd-t">1000 pretend people</span></h3>
+          <div class="seg" role="group" aria-label="Pick a story">
+            <button type="button" id="st-med" class="on" aria-pressed="true">Medical test</button>
+            <button type="button" id="st-key" aria-pressed="false">Lost keys</button>
+          </div>
+        </div>
+        <canvas id="grid" class="cv" aria-label="A grid of 1000 dots. Red dots are true alarms, orange dots are false alarms."></canvas>
+        <div class="legend" style="margin-top:8px">
+          <span><i style="background:var(--bad)"></i><span id="lg-tp">sick and flagged</span></span>
+          <span><i style="background:var(--warn)"></i><span id="lg-fp">healthy but flagged</span></span>
+          <span><i style="background:var(--bad);opacity:.35"></i><span id="lg-fn">sick, missed</span></span>
+          <span><i style="background:var(--line)"></i><span id="lg-tn">healthy, quiet</span></span>
+        </div>
+        <p class="big" id="answer" style="margin:10px 0 0" aria-live="polite"></p>
+        <p class="muted" id="explain" style="margin:4px 0 0; font-weight:700"></p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="prior"><span id="l-prior">How common is the sickness?</span> <span class="val"><b data-for="prior"></b></span></label>
+            <input type="range" id="prior" min="1" max="500" step="1" value="200">
+            <div class="hint" id="h-prior">Out of 1000 people, how many really have it.</div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="sens"><span id="l-sens">Test catches the sick</span> <span class="val"><b data-for="sens"></b></span></label>
+            <input type="range" id="sens" min="50" max="100" step="1" value="90">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="fpr"><span id="l-fpr">False alarms on healthy people</span> <span class="val"><b data-for="fpr"></b></span></label>
+            <input type="range" id="fpr" min="0" max="40" step="1" value="10">
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="repeat"></i> Test again and update</h3>
+          <div class="bar" aria-hidden="true"><i id="belief-bar"></i></div>
+          <p class="big" id="belief" style="margin:6px 0">20%</p>
+          <div class="tags" id="hist" style="margin-bottom:8px"></div>
+          <div class="btn-row">
+            <button class="btn small" id="t-pos"><i data-icon="plus"></i> Another positive</button>
+            <button class="btn small" id="t-neg"><i data-icon="minus"></i> A negative</button>
+            <button class="btn small ghost" id="t-rand"><i data-icon="dice"></i> Random test</button>
+            <button class="btn small ghost" id="t-reset"><i data-icon="reset"></i> Reset belief</button>
+          </div>
+          <p class="muted" id="truth" style="margin:8px 0 0; font-weight:700; font-size:.88rem"></p>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-flip"><span class="tick"></span><span>Trust a positive: change the sliders until a positive result means 90% or more.</span></div>
+      <div class="chal" id="c-rare"><span class="tick"></span><span>The rare surprise: make it very rare (1% or less) with a test that catches 90%+. Positive now means under 25%!</span></div>
+      <div class="chal" id="c-twice"><span class="tick"></span><span>Second opinions: start at 5% or less, then press Another positive until you believe 90% or more.</span></div>
+      <div class="chal" id="c-good"><span class="tick"></span><span>Good news: start at 10% or more, then use negatives to push the belief under 1%.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>A test is not the answer. It is a clue that moves what you believe.</li>
+      <li>Count the dots: of everyone flagged, the sick ones (red) and the false alarms (orange) are what matter.</li>
+      <li>When the thing is rare, even a small false-alarm rate makes lots of orange dots, so a positive is often a false alarm.</li>
+      <li>Each new result starts from your last belief. Two positives in a row are much stronger than one.</li>
+      <li>This is exactly how robots update: start with a guess, see evidence, move the guess.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">Bayes' rule</span>: <code>P(H | +) = P(+ | H) P(H) / [P(+ | H) P(H) + P(+ | ¬H) P(¬H)]</code>. Here <code>P(H)</code> is the <span class="term">prior</span> (prevalence), <code>P(+ | H)</code> is the <span class="term">sensitivity</span> (true-positive rate), <code>P(+ | ¬H)</code> is the <span class="term">false-positive rate</span>, and the result is the <span class="term">posterior</span>.</p>
+        <ul>
+          <li>The dot grid uses <span class="term">natural frequencies</span> (Gigerenzer): counting people instead of multiplying probabilities makes the answer much easier to see. Posterior = red / (red + orange).</li>
+          <li><span class="term">Base-rate neglect</span> is the common mistake of ignoring the prior. With 1% prevalence, 90% sensitivity and 10% false positives, only about 8% of positives are real.</li>
+          <li>Repeated tests are applied sequentially: yesterday's posterior is today's prior. This assumes the tests are <span class="term">conditionally independent</span> given the truth, which real repeated tests often are not (the same flaw can fool both).</li>
+          <li>In odds form it is simpler: posterior odds = prior odds × likelihood ratio, where the positive likelihood ratio is sens / fpr.</li>
+          <li>Spam filters (the earlier lesson) and many classifiers use exactly this update, word after word.</li>
+        </ul>
+        <p>Further reading: Gigerenzer and Hoffrage (1995), <i>How to Improve Bayesian Reasoning Without Instruction</i> · 3Blue1Brown, <i>Bayes' theorem</i>.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/prob-bayes-core.js"></script>
+  <script src="js/prob-bayes.js"></script>
+</body>
+</html>

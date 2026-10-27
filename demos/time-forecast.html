@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Predict Tomorrow · Explore ML</title>
+  <meta name="description" content="Teach a robot to predict the next days of park visitors from the past, and see how its guesses get worse the further ahead it looks.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.plot { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.15rem; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .seg { display: inline-flex; border: 2px solid var(--line); border-radius: 999px; overflow: hidden; }
+    .seg button { font: inherit; font-weight: 800; font-size: .82rem; border: 0; background: var(--card); color: var(--ink); padding: 6px 12px; min-height: 36px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    .seg button:focus-visible, .chk input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .chk { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: .9rem; min-height: 32px; }
+    .chk input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .field input[type=range] { width: 100%; }
+    .note { margin: 8px 4px 0; font-size: .88rem; font-weight: 700; }
+    .meter { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; margin-top: 4px; }
+    .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+    @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="time" data-demo="time-forecast">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="clock"></i> Time Series &amp; Forecasting</span>
+      <h1>Predict <span class="em">Tomorrow</span></h1>
+      <p class="hero-sub">The robot looks at the last few days and learns a recipe for the next one. Can it beat the lazy guesses: same as yesterday, or same as last week?</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Slide <b>Days it remembers</b>. With only 1 day it cannot see the weekly rhythm. With 7 or more, it can!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px"><h3 style="margin:0"><i data-icon="trend"></i> Visitors at the park</h3></div>
+        <div class="chart-box"><canvas class="plot" id="chart" role="img" aria-label="Forecasts compared with what really happened"></canvas></div>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--ink)"></i>what we knew</span><span><i style="background:var(--good)"></i>what really happened</span><span><i style="background:var(--accent)"></i>robot (AR)</span><span><i style="background:var(--muted)"></i>same as yesterday</span><span><i style="background:var(--warn)"></i>same as last week</span></div>
+        <div class="field" style="margin-top:10px">
+          <label for="org">Forecast from which day? <span class="val" id="org-v"></span></label>
+          <input type="range" id="org" min="0" max="27" step="1" value="10">
+          <div class="hint">These days are the hidden exam: the robot never saw them while learning.</div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="k">Days it remembers <span class="val" id="k-v">7</span></label>
+            <input type="range" id="k" min="1" max="28" step="1" value="1">
+          </div>
+          <div class="field" style="margin-top:8px">
+            <label for="hor">How far ahead <span class="val" id="hor-v">7</span> days</label>
+            <input type="range" id="hor" min="1" max="14" step="1" value="7">
+          </div>
+          <div class="btn-row" style="margin-top:8px"><button class="btn small" id="bestk"><i data-icon="target"></i> Best memory size</button><button class="btn ghost small" id="newdata"><i data-icon="shuffle"></i> New park</button></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Average miss on the hidden exam <span class="muted" style="font-size:.8rem" id="at-h"></span></h3>
+          <div class="three">
+            <div class="stat"><div class="k">Robot</div><div class="v" id="e-ar" style="color:var(--accent)">0</div></div>
+            <div class="stat"><div class="k">Yesterday</div><div class="v" id="e-nv">0</div></div>
+            <div class="stat"><div class="k">Last week</div><div class="v" id="e-sn" style="color:var(--warn)">0</div></div>
+          </div>
+          <canvas class="plot" id="errc" style="margin-top:8px" role="img" aria-label="Forecast error for each number of days ahead"></canvas>
+          <p class="muted note">Miss = how many visitors off, on average, over every day of the hidden exam. Lower is better.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="search"></i> What the robot learned</h3>
+          <canvas class="plot" id="coef" role="img" aria-label="Weights the robot gives to each past day"></canvas>
+          <p class="muted note" id="coef-note"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-beat"><span class="tick"></span><span>Beat yesterday: remember 7 or more days and have a smaller miss than 'same as yesterday' when predicting 1 day ahead.</span></div>
+      <div class="chal" id="c-short"><span class="tick"></span><span>Forgetful robot: remember only 1 or 2 days and watch 'same as last week' win when predicting 7 days ahead.</span></div>
+      <div class="chal" id="c-far"><span class="tick"></span><span>Look far ahead: predict 10 or more days ahead and see the robot miss by more than it did for 1 day.</span></div>
+      <div class="chal" id="c-best"><span class="tick"></span><span>Perfect memory size: choose the number of days that gives the lowest average miss across all 14 horizons (within 5%).</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The robot learned a recipe: tomorrow is a weighted mix of the last few days. It found the weights by trying to fit the old data as closely as possible.</li>
+      <li>With a memory of 7 or more days it can see that Saturday is busy, so it beats the lazy guesses.</li>
+      <li>To look further ahead it feeds its own guesses back in, so small mistakes pile up. The further ahead, the bigger the miss.</li>
+      <li>'Same as yesterday' ignores the weekly rhythm. 'Same as last week' uses it, and is surprisingly hard to beat. Always check a fancy model against simple guesses!</li>
+      <li>The exam days were hidden while learning, so the scores are honest.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is an <span class="term">autoregressive model</span> AR(k): <code>y<sub>t</sub> = c + a<sub>1</sub>y<sub>t−1</sub> + … + a<sub>k</sub>y<sub>t−k</sub> + ε</code>. The coefficients are fitted by <span class="term">ordinary least squares</span> on the training part (first 154 days) by solving the normal equations <code>(XᵀX + λI) a = Xᵀy</code> with a tiny ridge term for stability.</p>
+        <ul>
+          <li><span class="term">Multi-step forecasts</span> are <span class="term">recursive</span>: the prediction for day t+1 is fed back as an input for day t+2, so errors compound with the horizon.</li>
+          <li>Baselines: <span class="term">naive</span> (<code>ŷ<sub>t+h</sub> = y<sub>t</sub></code>) and <span class="term">seasonal naive</span> (<code>ŷ<sub>t+h</sub> = y<sub>t+h−7</sub></code>). A model that cannot beat them is not worth deploying.</li>
+          <li>Evaluation is a <span class="term">rolling-origin backtest</span>: for every origin day in the hidden last 42 days, forecast up to 14 days ahead from the data before it and average the <span class="term">mean absolute error</span> per horizon. Time series must be split by time, never shuffled, or the future leaks into training.</li>
+          <li>The series has a weekly shape, a slow level that wanders, and correlated noise. A fixed AR recipe cannot track wandering levels perfectly, which is why seasonal naive can stay competitive; real tools add differencing (ARIMA), seasonal terms (SARIMA) or exponential smoothing (ETS).</li>
+        </ul>
+        <p>Further reading: Hyndman and Athanasopoulos, <i>Forecasting: Principles and Practice</i>, ch. 5 and 9.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/time-forecast-core.js"></script>
+  <script src="js/time-forecast.js"></script>
+</body>
+</html>

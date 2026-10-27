@@ -2,41 +2,9 @@
 // 1) you pick which of two tricks earns a treat, 2) a Bradley–Terry "treat predictor"
 // learns your taste, 3) the puppy's softmax policy practises with REINFORCE + a KL leash.
 (function () {
+  const core = window.RlhfCore;
   const $ = (id) => document.getElementById(id);
-  const TRICKS = [
-    { k: "sit", name: "Sit" },
-    { k: "paw", name: "Paw" },
-    { k: "roll", name: "Roll" },
-    { k: "jump", name: "Jump" },
-    { k: "spin", name: "Spin" },
-    { k: "bark", name: "Bark", naughty: true },
-    { k: "chew", name: "Chew shoe", naughty: true },
-    { k: "dig", name: "Dig", naughty: true },
-  ];
-  const N = TRICKS.length;
-  // Action = trick index * 2 + (fast ? 1 : 0)
-  const A = N * 2;
-  const trickOf = (a) => a >> 1;
-  const fastOf = (a) => a & 1;
-  const feats = (a) => { const f = new Array(N + 1).fill(0); f[trickOf(a)] = 1; f[N] = fastOf(a); return f; };
-
-  // Hidden tastes for the auto-human.
-  const TASTES = {
-    calm: { tr: [1, 1.5, 2, 0.8, 0.6, -1.5, -2, -1.2], fast: -0.8 },
-    roll: { tr: [0.3, 0.4, 3, 0.2, 0.2, -1, -1.5, -1], fast: 0 },
-    silly: { tr: [-0.5, -0.3, 1, 1.5, 2, 0.5, -1.5, -0.5], fast: 1.2 },
-  };
-  const humanU = (a) => { const t = TASTES[state.taste]; return t.tr[trickOf(a)] + t.fast * fastOf(a); };
-
-  // Puppy starts a bit naughty.
-  const INIT = Array.from({ length: A }, (_, a) => (TRICKS[trickOf(a)].naughty ? 0.6 : 0) + (fastOf(a) ? 0.2 : 0));
-  const rnd = ML.seeded(11);
-  const HELD = Array.from({ length: 60 }, () => {
-    let a = Math.floor(rnd() * A), b = Math.floor(rnd() * A);
-    while (trickOf(b) === trickOf(a)) b = Math.floor(rnd() * A);
-    return [a, b];
-  });
-
+  const { TRICKS, N, A, trickOf, fastOf, INIT, softmax, sample, trickProbs } = core;
   const state = {
     stage: 1,
     taste: "calm",
@@ -58,27 +26,14 @@
   };
 
   // ---------- model bits ----------
-  const rmRaw = (a) => feats(a).reduce((s, x, i) => s + x * state.w[i], 0);
+  const rmRaw = (a) => core.rmRaw(state.w, a);
   const rm = (a) => rmRaw(a) + ($("bug").checked && fastOf(a) ? 3 : 0);
-  const softmax = (l) => { const m = Math.max(...l); const e = l.map((x) => Math.exp(x - m)); const s = e.reduce((a, b) => a + b, 0); return e.map((x) => x / s); };
-  const sample = (p) => { let r = Math.random(); for (let i = 0; i < p.length; i++) { r -= p[i]; if (r <= 0) return i; } return p.length - 1; };
-  const trickProbs = (logits) => { const p = softmax(logits); const t = new Array(N).fill(0); p.forEach((x, a) => (t[trickOf(a)] += x)); return { t, fast: p.reduce((s, x, a) => s + (fastOf(a) ? x : 0), 0) }; };
-  function heldAcc() {
-    let ok = 0;
-    for (const [a, b] of HELD) if ((rmRaw(a) > rmRaw(b)) === (humanU(a) > humanU(b))) ok++;
-    return Math.round((ok / HELD.length) * 100);
-  }
+  const humanU = (a) => core.humanU(state.taste, a);
+  const heldAcc = () => core.heldAcc(state.w, state.taste);
   function trainRM(win, lose) {
-    // Bradley–Terry: a few SGD passes on the newest comparison + replay of old ones.
     state.data = state.data || [];
     state.data.push([win, lose]);
-    for (let ep = 0; ep < 20; ep++)
-      for (const [x, y] of state.data) {
-        const fx = feats(x), fy = feats(y);
-        const d = rmRaw(x) - rmRaw(y);
-        const g = 1 - 1 / (1 + Math.exp(-d));
-        for (let i = 0; i <= N; i++) state.w[i] += 0.05 * (g * (fx[i] - fy[i]) - 0.01 * state.w[i]);
-      }
+    core.trainRM(state.w, state.data);
   }
 
   // ---------- canvases ----------
@@ -222,13 +177,8 @@
     const p = softmax(state.logits);
     const a = sample(p);
     const r = rm(a);
-    state.baseline += 0.05 * (r - state.baseline);
-    const adv = r - state.baseline;
-    const lr = 0.3, beta = +$("kl").value * 0.04;
-    for (let i = 0; i < A; i++) {
-      state.logits[i] += lr * adv * ((i === a ? 1 : 0) - p[i]);
-      state.logits[i] += beta * (INIT[i] - state.logits[i]); // KL leash toward the old puppy
-    }
+    const beta = +$("kl").value * 0.04;
+    state.baseline = core.reinforce(state.logits, state.baseline, a, r, p, beta).baseline;
     state.rewards.push(r);
     if (state.rewards.length > 50) state.rewards.shift();
     state.prac++;

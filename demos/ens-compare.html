@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bagging vs Boosting · Explore ML</title>
+  <meta name="description" content="Race one tree, a bagged forest and a boosted team on the same noisy data. Boosting chases the noise; bagging stays calm.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.35rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .gridmaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+    .gridmaps figure { margin: 0; min-width: 0; }
+    .gridmaps figcaption { font-weight: 800; font-size: .85rem; margin-bottom: 4px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ensemble" data-demo="ens-compare">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Ensembles &amp; Boosting</span>
+      <h1>Bagging vs <span class="em">Boosting</span></h1>
+      <p class="hero-sub">Same dots, same wrong labels, two team styles. Turn up the noise and see which team keeps its cool.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Slide <b>wrong labels</b> up. Watch the lines: the <b>purple</b> team (boosting) can climb and then slump, while the <b>green</b> team (bagging) stays steady.</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="trend"></i> Score on fresh dots, round by round</h3>
+          <div class="btn-row"><button class="btn ghost small" id="newdata"><i data-icon="shuffle"></i> New data</button></div>
+        </div>
+        <canvas id="chart" class="cv" role="img" aria-label="Chart of held-out accuracy against rounds for a single tree, bagging and boosting"></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--muted)"></i>one tree</span><span><i style="background:var(--good)"></i>bagging</span><span><i style="background:var(--accent)"></i>boosting</span><span><i style="background:var(--warn)"></i>boosting on its own training dots</span></div>
+        <p class="cap">Fresh dots have their true labels, so this shows how well each team learned the real pattern, not the mistakes.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="noise">Wrong labels <span class="val"><b data-for="noise">10%</b></span></label>
+            <input type="range" id="noise" min="0" max="40" step="1" value="10">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="rounds">Read scores at round <span class="val"><b data-for="rounds">40</b></span></label>
+            <input type="range" id="rounds" min="1" max="80" step="1" value="40">
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Scoreboard at this round</h3>
+          <div class="three">
+            <div class="stat"><div class="k">One tree</div><div class="v" id="s-one">0%</div></div>
+            <div class="stat"><div class="k">Bagging</div><div class="v" id="s-bag" style="color:var(--good)">0%</div></div>
+            <div class="stat"><div class="k">Boosting</div><div class="v" id="s-boost" style="color:var(--accent)">0%</div></div>
+          </div>
+          <p class="cap" id="verdict"></p>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-noisy"><span class="tick"></span><span>Noise test: at 25% wrong labels or more, find a round where boosting scores lower than bagging.</span></div>
+      <div class="chal" id="c-peak"><span class="tick"></span><span>Boosting slump: find a noise level where boosting’s best score is at least 4 points above its score at round 80.</span></div>
+      <div class="chal" id="c-steady"><span class="tick"></span><span>Calm bagging: with 20% or more wrong labels, bagging at round 80 is within 3 points of its own best.</span></div>
+      <div class="chal" id="c-clean"><span class="tick"></span><span>Clean data: set wrong labels to 0% and see boosting do about as well as bagging (within 3 points).</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Bagging trains many deep trees on shuffled copies of the data. They each memorise noise differently, and voting cancels it out. More trees never hurt much.</li>
+      <li>Boosting trains small trees one after another and makes the hard dots count more each round. A wrongly labelled dot is always hard, so boosting keeps putting more and more attention on it.</li>
+      <li>On clean data boosting is great. With many wrong labels it starts bending the boundary around the mistakes, and fresh-dot accuracy falls.</li>
+      <li>The amber line is boosting on its own training dots: it keeps going up toward 100% by learning the noise, while the purple line on fresh dots does not.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>Make training dots with some labels flipped, and fresh dots with true labels.</li>
+      <li>Bagging: each round adds one deep tree trained on a bootstrap sample. Prediction is a majority vote.</li>
+      <li>Boosting: each round adds one depth-3 tree trained on re-weighted dots. Prediction is the sign of the weighted sum.</li>
+      <li>Score both on the fresh dots after every round.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Bagging reduces <span class="term">variance</span> by averaging low-bias, high-variance learners (here depth-8 CART trees). Boosting reduces <span class="term">bias</span> by fitting an additive model to the weighted errors (discrete AdaBoost with depth-3 trees).</p>
+        <ul>
+          <li>AdaBoost minimises exponential loss <code>exp(−y F(x))</code>, which grows without bound on a mislabelled point, so noisy labels get ever-larger weight. Bagging only resamples; no single dot can dominate.</li>
+          <li>Boosting therefore tends to <span class="term">overfit label noise</span> when run for many rounds without <span class="term">regularisation</span>. Remedies: fewer rounds (<span class="term">early stopping</span> on a validation set), a <span class="term">learning rate</span> (shrinkage), shallower trees, or more robust losses such as the logistic loss used in gradient boosting.</li>
+          <li>Real libraries (XGBoost, LightGBM) boost with such regularisers and often beat bagging on clean tabular data; the point here is the trade-off, not a winner.</li>
+          <li>Training: 150 half-moon dots, label flips at the chosen rate. Test: 500 fresh dots scored against their true class. One seed is noisy, so press New data a few times.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ens-compare-core.js"></script>
+  <script src="js/ens-compare.js"></script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backprop, Step by Step · Explore ML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .bpsvg { width: 100%; height: auto; display: block; background: var(--canvas-bg); border-radius: 14px; touch-action: manipulation; }
+    .bpsvg text { fill: var(--ink); font-family: Nunito, sans-serif; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+    .bpsvg .edge { cursor: pointer; }
+    .bpsvg .chip rect { fill: var(--card); stroke-width: 2; }
+    .bpsvg .node { fill: var(--card); stroke: var(--ink); stroke-width: 3.5; transition: fill .3s; }
+    .bpsvg .node.lit { fill: var(--accent-soft); stroke: var(--accent); }
+    .bpsvg .node.hl { stroke: var(--accent); stroke-width: 6; }
+    .bpsvg .small { font-size: 11px; }
+    .bpsvg .tiny { font-size: 10px; fill: var(--muted); }
+    .bpsvg .lbl { font-size: 12px; fill: var(--muted); }
+    .bpsvg .val { font-size: 15px; font-family: Fredoka, sans-serif; font-weight: 600; }
+    .pairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .pairs .pr { background: var(--bg-2); border-radius: 12px; padding: 6px 10px; font-size: .85rem; font-weight: 700; }
+    .pairs .pr b { font-family: var(--font-mono); }
+    .sl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 18px; margin-top: 14px; }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 12px; }
+    .phases { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .phase { flex: 1 1 130px; padding: 8px 10px; border-radius: 12px; border: 3px solid var(--line); background: var(--bg-2); font-weight: 800; font-size: .85rem; color: var(--muted); }
+    .phase.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .phase.done { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+    .explain { font-weight: 600; line-height: 1.55; }
+    .explain .math { display: block; font-family: var(--font-mono); font-weight: 700; background: var(--bg-2); border-radius: 10px; padding: 6px 10px; margin: 6px 0; overflow-x: auto; white-space: nowrap; }
+    .explain .big { color: var(--accent); }
+    table.chk { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: .8rem; margin-top: 8px; }
+    table.chk th, table.chk td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--line); }
+    table.chk th:first-child, table.chk td:first-child { text-align: left; }
+    .tgl { display: inline-flex; gap: 8px; align-items: center; font-weight: 800; cursor: pointer; }
+    .tgl input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .cp-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; align-items: center; }
+    .cp { flex: none; border: 3px solid var(--line); border-radius: 14px; background: var(--card); padding: 6px 12px; cursor: pointer; font: inherit; font-weight: 800; font-size: .82rem; color: inherit; text-align: left; }
+    .cp.on, .cp:hover { border-color: var(--accent); }
+    .cp small { display: block; color: var(--muted); font-weight: 700; }
+    .chal { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+    .chal .btn { justify-content: flex-start; text-align: left; height: 100%; align-items: flex-start; flex-direction: column; gap: 4px; }
+    .chal .btn small { font-weight: 600; opacity: .85; }
+    canvas#chart { width: 100%; background: var(--canvas-bg); border-radius: 14px; }
+    .goal { font-weight: 800; }
+    .ok { color: var(--good); } .no { color: var(--bad); }
+  </style>
+</head>
+<body data-page="demo" data-topic="nn" data-demo="nn-backprop">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="repeat"></i> Neural Networks</span>
+      <h1>Backprop, <span class="em">step by step</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Here is a tiny brain: 2 inputs, 2 middle neurons, 1 answer. Every wire has a <b>weight</b>. Can <b>you</b> set them so the answer hits the target? Try the sliders!</p>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="gamepad"></i> 1. Try it by hand</h2>
+    <div class="card">
+      <div class="btn-row" style="margin-bottom:12px">
+        <div class="seg" id="p-mode">
+          <button class="on" data-m="one"><i data-icon="target"></i> One example</button>
+          <button data-m="all"><i data-icon="layers"></i> All 4 XOR rows</button>
+        </div>
+        <button class="btn small ghost" id="p-shuffle"><i data-icon="dice"></i> Shuffle</button>
+        <button class="btn small" id="p-robot"><i data-icon="wand"></i> Let Robot do it</button>
+      </div>
+      <svg class="bpsvg" id="p-svg" viewBox="0 0 700 360" role="img" aria-label="Small network with weights"></svg>
+      <p class="goal" id="p-goal" style="margin:12px 0 0"></p>
+      <div class="stats-row">
+        <div class="stat"><div class="k">Output</div><div class="v" id="p-out">0</div></div>
+        <div class="stat"><div class="k">Loss (oops)</div><div class="v" id="p-loss">0</div></div>
+        <div class="stat"><div class="k">Your tweaks</div><div class="v" id="p-tries">0</div></div>
+      </div>
+      <div class="sl-grid" id="p-sliders"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="step"></i> 2. One round, one click at a time</h2>
+    <div class="card">
+      <div class="phases" id="phases">
+        <div class="phase" data-p="1">1 Forward pass</div>
+        <div class="phase" data-p="2">2 Measure the oops</div>
+        <div class="phase" data-p="3">3 Backward pass</div>
+        <div class="phase" data-p="4">4 Nudge</div>
+      </div>
+      <svg class="bpsvg" id="s-svg" viewBox="0 0 700 360" role="img" aria-label="Network with step-by-step backprop"></svg>
+      <div class="btn-row" style="margin:14px 0">
+        <button class="btn primary" id="s-next"><i data-icon="step"></i> <span id="s-next-t">Start: forward pass</span></button>
+        <button class="btn ghost" id="s-reset"><i data-icon="reset"></i> Reset network</button>
+        <label class="tgl" for="s-check"><input type="checkbox" id="s-check"> Check my work</label>
+      </div>
+      <div class="btn-row" style="gap:16px;align-items:center">
+        <div class="seg" id="s-ex"></div>
+        <div class="field" style="min-width:200px;flex:1"><label for="s-lr">Learning rate (step size) <span class="val" data-for="s-lr"></span></label><input type="range" id="s-lr" min="0.1" max="5" step="0.1" value="1"></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat"><div class="k">Round</div><div class="v" id="s-round">0</div></div>
+        <div class="stat"><div class="k">Output</div><div class="v" id="s-out">?</div></div>
+        <div class="stat"><div class="k">Target</div><div class="v" id="s-tgt">1</div></div>
+        <div class="stat"><div class="k">Loss</div><div class="v" id="s-loss">?</div></div>
+      </div>
+      <div class="card" style="margin-top:14px;background:var(--bg-2)">
+        <h3 style="margin:0 0 6px"><i data-icon="eye"></i> <span id="s-title">Ready</span></h3>
+        <div class="explain" id="s-explain"></div>
+        <div id="s-table"></div>
+      </div>
+      <p class="muted" style="margin:10px 0 0;font-size:.9rem">Tip: in the backward pass, tap any wire to see the chain-rule product for that weight.</p>
+    </div>
+
+    <h2 class="section-title"><i data-icon="trend"></i> 3. Watch it learn</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <svg class="bpsvg" id="l-svg" viewBox="0 0 700 360" role="img" aria-label="Network learning live"></svg>
+        <div class="legend" style="margin:10px 0">
+          <span><i style="background:var(--good)"></i>Green = positive weight</span>
+          <span><i style="background:var(--bad)"></i>Red = negative weight</span>
+          <span>Thicker = bigger</span>
+          <span><i style="background:var(--accent)"></i>Arrows = blame</span>
+        </div>
+        <canvas id="chart"></canvas>
+        <div class="cp-head" style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin:12px 0 4px;flex-wrap:wrap">
+          <h3 style="margin:0"><i data-icon="flag"></i> Snapshots</h3>
+          <button class="btn small hidden" id="l-live"><i data-icon="arrow-left"></i> Back to live</button>
+        </div>
+        <div class="cp-row" id="l-cps"><span class="muted" style="font-size:.9rem">Snapshots appear at round 1, 10, 100, 1000 and when it's solved. Tap one to time-travel.</span></div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <span class="lbl">Puzzle</span>
+            <div class="seg" id="l-data">
+              <button data-d="AND">AND</button><button data-d="OR">OR</button><button data-d="XOR" class="on">XOR</button>
+            </div>
+          </div>
+          <div class="field"><label for="l-lr">Learning rate <span class="val" data-for="l-lr"></span></label><input type="range" id="l-lr" min="0.1" max="120" step="0.1" value="2"></div>
+          <div class="btn-row">
+            <button class="btn" id="l-1"><i data-icon="step"></i> Run 1 round</button>
+            <button class="btn" id="l-100"><i data-icon="zap"></i> Run 100</button>
+            <button class="btn primary" id="l-auto"><i data-icon="play"></i> Auto</button>
+            <button class="btn ghost" id="l-reset"><i data-icon="reset"></i> Fresh start</button>
+          </div>
+          <label class="tgl" for="l-arrows"><input type="checkbox" id="l-arrows" checked> Show blame arrows</label>
+          <div class="stats-row" style="margin:0">
+            <div class="stat"><div class="k">Round</div><div class="v" id="l-round">0</div></div>
+            <div class="stat"><div class="k">Loss</div><div class="v" id="l-loss">0</div></div>
+            <div class="stat"><div class="k">Right</div><div class="v" id="l-right">0<small>/4</small></div></div>
+          </div>
+          <div class="pairs" id="l-preds"></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="explain" id="l-inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="flag"></i> Challenges</h2>
+    <p class="muted" style="margin-top:-6px">Each one breaks the network above at the current round. The chart marks the moment so you can see what happens next. Press <b>Auto</b> after!</p>
+    <div class="chal">
+      <button class="btn" data-c="zero"><b><i data-icon="minus"></i> All-zero start</b><small>Every weight is 0. Twins can't tell themselves apart.</small></button>
+      <button class="btn" data-c="huge"><b><i data-icon="zap"></i> Huge learning rate</b><small>Giant steps. Does it overshoot?</small></button>
+      <button class="btn" data-c="sat"><b><i data-icon="gauge"></i> Bigger weights</b><small>Sigmoid saturates and the blame fades (vanishing gradient).</small></button>
+      <button class="btn" data-c="dead"><b><i data-icon="x"></i> A lonely dead neuron</b><small>One middle neuron stuck at 0 forever.</small></button>
+    </div>
+    <div class="card" style="margin-top:12px"><div class="explain" id="c-note">Pick a challenge, then press <b>Auto</b> in the section above and watch the loss line.</div></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="arrow-right"></i></div><h3>Forward</h3><p>Numbers travel left to right. Each neuron adds up its wires and squashes the total.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Oops</h3><p>Compare the answer with the target. Wrong by a lot means a big oops number.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="arrow-left"></i></div><h3>Blame backwards</h3><p>Starting at the answer, work out how much each weight helped cause the oops.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wrench"></i></div><h3>Nudge</h3><p>Move every weight a small step the opposite way from its blame. Then repeat!</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The network <b>guessed</b> by passing numbers forward, then measured how <b>wrong</b> it was.</li>
+      <li>The blame flowed <b>backwards</b>: wires that mattered more got more blame.</li>
+      <li>Each weight moved a little, so the next guess is a bit better. Repeat many times and it learns XOR.</li>
+      <li>Starting at zero, huge steps, or saturated neurons can make learning stall.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">backpropagation</span> on a 2-2-1 multilayer perceptron with sigmoid <code>σ(z) = 1/(1+e^−z)</code> in both layers.</p>
+        <ul>
+          <li><b>Loss:</b> squared error <code>L = (o − y)²</code>, averaged over the dataset in the "watch it learn" loop (full-batch <span class="term">gradient descent</span>).</li>
+          <li><b>Chain rule:</b> <code>∂L/∂w2ⱼ = 2(o−y) · o(1−o) · hⱼ</code> and <code>∂L/∂w1ᵢⱼ = 2(o−y) · o(1−o) · w2ⱼ · hⱼ(1−hⱼ) · xᵢ</code>. Each factor is one local derivative; the blame signal <code>δ</code> is reused for every weight behind it.</li>
+          <li><b>Update:</b> <code>w ← w − η ∂L/∂w</code>, with learning rate <code>η</code>. Too big overshoots; too small crawls.</li>
+          <li><b>Gradient check:</b> the "check my work" table compares analytic gradients with the central finite difference <code>(L(w+ε) − L(w−ε)) / 2ε</code>, ε = 10⁻⁴. They agree to ~10⁻⁹. This is how backprop implementations are unit-tested.</li>
+          <li><b>Vanishing gradients:</b> <code>σ'(z) ≤ 0.25</code>, and it approaches 0 when |z| is large (saturation). Multiply many small factors and early layers get almost no signal. Dead or saturated units behave similarly.</li>
+          <li><b>Symmetry:</b> identical initial weights give identical gradients, so hidden units stay clones forever. Random initialization breaks the tie.</li>
+          <li><b>Why it's efficient:</b> reverse-mode automatic differentiation computes the gradient for all N weights in about the cost of one or two forward passes, instead of N extra passes as in finite differences.</li>
+          <li>Further reading: <a href="https://playground.tensorflow.org" target="_blank" rel="noopener">TensorFlow Playground</a> · <a href="https://www.youtube.com/watch?v=Ilg3gGewQ5U" target="_blank" rel="noopener">3Blue1Brown, What is backpropagation really doing?</a></li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/nn-backprop-core.js"></script>
+  <script src="js/nn-backprop.js"></script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Find the Best Knobs · Explore ML</title>
+  <meta name="description" content="Tune the settings of a real nearest-neighbour model with grid and random search, and see why you must not tune on the test set.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .pair { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .pair figure { margin: 0; text-align: center; font-weight: 800; font-size: .9rem; }
+    .pair canvas, .cv { width: 100%; max-width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+    .three > *, .four > * { min-width: 0; }
+    .four { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .big { font-family: var(--font-head); font-size: 1.4rem; font-weight: 600; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .ctl { display: grid; gap: 4px; margin-bottom: 10px; }
+    .ctl label { font-weight: 800; font-size: .9rem; display: flex; justify-content: space-between; gap: 8px; }
+    .ctl input[type=range] { width: 100%; }
+    .ctl .hint { font-size: .82rem; color: var(--muted); font-weight: 700; }
+    .note { font-weight: 700; font-size: .9rem; color: var(--muted); margin: 6px 0 0; }
+    .tbl { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .tbl th, .tbl td { text-align: left; padding: 4px 6px; border-bottom: 2px solid var(--line); font-weight: 700; }
+    .tbl td.n { font-family: var(--font-mono); }
+    input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+    button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }    #heat, #model { max-width: 100%; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="optim" data-demo="opt-tune">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="target"></i> Optimisation &amp; Search</span>
+      <h1>Find the Best <span class="em">Knobs</span></h1>
+      <p class="hero-sub">A model has settings, like how many neighbours vote. You only get a few tries, so which settings do you test? And never peek at the final exam!</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">My model has two knobs: <b>k</b> (how many neighbours vote) and a <b>weight</b> (how much closer neighbours count). Press <b>Search</b> to try a few settings.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="map"></i> Score landscape <span class="muted" id="bnote"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="go"><i data-icon="search"></i> Search</button>
+            <button class="btn small" id="newd"><i data-icon="shuffle"></i> New data</button>
+            <button class="btn small" id="race"><i data-icon="repeat"></i> Repeat on 30 datasets</button>
+          </div>
+        </div>
+        <canvas id="heat" class="cv" aria-label="Validation score for each pair of settings"></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--ink)"></i>square = grid try</span><span><i style="background:var(--warn)"></i>circle = random try</span><span>darker blue = better validation score</span></div>
+        <label class="note" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="reveal"> Reveal the whole landscape (the tuner cannot see it)</label>
+        <h3 style="margin:12px 0 6px"><i data-icon="eye"></i> The chosen model <span class="muted" id="mnote"></span></h3>
+        <canvas id="model" class="cv" aria-label="Decision regions of the chosen model"></canvas>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Search plan</h3>
+          <div class="ctl"><label for="budget">Budget: tries allowed <b data-for="budget">12</b></label><input id="budget" type="range" min="4" max="60" step="1" value="12" aria-label="Number of settings you may try"><span class="hint">Grid and random get exactly the same number of tries.</span></div>
+          <div class="seg" id="by" role="group" aria-label="Which score picks the winner"><button data-b="val" class="on">Pick by validation (honest)</button><button data-b="test">Pick by test (cheating)</button></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trophy"></i> Winners</h3>
+          <table class="tbl"><thead><tr><th></th><th>k</th><th>weight</th><th>Valid.</th><th>Test</th><th>Fresh</th></tr></thead><tbody id="res"><tr><td colspan="6" class="muted">Press Search.</td></tr></tbody></table>
+          <p class="note"><b>Fresh</b> = 400 new points nobody has used. It is the honest score you can expect in real life.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="flask"></i> 30 datasets, averaged</h3>
+          <div id="raceout" class="note">Press Repeat. It redoes everything on 30 different datasets, so luck averages out.</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-search"><span class="tick"></span><span>Search once: try grid and random search.</span></div>
+      <div class="chal" id="c-big"><span class="tick"></span><span>Big budget: search with 30 or more tries.</span></div>
+      <div class="chal" id="c-cheat"><span class="tick"></span><span>Cheat once: pick the winner by test score, and look at the Test and Fresh columns.</span></div>
+      <div class="chal" id="c-race"><span class="tick"></span><span>Fair race: press Repeat on 30 datasets and read the averages.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The model is a real k-nearest-neighbours classifier. Each point is labelled by a vote of its k closest training points; the weight knob makes closer neighbours count more.</li>
+      <li>Grid search tries evenly spaced settings. Random search tries random ones. With the same budget, here they usually end up close. Random tends to win when only one knob really matters, because it tests many different values of that knob.</li>
+      <li>The validation score is used to choose, so it is a little too hopeful. The fresh score is the honest one.</li>
+      <li>If you choose by the test score, the test score becomes the hopeful one, and you no longer have a clean exam left.</li>
+      <li>The more tries you allow, the more the best-looking one is partly luck.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li><b>Split</b> the data: train (the model learns from it), validation (you pick settings with it), test (the final exam).</li>
+      <li><b>Choose</b> which settings to try: a grid, or random ones, with the same budget.</li>
+      <li><b>Score</b> every try on validation data.</li>
+      <li><b>Pick</b> the best settings.</li>
+      <li><b>Report</b> the test score once, at the end. Never tune on it.</li>
+    </ol></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>These settings are <span class="term">hyperparameters</span>: chosen by you, not learned from data. Here they are <code>k</code> (1 to 25) and an inverse-distance weight power <code>p</code> (0 to 3): each neighbour votes with weight <code>1 / (d + 0.05)<sup>p</sup></code>.</p>
+        <ul>
+          <li><span class="term">Grid search</span> puts the budget on a regular lattice; <span class="term">random search</span> (Bergstra and Bengio, 2012) samples independently. Random is better when some knobs matter much less than others, since a grid wastes tries repeating the same values of the important knob. On this tiny landscape both are usually close, which the 30-dataset average shows honestly.</li>
+          <li>Choosing the maximum of many noisy scores gives a <span class="term">winner's curse</span>: the selected score is biased upward. That bias is the gap between Valid. and Fresh.</li>
+          <li><span class="term">Data leakage</span>: tuning on the test set makes it part of training. The test score is then optimistic too. Real projects keep a final untouched set, or use <span class="term">cross-validation</span> and <span class="term">nested</span> cross-validation to keep the estimate honest.</li>
+          <li>The dataset is two noisy half-moons with 8% of the labels flipped, so the landscape is bumpy. Validation and test have only 50 points each, so single scores are noisy by several percent.</li>
+        </ul>
+        <p>Further reading: Bergstra and Bengio, <i>Random Search for Hyper-Parameter Optimization</i>, JMLR (2012).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/opt-tune-core.js"></script>
+  <script src="js/opt-tune.js"></script>
+</body>
+</html>

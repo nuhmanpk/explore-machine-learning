@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Squeeze and Rebuild · Explore ML</title>
+  <meta name="description" content="Squeeze a picture through a tiny bottleneck of numbers and watch a neural network rebuild it. The smaller the squeeze, the blurrier the picture.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .three { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cp-head h3 { margin: 0; }
+    .cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; touch-action: none; }
+    .cv.pick { cursor: crosshair; }
+    .cv:focus-visible { outline: 3px solid var(--accent); }
+    .note { margin: 8px 4px 0; font-size: .88rem; font-weight: 700; color: var(--muted); }
+    .kchips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .kbtn { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px; min-height: 36px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .kbtn[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--card)); }
+    .kbtn:focus-visible { outline: 3px solid var(--accent); }
+    .kbtn i.sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .tag { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+    input[type=range] { width: 100%; }
+  </style>
+</head>
+<body data-page="demo" data-topic="gen" data-demo="gen-compress">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="palette"></i> Generative Models</span>
+      <h1>Squeeze and <span class="em">Rebuild</span></h1>
+      <p class="hero-sub">A small neural network squeezes each picture into just a few numbers, then tries to rebuild it. Make the squeeze tighter and watch what gets lost.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">These are tiny 8×8 pictures: 64 pixels each. I squash every picture into only <b>4 numbers</b> and rebuild it. Drag the slider to change how many numbers I may keep!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3><i data-icon="image"></i> Original, secret code, rebuilt</h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="play"><i data-icon="pause"></i> Pause</button>
+            <button class="btn ghost small" id="shuffle"><i data-icon="shuffle"></i> Other pictures</button>
+          </div>
+        </div>
+        <canvas class="cv" id="pics" role="img" aria-label="Eight test pictures, the numbers each is squeezed into, and the rebuilt pictures"></canvas>
+        <p class="note" id="picnote">These 8 pictures were never used for learning, so the rebuilt row is an honest test.</p>
+        <div class="field" style="margin-top:12px">
+          <label for="k">Numbers I may keep (the bottleneck) <b class="val" data-for="k"></b></label>
+          <input type="range" id="k" min="1" max="16" step="1" value="4">
+          <div class="hint">64 pixels go in, only this many numbers come out of the middle, then the picture is rebuilt from them.</div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How well is it rebuilding?</h3>
+          <div class="three"><div class="stat"><div class="k">Kept</div><div class="v" id="s-k">-</div></div><div class="stat"><div class="k">Error</div><div class="v" id="s-err">-</div></div><div class="stat"><div class="k">Steps</div><div class="v" id="s-steps">-</div></div></div>
+          <div class="chart-box"><canvas class="cv" id="loss" role="img" aria-label="Training and test error while learning"></canvas></div>
+          <div class="legend"><span><i style="background:var(--accent)"></i>practice pictures</span><span><i style="background:var(--warn)"></i>new pictures</span></div>
+        </div>
+        <div class="card">
+          <div class="cp-head"><h3><i data-icon="trend"></i> Every squeeze size</h3><button class="btn small" id="sweep"><i data-icon="zap"></i> Try them all</button></div>
+          <div class="chart-box"><canvas class="cv" id="sweepc" role="img" aria-label="Final error for each bottleneck size"></canvas></div>
+          <p class="note" style="margin-top:0" id="sweepnote">Press the button to train a fresh network for each size. Shorter bars are better.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-big"><span class="tick"></span><span>Keep plenty: set the bottleneck to 12 or more and train until the error on new pictures is under 0.035.</span></div>
+      <div class="chal" id="c-tiny"><span class="tick"></span><span>Squeeze hard: set it to 2 or fewer, train 500 steps, and see the error stay above 0.045 (blurry!).</span></div>
+      <div class="chal" id="c-sweep"><span class="tick"></span><span>Try them all: run the sweep and watch error drop as the bottleneck grows.</span></div>
+      <div class="chal" id="c-bargain"><span class="tick"></span><span>Find a bargain: reach error under 0.035 with a bottleneck of 8 or fewer numbers.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The middle of the network is a <b>bottleneck</b>: only a few numbers can get through, so it has to keep the most important parts of each picture.</li>
+      <li>The first half <b>squeezes</b> (encodes), the second half <b>rebuilds</b> (decodes). Nobody told it what the shapes are. It only learns to make its output match its input.</li>
+      <li>With a tight squeeze it forgets detail, so the pictures come back blurry and in-between. With a wide one it can copy almost perfectly.</li>
+      <li>The orange line is measured on pictures it never practised on, so it is an honest score.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is an <span class="term">autoencoder</span>: a neural network trained to output its own input. Here it is <code>64 → 24 → k → 24 → 64</code> with <span class="term">tanh</span> hidden units, a linear bottleneck of <code>k</code> units and a <span class="term">sigmoid</span> output. It is a real network, trained in your browser with <span class="term">backpropagation</span> and the <span class="term">Adam</span> optimiser on mini-batches of 16 pictures.</p>
+        <ul>
+          <li>Loss is <span class="term">mean squared error</span> per pixel between input and rebuilt picture. The number in the box is that loss on 48 held-out pictures.</li>
+          <li>The bottleneck forces <span class="term">lossy compression</span>. Fewer latent units means a smaller <span class="term">code</span> and a higher error floor. It is a non-linear cousin of <span class="term">PCA</span>.</li>
+          <li>Error on the practice pictures can fall below the error on new ones: that gap is <span class="term">overfitting</span>.</li>
+          <li>Pictures are procedurally drawn squares, rings, plus signs, slashes, triangles and stripes with random size and position plus a little noise.</li>
+        </ul>
+        <p>Further reading: Hinton and Salakhutdinov, <i>Reducing the dimensionality of data with neural networks</i> (Science, 2006).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/gen-compress-core.js"></script>
+  <script src="js/gen-compress.js"></script>
+</body>
+</html>

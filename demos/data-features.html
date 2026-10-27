@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pick the Clues · Explore ML</title>
+  <meta name="description" content="A puzzle a straight line cannot solve becomes easy when you give the robot the right clue. Pick features and watch accuracy change.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    #chart,#chart2 { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); touch-action: none; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .seg button { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .seg button:focus-visible, .tbl button:focus-visible, .feat input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .lab { display: block; font-weight: 800; font-size: .86rem; margin: 10px 0 6px; }
+    .bars { display: grid; gap: 6px; }
+    .bar { display: grid; grid-template-columns: 7.5em 1fr 3.4em; gap: 8px; align-items: center; font-size: .82rem; font-weight: 800; }
+    .bar .t { height: 12px; border-radius: 6px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .bar .t i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+    .bar b { font-family: var(--font-mono); text-align: right; }
+    @media (prefers-reduced-motion: reduce) { .bar .t i { transition: none; } }
+    .feat { display: grid; gap: 4px; }
+    .feat label { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: .88rem; padding: 4px 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); cursor: pointer; min-height: 36px; }
+    .feat label.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+    .feat label.junk span { color: var(--muted); font-style: italic; }
+    .feat input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .big { font-family: var(--font-head); font-size: 1.6rem; font-weight: 600; }
+  </style>
+</head>
+<body data-page="demo" data-topic="data" data-demo="data-features">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="layers"></i> Data &amp; Features</span>
+      <h1>Pick the <span class="em">Clues</span></h1>
+      <p class="hero-sub">The robot can only draw straight lines. Give it smarter clues, like distance from the centre, and the hard puzzle becomes easy. Beware of useless clues!</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Right now I only know x and y, and I can only cut with a straight line. Tick some clues and press Train. Which clue solves the puzzle?</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="target"></i> <span id="ptitle"></span> <span class="muted" style="font-size:.8rem" id="phint"></span></h3>
+          <div class="btn-row"><button class="btn ghost small" id="reset"><i data-icon="shuffle"></i> New points</button></div>
+        </div>
+        <div class="seg" id="g-prob" role="group" aria-label="Choose a puzzle" style="margin-bottom:8px">
+          <button type="button" data-v="ring" aria-pressed="true">Bullseye</button>
+          <button type="button" data-v="corners" aria-pressed="false">Corners</button>
+        </div>
+        <div class="chart-box"><canvas id="chart" role="img" aria-label="Scatter plot of training points with the robot's decision regions painted behind them"></canvas></div>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--good)"></i>class A</span><span><i style="background:var(--bad)"></i>class B</span><span><i style="background:var(--muted)"></i>painted = the robot's answer</span></div>
+        <label class="lab" for="n">Training points: <b id="n-out" data-for="n">40</b></label>
+        <input type="range" id="n" min="20" max="200" step="10" value="40" style="width:100%" aria-label="Number of training points">
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="search"></i> Clues the robot may use</h3>
+          <div class="feat" id="feats"></div>
+          <div class="btn-row" style="margin-top:10px"><button class="btn primary small" id="train"><i data-icon="play"></i> Train</button></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Held-out accuracy <span class="muted" style="font-size:.8rem">(400 unseen points)</span></h3>
+          <div class="three">
+            <div class="stat"><div class="k">With your clues</div><div class="v big" id="acc">50%</div></div>
+            <div class="stat"><div class="k">Training points right</div><div class="v" id="tacc">50%</div></div>
+            <div class="stat"><div class="k">Without junk</div><div class="v" id="nj">-</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="wand"></i> How much each clue matters</h3>
+          <div class="bars" id="imp"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-stuck"><span class="tick"></span><span>Stuck: on Bullseye with only x and y, see the accuracy stay under 65%.</span></div>
+      <div class="chal" id="c-ring"><span class="tick"></span><span>Bullseye solved: reach 90% accuracy.</span></div>
+      <div class="chal" id="c-corners"><span class="tick"></span><span>Switch to Corners and reach 90%. Which clue is the key?</span></div>
+      <div class="chal" id="c-junk"><span class="tick"></span><span>Junk hurts: take a good set of clues and add junk clues until accuracy drops by 3 points or more compared to the same set without junk.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>With only x and y, the robot can cut the picture with a straight line. A bullseye or a checkerboard cannot be split by one line, so it guesses.</li>
+      <li>The clue distance from the centre turns the bullseye into a simple one-number question: is it small or big? The clue x times y does the same for the corners.</li>
+      <li>Making new clues from the ones you have is called feature engineering. Good clues beat a smarter robot.</li>
+      <li>Random junk clues carry no information, but the robot can still use them to memorise the training dots. Held-out accuracy drops, especially with few training points.</li>
+      <li>More training points make junk less harmful, but the best answer is still: use fewer, better clues.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The model is <span class="term">logistic regression</span> trained by batch gradient descent on standardised features with a small <span class="term">L2 penalty</span> (λ = 0.001). Because it is linear in its inputs, it can only draw a straight boundary in <em>feature space</em>. With the right derived feature the boundary becomes curved in the original (x, y) picture.</p>
+        <ul>
+          <li>Bullseye: label is <code>x² + y² &lt; 0.75²</code>. The feature <code>r = √(x²+y²)</code> (or <code>x²</code> plus <code>y²</code> together) makes it linearly separable. Corners: label is <code>x·y &gt; 0</code>, and the single <span class="term">interaction feature</span> <code>x·y</code> separates it perfectly apart from 3% label noise.</li>
+          <li><span class="term">Importance</span> here is each clue's share of the total absolute weight. Features are standardised so weights are comparable. This is a simple measure; correlated clues share credit in confusing ways.</li>
+          <li>The four junk features are uniform random numbers independent of the label. With <code>n</code> training points and <code>d</code> features, a model can <span class="term">overfit</span> by fitting noise. Held-out accuracy (400 fresh points) exposes it; training accuracy usually does not.</li>
+          <li>Related ideas: <span class="term">polynomial features</span>, the <span class="term">kernel trick</span> (do this implicitly), neural networks (learn their own features), and <span class="term">feature selection</span> (L1 penalty, mutual information, permutation importance).</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/data-features-core.js"></script>
+  <script src="js/data-features.js"></script>
+</body>
+</html>

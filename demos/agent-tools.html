@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pick the Right Tool · Explore ML</title>
+  <meta name="description" content="Teach a small router which tool to use for each request, and see what goes wrong when it picks the wrong one.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    @media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cp-head h3 { margin: 0; }
+    .toy { font-size: .8rem; font-weight: 800; color: var(--muted); background: var(--bg-2); border: 2px dashed var(--line); border-radius: 10px; padding: 4px 8px; margin: 8px 0 0; }
+    .opt { font: inherit; font-weight: 800; font-size: .84rem; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 10px; min-height: 34px; cursor: pointer; }
+    .opt:focus-visible, .sel:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .opt.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sel { font: inherit; font-weight: 700; padding: 6px 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); max-width: 100%; }
+    .txt { width: 100%; font: inherit; font-weight: 700; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+    .mono { font-family: var(--font-mono); }
+    .pill { display: inline-block; font-family: var(--font-mono); font-weight: 700; font-size: .82rem; background: var(--bg-2); border: 2px solid var(--line); border-radius: 8px; padding: 1px 6px; overflow-wrap: anywhere; }
+    .pill.bad { border-color: var(--bad); color: var(--bad); } .pill.good { border-color: var(--good); color: var(--good); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+    .pile { max-height: 520px; overflow-y: auto; display: grid; gap: 6px; padding: 2px 4px 2px 2px; }
+    .rq { background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 6px 8px; display: grid; gap: 6px; }
+    .rq .t { font-weight: 800; overflow-wrap: anywhere; }
+    .rq .btns { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .rq .btns .opt { font-size: .78rem; padding: 3px 8px; min-height: 32px; }
+    .rq .pk { font-size: .78rem; font-weight: 800; color: var(--muted); margin-left: auto; font-family: var(--font-mono); }
+    .bars { display: grid; gap: 4px; margin: 8px 0; }
+    .bar { display: grid; grid-template-columns: 84px 1fr 40px; gap: 6px; align-items: center; font-size: .82rem; font-weight: 800; }
+    .bar i { display: block; height: 10px; border-radius: 6px; background: var(--accent); }
+    .bar div { background: var(--bg-2); border-radius: 6px; overflow: hidden; }
+    .res { border: 2px solid var(--line); border-radius: 12px; padding: 8px; font-weight: 700; background: var(--bg-2); }
+    .res.bad { border-color: var(--bad); } .res.good { border-color: var(--good); }
+    .fail { border-left: 4px solid var(--bad); padding: 4px 8px; margin: 6px 0; font-size: .88rem; font-weight: 700; background: var(--bg-2); border-radius: 8px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="agents" data-demo="agent-tools">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="robot"></i> Agents &amp; Tools</span>
+      <h1>Pick the <span class="em">Right Tool</span></h1>
+      <p class="hero-sub">A helper with many tools must choose one for each request. Tell Robo the right tool for a few requests and watch it learn to choose.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Each request needs a calculator, a clock, a lookup table, or <b>no tool</b>. Tap the right one for a few. The router that learns is real, but the tools are tiny toys.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="chat"></i> Requests <span class="muted" id="count"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="teach5"><i data-icon="play"></i> Teach 5 more for me</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <div class="pile" id="pile"></div>
+        <p class="muted" style="margin:8px 4px 0;font-size:.88rem;font-weight:700">Tap the tool this request really needs. The small code on the right is Robo's current pick and how sure it is.</p>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Held-out test <span class="muted" style="font-size:.8rem">(24 secret requests)</span></h3>
+          <div class="three">
+            <div class="stat"><div class="k">Right tool</div><div class="v" id="acc">25%</div></div>
+            <div class="stat"><div class="k">Wrong tool</div><div class="v" id="wrong" style="color:var(--bad)">24</div></div>
+            <div class="stat"><div class="k">Labelled</div><div class="v" id="lab">0</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="pencil"></i> Ask your own</h3>
+          <input class="txt" id="own" maxlength="80" placeholder="Try: what is 6 times 7" autocomplete="off" aria-label="Type a request">
+          <div class="btn-row" style="margin-top:8px"><button class="btn small primary" id="ask"><i data-icon="wand"></i> Pick and run a tool</button></div>
+          <div id="ask-out"></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="bug"></i> Wrong-tool failures <span class="muted" style="font-size:.8rem">(test set)</span></h3>
+          <div id="fails"></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> What's happening inside</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-fail"><span class="tick"></span><span>See a wrong tool fail: ask your own request and watch the tool error out, or fix a wrong pick.</span></div>
+      <div class="chal" id="c-few"><span class="tick"></span><span>Get 60% or more right with only 8 or fewer labelled requests.</span></div>
+      <div class="chal" id="c-good"><span class="tick"></span><span>Reach 85% right on the secret test.</span></div>
+      <div class="chal" id="c-teach"><span class="tick"></span><span>Ask your own request, then tap the tool it should have used to teach Robo.</span></div>
+      <div class="chal" id="c-great"><span class="tick"></span><span>Reach 95% right.</span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Robo turns each request into a bag of words and counts which words go with which tool.</li>
+      <li>Number-like words and signs like + point to the calculator. Words like time and today point to the clock.</li>
+      <li>A wrong pick is not just a wrong label: the calculator cannot tell the time, and the clock cannot add. Mistakes cost real answers.</li>
+      <li>More labelled examples, and examples that look alike but need different tools, make the router better.</li>
+      <li>The router really learns. The four tools are tiny toys, and nothing here is a real language model.</li>
+    </ul></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The router is a <span class="term">multinomial Naive Bayes</span> text classifier over a <span class="term">bag of words</span>: <code>P(tool | words) ∝ P(tool) · ∏ P(word | tool)</code> with <span class="term">add-one smoothing</span>. Numbers become a <code>&lt;num&gt;</code> token and arithmetic signs become <code>&lt;op&gt;</code>, so it generalises to numbers it never saw.</p>
+        <ul>
+          <li>This is a small version of <span class="term">tool selection</span> (also called routing or function calling). Real systems let a language model choose a tool and write its arguments; here a learned classifier chooses and simple code extracts the numbers.</li>
+          <li>The tools are <b>toy</b> implementations: a calculator that reads two numbers, a fixed clock, and a tiny lookup table.</li>
+          <li>Accuracy is measured on <span class="term">held-out</span> requests. Failures come in two kinds: the tool <i>errors</i> (loud, easy to notice) or it <i>answers the wrong question</i> (silent, worse).</li>
+          <li>Confidence is the posterior probability. Naive Bayes tends to be over-confident because it assumes words are independent.</li>
+        </ul>
+        <p>Further reading: Schick et al., <i>Toolformer</i> (2023) · Jurafsky and Martin, <i>Speech and Language Processing</i>, ch. 4.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/agent-tools-core.js"></script>
+  <script src="js/agent-tools.js"></script>
+</body>
+</html>

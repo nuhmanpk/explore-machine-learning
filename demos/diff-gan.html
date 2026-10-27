@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forger vs Detective · Explore ML</title>
+  <meta name="description" content="Two tiny neural networks compete: a forger makes fake dots and a detective tries to catch them. Be the detective, then watch both get better.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .left-col { display: grid; gap: 20px; min-width: 0; }
+    .view-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .view-head .title { font-family: var(--font-head); font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+    .toggles { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .shape-seg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .shape-seg .btn { padding: 8px 6px; flex-direction: column; gap: 0; line-height: 1.15; }
+    .shape-seg .btn small { font-size: .68rem; font-weight: 700; color: var(--muted); }
+    .shape-seg .btn.on small { color: var(--accent); }
+    #view, #game { cursor: default; }
+    #chart { width: 100%; background: var(--canvas-bg); border-radius: 12px; }
+    .sw { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin: 0 3px 0 6px; }
+    .sw.real { border-radius: 50%; background: var(--good); }
+    .sw.fake { background: var(--bad); transform: rotate(45deg) scale(.85); }
+    .sw.heat { border-radius: 3px; background: color-mix(in srgb, var(--nn) 45%, transparent); }
+    .ans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .ans .btn { justify-content: center; padding: 14px 10px; font-size: 1.05rem; }
+    .ans .btn.real { --b: var(--good); }
+    .ans .btn.fake { --b: var(--bad); }
+    .game-note { min-height: 3.2em; font-weight: 700; margin-top: 10px; }
+    .score { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pipsrow { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+    .pip { width: 14px; height: 14px; border-radius: 4px; background: var(--line); }
+    .pip.ok { background: var(--good); } .pip.no { background: var(--bad); }
+    .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 640px) { .sides { grid-template-columns: 1fr; } .ans .btn { padding: 12px 6px; } }
+    .side { border: 2px solid var(--line); border-radius: 16px; padding: 12px 14px; background: var(--card); transition: border-color .2s, box-shadow .2s; }
+    .side.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .side h4 { margin: 0 0 6px; display: flex; gap: 8px; align-items: center; font-family: var(--font-head); }
+    .side p { margin: 0 0 6px; font-weight: 700; }
+    .side .num { font-family: var(--font-mono); color: var(--accent); }
+    .chal { display: grid; gap: 10px; }
+    .chal .btn { justify-content: flex-start; text-align: left; }
+    .chal .done::after { content: " \2713"; color: var(--good); }
+    .chal-note { margin-top: 12px; font-weight: 700; }
+    .ck-empty { color: var(--muted); font-weight: 700; padding: 18px 4px; }
+    .ckpt.new { animation: ckIn .5s ease; }
+    @keyframes ckIn { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .ck-head { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 8px; gap: 8px; flex-wrap: wrap; }
+    .ck-head h3 { margin: 0; display: flex; gap: 8px; align-items: center; }
+    @media (prefers-reduced-motion: reduce) { .ckpt.new { animation: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="diff" data-demo="diff-gan">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="wand"></i> Diffusion · Chapter 8 · Lesson 8.3</span>
+      <h1>Forger <span class="em">vs</span> Detective</h1>
+      <p class="hero-sub">Two little brains play a game. The forger makes fake dots. The detective tries to catch them. Each one gets better because of the other. First, you be the detective!</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Hi! Pick a <b>dot pattern</b> on the right. Robo is getting the forgery lab ready…</p>
+      </div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="search"></i> 1. You be the detective</h2>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="view-head">
+          <span class="title"><i data-icon="eye"></i> Is this dot real or forged?</span>
+          <span class="chip accent" id="g-chip">round 1 / 10</span>
+        </div>
+        <canvas id="game" aria-label="A mystery dot among real example dots"></canvas>
+        <div class="ans">
+          <button class="btn real" id="g-real" disabled><i data-icon="check"></i> Real</button>
+          <button class="btn fake" id="g-fake" disabled><i data-icon="x"></i> Forged</button>
+        </div>
+        <div class="game-note" id="g-note" aria-live="polite">Getting ready…</div>
+        <div class="legend"><span><i class="sw real"></i>real example dots</span><span><i class="sw fake"></i>the mystery dot (the ringed one)</span></div>
+      </div>
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> The game</h3>
+          <div class="field">
+            <span class="lbl">How good is the forger?</span>
+            <div class="seg" id="g-level">
+              <button data-v="0" class="on">Rookie</button><button data-v="1">Learning</button><button data-v="2">Good</button><button data-v="3">Master</button>
+            </div>
+            <div class="hint">These are the forger at different practice stages, with Robo's detective from the same moment.</div>
+          </div>
+          <div class="score">
+            <div class="stat"><div class="k">You</div><div class="v" id="g-you">0</div></div>
+            <div class="stat"><div class="k">Robo detective</div><div class="v" id="g-bot">0</div></div>
+          </div>
+          <div class="pipsrow" id="g-pips" aria-hidden="true"></div>
+          <div class="btn-row"><button class="btn small" id="g-new"><i data-icon="repeat"></i> New game</button></div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="trend"></i> 2. Watch them learn</h2>
+    <section class="stage">
+      <div class="left-col">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="msg"></div>
+          <div class="view-head">
+            <span class="title" id="view-title"><i data-icon="film"></i> The forger's dots</span>
+            <span class="chip accent" id="view-chip">practice 0</span>
+          </div>
+          <canvas id="view" aria-label="Real dots, forged dots and the detective's heat map"></canvas>
+          <div class="legend" style="margin-top:8px"><span><i class="sw real"></i>real dots</span><span><i class="sw fake"></i>forged dots</span><span><i class="sw heat"></i>where the detective thinks "real"</span></div>
+          <div class="toggles">
+            <button class="btn small on" id="tg-heat"><i data-icon="eye"></i> Detective's map</button>
+            <button class="btn small on" id="tg-arrows"><i data-icon="arrow-right"></i> Hints</button>
+            <button class="btn small on" id="tg-real"><i data-icon="target"></i> Real dots</button>
+            <button class="btn small hidden" id="tg-live"><i data-icon="reset"></i> Back to live</button>
+          </div>
+          <div class="ck-head">
+            <h3><i data-icon="flag"></i> Checkpoints</h3>
+            <span class="muted" style="font-size:.88rem;font-weight:700">Tap a card to see the forger's earlier fakes.</span>
+          </div>
+          <div class="checkpoints" id="ckpts"><div class="ck-empty">Press <b>Robo, train both!</b> to save the first checkpoint.</div></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="search"></i> What's happening inside</h3>
+          <div class="sides">
+            <div class="side" id="side-d">
+              <h4><i data-icon="eye"></i> The detective</h4>
+              <p id="d-say">Shown real dots and forged dots. It has to say which is which.</p>
+              <div class="muted" style="font-size:.88rem;font-weight:700" id="d-num"></div>
+            </div>
+            <div class="side" id="side-g">
+              <h4><i data-icon="wand"></i> The forger</h4>
+              <p id="g-say">Starts from random numbers and turns them into dots. It never sees the real ones!</p>
+              <div class="muted" style="font-size:.88rem;font-weight:700" id="f-num"></div>
+            </div>
+          </div>
+          <p class="muted" style="margin:10px 0 0;font-weight:700">The forger never peeks at the real dots. Its only teacher is the detective's opinion, shown as the hint arrows: "move this way to look more real."</p>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="target"></i> Real pattern</h3>
+          <div class="shape-seg" id="shapes">
+            <button class="btn small on" data-s="ring">Ring</button>
+            <button class="btn small" data-s="moons">Two blobs</button>
+            <button class="btn small" data-s="blobs4">Four blobs</button>
+            <button class="btn small" data-s="heart">Heart<small>usually works</small></button>
+            <button class="btn small" data-s="spiral" style="grid-column: span 2">Spiral<small>tricky, often smudgy</small></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="cpu"></i> Training</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Robo, train both!</button>
+            <button class="btn" id="reset" title="Two new baby brains"><i data-icon="reset"></i> Reset</button>
+          </div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn small" id="step"><i data-icon="step"></i> <span id="step-lbl">Detective's turn</span></button>
+          </div>
+          <div class="field">
+            <label for="speed">Speed <span class="val" data-for="speed"></span></label>
+            <input type="range" id="speed" min="0" max="3" value="1" step="1">
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Rounds</div><div class="v" id="st-step">0</div></div>
+            <div class="stat"><div class="k">Detective right</div><div class="v" id="st-acc">–</div></div>
+            <div class="stat"><div class="k">Fakes off by</div><div class="v" id="st-dist">–</div></div>
+          </div>
+          <canvas id="chart"></canvas>
+          <div class="legend" style="font-size:.8rem"><span><i style="background:var(--nn)"></i>Detective right (50% = fooled)</span><span><i style="background:var(--bad)"></i>Fakes' distance (lower = better)</span></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Settings</h3>
+          <div class="field">
+            <span class="lbl">Detective</span>
+            <div class="seg" id="strength"><button data-v="lazy">Lazy</button><button data-v="fair" class="on">Fair</button><button data-v="strong">Super-strong</button></div>
+            <div class="hint">How much the detective practises per forger turn. Changing this starts over.</div>
+          </div>
+          <div class="field">
+            <span class="lbl">Forger's learning rule</span>
+            <div class="seg" id="rule"><button data-v="ns" class="on">Smarter</button><button data-v="sat">Classic</button></div>
+            <div class="hint">Smarter keeps giving useful hints even when the detective is very sure.</div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <h2 class="section-title"><i data-icon="bug"></i> 3. When the game goes wrong</h2>
+    <div class="card">
+      <p style="margin-top:0;font-weight:700">Each button starts a fresh run with a setting that provokes a famous GAN problem. The chart marks the moment it happens.</p>
+      <div class="chal" id="chal">
+        <button class="btn" data-c="strong"><i data-icon="zap"></i> A super-strong detective: the forger gets stuck</button>
+        <button class="btn" data-c="collapse"><i data-icon="groups"></i> Mode collapse: the forger only copies a few blobs</button>
+        <button class="btn" data-c="lazy"><i data-icon="coffee"></i> A lazy detective: the forger runs wild</button>
+      </div>
+      <div class="chal-note robo-say"><div class="robo"></div><p class="bubble" id="chal-say">Pick a challenge. I will explain what to look for.</p></div>
+      <div class="btn-row" style="margin-top:12px"><button class="btn small hidden" id="fix-rule"><i data-icon="wrench"></i> Give the forger the smarter rule</button></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="wand"></i></div><h3>The forger makes fakes</h3><p>It starts with random numbers and turns them into dots. At first they are just a smudge in the middle.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>The detective guesses</h3><p>It sees real dots and forged dots, says "real" or "fake" for each, and learns from its mistakes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="arrow-right"></i></div><h3>The detective gives hints</h3><p>Its opinion slopes up towards "looks real". Those slopes are the arrows the forger follows.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Take turns, again and again</h3><p>A better detective makes better hints. Better fakes make the detective work harder. Both improve together.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The <b>forger</b> and the <b>detective</b> took turns, and only the detective ever saw the real dots.</li>
+        <li>At first the fakes were a smudge and the detective caught nearly all of them.</li>
+        <li>As the forger improved, the detective's score fell towards <b>50%</b>: a coin flip means the fakes are good!</li>
+        <li>If one side wins too hard, learning can <b>stall</b>. A lazy or super-strong detective makes the game unfair.</li>
+        <li>The forger can also play it safe and copy only a few blobs. That is <b>mode collapse</b>.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <ul>
+          <li><span class="term">A real GAN, in your browser.</span> A generative adversarial network (Goodfellow et al., 2014) trained live in plain JavaScript with hand-written backprop. The <b>generator</b> is an MLP 4 → 24 → 24 → 2 (tanh hidden, linear output) that maps Gaussian noise z to a 2-D point. The <b>discriminator</b> is an MLP 2 → 24 → 24 → 1 with a sigmoid output giving P(real). Both use Adam (β₁ = 0.5, gradient clipping), batch 64 real + 64 fake.</li>
+          <li><span class="term">The minimax game.</span> min<sub>G</sub> max<sub>D</sub> E[log D(x)] + E[log(1 − D(G(z)))]. With a perfect discriminator the generator minimises the Jensen-Shannon divergence between data and model. At the ideal equilibrium D = ½ everywhere, which is why the "detective right" line hovers near 50%.</li>
+          <li><span class="term">Non-saturating loss.</span> "Classic" minimises log(1 − D(G(z))), which has a vanishing gradient when D confidently rejects fakes. "Smarter" maximises log D(G(z)) instead (the non-saturating heuristic from the original paper): same fixed point, strong gradient early. In the super-strong challenge the forger starts far from the data; in our runs the classic rule stayed stuck while the smarter rule recovered. This is a demonstration on a toy, not a proof.</li>
+          <li><span class="term">Mode collapse.</span> With a fast generator and a slow discriminator the generator can hop between a few modes the discriminator currently under-penalises. The chart uses a fixed noise set, so you see the same fakes move over time. We report how many of the real blobs hold forged dots. It is seed-dependent, which is typical.</li>
+          <li><span class="term">Instability.</span> GAN training is a two-player game, not a single falling loss, so there is no number that just goes down. Real systems use tricks such as spectral normalisation, WGAN-GP, two-timescale updates and careful balance. Some datasets here (spiral, sometimes heart) are unreliable for this tiny network and are labelled.</li>
+          <li><span class="term">Why the dist metric.</span> "Fakes off by" is the mean distance from each forged dot to its nearest real sample (lower is better). It can look good during mode collapse, so coverage of the blobs is checked as well.</li>
+          <li><span class="term">Deepfakes and diffusion.</span> Face-swap and "deepfake" images of the late 2010s were largely GANs (StyleGAN and friends). Diffusion models largely replaced them for image generation because they train with a plain regression loss (no adversary, so no mode collapse or balancing act), cover the data distribution better, and scale well with text conditioning. GANs are still fast, since one forward pass makes a sample.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/diff-gan-core.js"></script>
+  <script src="js/diff-gan.js"></script>
+</body>
+</html>

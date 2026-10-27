@@ -1,9 +1,8 @@
 // Mouse Finds Cheese — tabular Q-learning on an editable grid world.
 (function () {
-  const N = 8, CELL = 70, W = N * CELL, H = N * CELL;
-  const EMPTY = 0, WALL = 1, TRAP = 2, CHEESE = 3;
-  const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // up, right, down, left
-  const R_CHEESE = 10, R_TRAP = -10, R_STEP = -0.1, R_BUMP = -0.3, MAX_STEPS = 150;
+  const MC = window.MazeCore;
+  const { N, EMPTY, WALL, TRAP, CHEESE, DIRS, MAX_STEPS, idx, inside } = MC;
+  const CELL = 70, W = N * CELL, H = N * CELL;
   const SPEEDS = [
     { name: "0.5×", sps: 3 }, // half of Walk (6)
     { name: "Walk", sps: 6 },
@@ -12,49 +11,6 @@
     { name: "Turbo", sps: 0 },
   ];
   const TURBO_STEPS_PER_FRAME = 3000;
-
-  const PRESETS = {
-    tricky: [
-      "M..#....",
-      ".#.#.##.",
-      ".#...#..",
-      ".####.T.",
-      "......#.",
-      "T##.#.#.",
-      "...#..#.",
-      ".#...T#C",
-    ],
-    cliff: [
-      "........",
-      "........",
-      "........",
-      "........",
-      "........",
-      "........",
-      "........",
-      "MTTTTTTC",
-    ],
-    open: [
-      "M.......",
-      "........",
-      "...T....",
-      "........",
-      ".....T..",
-      "..T.....",
-      "........",
-      ".......C",
-    ],
-    empty: [
-      "M.......",
-      "........",
-      "........",
-      "........",
-      "........",
-      "........",
-      "........",
-      "........",
-    ],
-  };
 
   const cv = document.getElementById("maze");
   const { ctx } = ML.setupCanvas(cv, W, H);
@@ -77,18 +33,8 @@
   let ckpts = [], view = null, ckDirty = true;
   let lastSay = 0, lastTurboSay = 0, flash = null, facing = 1;
 
-  const idx = (x, y) => y * N + x;
-  const inside = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
-
   function loadPreset(name) {
-    const rows = PRESETS[name];
-    grid.fill(EMPTY);
-    rows.forEach((row, y) => [...row].forEach((ch, x) => {
-      if (ch === "#") grid[idx(x, y)] = WALL;
-      else if (ch === "T") grid[idx(x, y)] = TRAP;
-      else if (ch === "C") grid[idx(x, y)] = CHEESE;
-      else if (ch === "M") start = { x, y };
-    }));
+    start = MC.loadPreset(name, grid, start);
     resetBrain(false);
   }
 
@@ -109,33 +55,13 @@
     anim = null;
   }
 
-  const maxQ = (s) => Math.max(Q[s * 4], Q[s * 4 + 1], Q[s * 4 + 2], Q[s * 4 + 3]);
-  function argmaxQ(s) {
-    let best = -Infinity, picks = [];
-    for (let a = 0; a < 4; a++) {
-      const q = Q[s * 4 + a];
-      if (q > best + 1e-9) { best = q; picks = [a]; }
-      else if (Math.abs(q - best) <= 1e-9) picks.push(a);
-    }
-    return picks[Math.floor(Math.random() * picks.length)];
-  }
+  const maxQ = (s) => MC.maxQ(Q, s);
 
   // One real Q-learning step. Returns what happened so the narrator can talk about it.
   function stepAgent() {
-    const s = idx(agent.x, agent.y);
-    const explored = Math.random() < P.eps;
-    const a = explored ? Math.floor(Math.random() * 4) : argmaxQ(s);
-    let nx = agent.x + DIRS[a][0], ny = agent.y + DIRS[a][1];
+    const { s, a, nx, ny, explored, bumped, outcome: o } = MC.qStep(Q, grid, agent, P);
     if (DIRS[a][0]) facing = DIRS[a][0];
-    let r = R_STEP, bumped = false;
-    if (!inside(nx, ny) || grid[idx(nx, ny)] === WALL) { nx = agent.x; ny = agent.y; r = R_BUMP; bumped = true; }
-    const ns = idx(nx, ny);
-    const cell = grid[ns];
-    let outcome = null;
-    if (cell === CHEESE) { r = R_CHEESE; outcome = "cheese"; }
-    else if (cell === TRAP) { r = R_TRAP; outcome = "trap"; }
-    const target = outcome ? r : r + P.gamma * maxQ(ns);
-    Q[s * 4 + a] += P.alpha * (target - Q[s * 4 + a]);
+    let outcome = o;
     visited[s] = 1;
 
     const from = { x: agent.x, y: agent.y };
@@ -160,28 +86,7 @@
   }
 
   // Follow the favorite arrows from the start and see where they lead.
-  function greedyPath() {
-    const path = [{ x: start.x, y: start.y }];
-    const seen = new Set([idx(start.x, start.y)]);
-    let x = start.x, y = start.y;
-    for (let i = 0; i < N * N; i++) {
-      const s = idx(x, y);
-      const qs = [0, 1, 2, 3].map((a) => Q[s * 4 + a]);
-      const best = Math.max(...qs);
-      if (qs.every((q) => q === best)) return { path, reached: false };
-      const a = qs.indexOf(best);
-      let nx = x + DIRS[a][0], ny = y + DIRS[a][1];
-      if (!inside(nx, ny) || grid[idx(nx, ny)] === WALL) return { path, reached: false };
-      x = nx; y = ny;
-      path.push({ x, y });
-      const c = grid[idx(x, y)];
-      if (c === CHEESE) return { path, reached: true };
-      if (c === TRAP) return { path, reached: false };
-      if (seen.has(idx(x, y))) return { path, reached: false };
-      seen.add(idx(x, y));
-    }
-    return { path, reached: false };
-  }
+  const greedyPath = () => MC.greedyPath(Q, grid, start);
 
   function checkCelebrate() {
     if (celebrated) return;
