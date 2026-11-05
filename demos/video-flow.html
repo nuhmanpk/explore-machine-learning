@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spot the Motion · Explore ML</title>
+  <meta name="description" content="Compare two video frames block by block and draw arrows where things moved: block-matching optical flow, the aperture problem and noise, all in your browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    canvas.px { image-rendering: pixelated; }
+    #flow { cursor: crosshair; }
+    .twin { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .view-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px 4px; display: flex; align-items: center; gap: 6px; }
+    .view-label .tag { margin-left: auto; text-transform: none; letter-spacing: 0; color: var(--accent); }
+    .howto { display: flex; gap: 10px; align-items: flex-start; background: var(--bg-2); border: 2px dashed var(--line); border-radius: 14px; padding: 10px 12px; margin: 0 0 12px; font-weight: 700; font-size: .9rem; }
+    .howto b { color: var(--accent); }
+    .howto ol { margin: 0; padding-left: 18px; }
+    .stat .v { font-size: 1.3rem; }
+    .stat { min-width: 0; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done > span:last-child > span:first-child { color: var(--good); }
+    .chal .try { display: none; font-weight: 600; color: var(--ink-2); font-size: .86rem; margin-top: 2px; }
+    .chal.done .try { display: block; }
+    .cap { margin: 6px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .peek { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .peek figure { margin: 0; min-width: 0; }
+    .peek figcaption { font-weight: 800; font-size: .8rem; margin-bottom: 4px; }
+    .seg button[aria-pressed="true"] { background: var(--card); color: var(--accent); box-shadow: var(--shadow-sm); }
+    .bylayer { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: .85rem; font-weight: 700; }
+    .bylayer .bad { color: var(--bad); } .bylayer .ok { color: var(--good); }
+    .wheel-wrap { display: none; align-items: center; gap: 8px; }
+    .wheel-wrap.show { display: flex; }
+    .wheel-wrap canvas { width: 44px; height: 44px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="video" data-demo="video-flow">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="film"></i> Video generation</span>
+      <h1>Spot the <span class="em">Motion</span></h1>
+      <p class="hero-sub">Two pictures from a video, a moment apart. Can a computer work out what moved, which way, and how far? It plays a giant game of spot-the-difference, one little square at a time.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I cut picture A into little squares called <b>blocks</b>. For each block, I hunt around in picture B for the spot that looks the same. Then I draw an arrow: "this bit moved over there!" <b>Tap any block</b> on the big picture to watch me hunt.</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="howto"><i data-icon="info"></i><ol>
+          <li>Look at <b>picture A</b> and <b>picture B</b>. The square slides, the ball rolls, the windmill spins.</li>
+          <li>The big picture shows my <b>arrows</b>: <span style="color:var(--good)">green</span> = right, <span style="color:var(--bad)">red</span> = wrong.</li>
+          <li><b>Tap a block</b> to see my hunt, then try the challenges below.</li>
+        </ol></div>
+        <div class="twin">
+          <div><p class="view-label"><i data-icon="image"></i> Picture A <span class="tag">first</span></p><canvas id="fa" class="cv px" role="img" aria-label="Frame A of the scene: a chequered square, an orange ball, a spinning windmill wheel over a sky and grass background"></canvas></div>
+          <div><p class="view-label"><i data-icon="image"></i> Picture B <span class="tag">a moment later</span></p><canvas id="fb" class="cv px" role="img" aria-label="Frame B, a moment later: things have moved a little"></canvas></div>
+        </div>
+        <div class="cp-head" style="margin-bottom:6px">
+          <p class="view-label" style="margin:0"><i data-icon="target"></i> Robo's motion arrows <span class="tag" id="viewtag"></span></p>
+          <div class="btn-row">
+            <button class="btn small" id="flick"><i data-icon="repeat"></i> Flick A ↔ B</button>
+          </div>
+        </div>
+        <canvas id="flow" class="cv px" tabindex="0" role="img" aria-label="Picture A cut into blocks, with an arrow on each block showing where Robo thinks it moved. Tap or use arrow keys to pick a block."></canvas>
+        <p class="cap" id="flowcap">Each arrow starts in the middle of a block and points to where that block went. The yellow box is the block you picked.</p>
+        <div class="wheel-wrap" id="wheelwrap"><canvas id="wheel" role="img" aria-label="Colour wheel: the colour shows the direction of motion, stronger colour means faster"></canvas><span class="cap" style="margin:0">Colour = which way it moved (see the wheel). Pale = barely moved, strong = moved a lot.</span></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Robo's hunting tools</h3>
+          <div class="field">
+            <label for="bs">Block size <span class="val"><b data-for="bs">8</b></span></label>
+            <input type="range" id="bs" min="4" max="16" step="2" value="8" aria-describedby="bs-hint">
+            <div class="hint" id="bs-hint">How big each little square is. Small blocks see fine detail but get fooled easily. Big blocks are steady but blur edges.</div>
+          </div>
+          <div class="field">
+            <label for="r">Search distance <span class="val"><b data-for="r">6</b></span></label>
+            <input type="range" id="r" min="1" max="12" step="1" value="6" aria-describedby="r-hint">
+            <div class="hint" id="r-hint">How far I look around in picture B. If something moves further than this, I can never find it!</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="film"></i> Change the video</h3>
+          <div class="field">
+            <label for="speed">How fast things move <span class="val"><b data-for="speed">1×</b></span></label>
+            <input type="range" id="speed" min="1" max="3" step="0.5" value="1" aria-describedby="sp-hint">
+            <div class="hint" id="sp-hint">Faster means things jump further between the two pictures.</div>
+          </div>
+          <div class="field">
+            <span class="lbl">Extras</span>
+            <div class="seg" id="extras">
+              <button type="button" data-k="wall" aria-pressed="false" title="Adds a plain wall with no pattern that slides right">Blank wall</button>
+              <button type="button" data-k="zoom" aria-pressed="false" title="The camera zooms in, so the background spreads outwards">Zoom in</button>
+              <button type="button" data-k="noise" aria-pressed="false" title="Adds speckles, like a video filmed in the dark">Noisy camera</button>
+            </div>
+            <div class="hint">Each extra makes my job harder in a different way.</div>
+          </div>
+          <div class="field">
+            <span class="lbl">Show</span>
+            <div class="seg" id="view">
+              <button type="button" data-v="arrows" class="on" title="My arrows, green if right and red if wrong">My arrows</button>
+              <button type="button" data-v="colours" title="Paint each block by direction">Colours</button>
+              <button type="button" data-v="truth" title="The real motion, to check me">True motion</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How good are my arrows?</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Average miss</div><div class="v" id="avg">0</div></div>
+            <div class="stat"><div class="k">Arrows right</div><div class="v" id="good" style="color:var(--good)">0</div></div>
+            <div class="stat"><div class="k">Worst thing</div><div class="v" id="worst" style="font-size:1rem">-</div></div>
+          </div>
+          <div class="bylayer" id="bylayer" aria-live="polite"></div>
+          <p class="cap" style="margin:0">"Miss" = how many dots my arrow tip lands away from the true spot. Under 1 dot counts as right.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="search"></i> Inside one block</h3>
+          <div class="peek">
+            <figure><figcaption>Where I looked in B</figcaption><canvas id="win" class="cv px" role="img" aria-label="Zoomed search window in picture B, with the block's best match outlined"></canvas></figure>
+            <figure><figcaption>Match map</figcaption><canvas id="heat" class="cv px" role="img" aria-label="Heatmap of how different each possible move looks; bright means a good match"></canvas></figure>
+          </div>
+          <p class="cap" id="peektext" aria-live="polite"></p>
+          <p class="cap" style="margin:0">Match map: every square is one move I tried. <b>Bright = looks the same</b>, dark = looks different. The ring is my pick, the + is the true move.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-fast"><span class="tick"></span><span><span>Catch the speedy square: set the speed to 2× or more, then change my tools until the square's arrows are right (miss under 1 dot).</span>
+        <span class="try">Try this: set the search distance back to 3 and watch the square's arrows go red. I just can't look far enough!</span></span></div>
+      <div class="chal" id="c-wall"><span class="tick"></span><span><span>The blank wall puzzle: turn on the blank wall, then tap a block right in the middle of it. Look at the match map.</span>
+        <span class="try">Try this: tap a block on the wall's top edge. The edge is a straight line, so sliding along it still looks the same. Grown-ups call this the aperture problem.</span></span></div>
+      <div class="chal" id="c-noise"><span class="tick"></span><span><span>Beat the speckles: at 1× speed with only the noisy camera turned on, get the average miss under 1 dot.</span>
+        <span class="try">Try this: switch to Colours. With tiny blocks the speckles make a messy rainbow; with big blocks the colours calm down.</span></span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>I cut picture A into blocks and, for each one, slid it around picture B looking for the best match. The best spot gives the arrow.</li>
+      <li>"Best match" means the smallest total difference in brightness, dot by dot. The match map shows that difference for every move I tried.</li>
+      <li>If something moves further than my search distance, I simply cannot find it. Faster video needs a bigger search.</li>
+      <li>A block with no pattern (the blank wall) looks the same everywhere, so every move is equally good and I just guess. Patterns and corners are what make motion visible.</li>
+      <li>Speckle noise confuses small blocks. Bigger blocks average more dots, so the noise cancels out, but they blur the edges between different moving things.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Cut into blocks</h3><p>Picture A is chopped into a grid of little squares, like a chocolate bar.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Hunt</h3><p>Each block is slid to every spot nearby in picture B: left, right, up, down.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Score</h3><p>At each spot, add up how different every dot looks. Small total = good match.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="arrow-right"></i></div><h3>Draw the arrow</h3><p>The best spot wins. The arrow goes from the block to that spot.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="check"></i></div><h3>Check</h3><p>Because this video is made up, we know the true motion and can mark each arrow right or wrong.</p></div>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">block-matching optical flow</span>, the workhorse of video codecs (MPEG/H.264 motion estimation) and the simplest way to estimate a dense motion field.</p>
+        <ul>
+          <li><b>Brightness constancy:</b> we assume a point keeps its brightness as it moves, <code>I<sub>A</sub>(x) ≈ I<sub>B</sub>(x + d)</code>. Lighting changes, shadows, noise and blur break this assumption.</li>
+          <li><b>Matching cost:</b> for each <code>b×b</code> block we exhaustively test every integer displacement <code>d</code> with <code>|d<sub>x</sub>|, |d<sub>y</sub>| ≤ r</code> and minimise the <span class="term">SAD</span> (sum of absolute differences) on luminance. SSD (squared) or normalised cross-correlation are common alternatives; SSD is the maximum-likelihood choice under Gaussian noise, SAD is more robust to outliers. A tiny penalty <code>λ|d|<sub>1</sub></code> breaks ties towards zero motion, and a parabola fitted through the minimum and its neighbours gives sub-pixel estimates.</li>
+          <li><b>The aperture problem:</b> a textureless patch constrains nothing, and a patch containing only a straight edge constrains only the motion component perpendicular to that edge. The cost surface becomes a flat plateau or a long valley. The structure tensor (second-moment matrix of the image gradient) measures this: you need two large eigenvalues, i.e. a corner or texture.</li>
+          <li><b>Trade-offs:</b> larger blocks average more pixels (noise variance falls like <code>1/b²</code>) but assume one translation per block, so they fail at motion boundaries, on rotation and on zoom. The search range must exceed the largest displacement; real systems use coarse-to-fine image pyramids instead of huge windows.</li>
+          <li><b>Beyond block matching:</b> <span class="term">Lucas–Kanade</span> linearises brightness constancy and solves a 2×2 least-squares system per window; Horn–Schunck adds a global smoothness term. Modern deep methods such as FlowNet, PWC-Net and <span class="term">RAFT</span> learn features, build a full correlation (cost) volume much like the match map here, and refine the flow iteratively with a recurrent update. They are trained on synthetic data with known ground truth (FlyingChairs, Sintel), exactly as this scene provides.</li>
+        </ul>
+        <p>Evaluation uses the <span class="term">end-point error</span> (EPE): the Euclidean distance between the estimated vector and the ground-truth flow averaged over the block. The scene is procedural: each layer has an analytic motion (translation, rotation, zoom), so ground truth is exact. Frames are 128×96, 2×2 supersampled; noise is Gaussian with σ = 0.08.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/video-flow-core.js"></script>
+  <script src="js/video-flow.js"></script>
+</body>
+</html>

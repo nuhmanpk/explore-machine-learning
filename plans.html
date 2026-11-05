@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Learning Plans · Explore ML</title>
+  <meta name="description" content="Pick a learning plan: short self-paced paths through the Explore Machine Learning course (first hour of ML, how ChatGPT works, games that learn and more) plus ready-to-teach classroom plans with warm-ups, discussion questions and exit tickets.">
+  <link rel="canonical" href="https://nuhmanpk.github.io/explore-machine-learning/plans.html">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Learning Plans · Explore Machine Learning">
+  <meta property="og:description" content="Self-paced paths and classroom plans built from 100+ live machine learning lessons.">
+  <meta property="og:url" content="https://nuhmanpk.github.io/explore-machine-learning/plans.html">
+  <meta property="og:image" content="https://nuhmanpk.github.io/explore-machine-learning/og-image.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="plans" data-topic="intro">
+  <header class="topbar"></header>
+  <main class="wrap" id="plans-app">
+    <section class="hero hero-split plans-hero">
+      <div>
+        <span class="kicker"><i data-icon="flag"></i> Learning plans</span>
+        <h1>Pick a path, <span class="rainbow">follow the steps</span></h1>
+        <p class="hero-sub">Short routes through the course for a goal you care about, plus ready-to-teach plans for classrooms and clubs. Your progress is saved on this device, so "Continue" always takes you to your next lesson.</p>
+        <div class="cta-row btn-row">
+          <a class="btn primary" href="#paths-title" style="--b: var(--intro)"><i data-icon="footprints"></i> Self-paced paths</a>
+          <a class="btn" href="#classes-title"><i data-icon="teacher"></i> Classroom plans</a>
+        </div>
+      </div>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Not sure where to start? Try <b>Your first hour of ML</b>. It visits a bit of everything in under an hour, or answer three quick questions below.</p>
+      </div>
+    </section>
+
+    <h2 class="section-title" id="howto-title"><i data-icon="info"></i> How to use plans</h2>
+    <div class="steps plan-howto">
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Pick a path</h3><p>Choose one that matches your age, your time and what you find exciting. Not sure? Use the picker below.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="footprints"></i></div><h3>Follow the steps</h3><p>Open the steps. Each one tells you what to notice, and some have a small challenge to try.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="check"></i></div><h3>Track your progress</h3><p>Press "Mark as done" at the end of a lesson. Come back here and "Continue" jumps to your next one.</p></div>
+    </div>
+
+    <h2 class="section-title" id="pick-title"><i data-icon="question"></i> Not sure where to start?</h2>
+    <form class="plan-picker card" id="plan-picker" aria-labelledby="pick-title">
+      <fieldset class="set-row">
+        <legend>1. How old is the learner?</legend>
+        <div class="seg">
+          <label><input type="radio" name="q-age" value="u10"><span>Under 10</span></label>
+          <label><input type="radio" name="q-age" value="mid"><span>10 to 13</span></label>
+          <label><input type="radio" name="q-age" value="teen"><span>14 to 18</span></label>
+          <label><input type="radio" name="q-age" value="adult"><span>Grown-up</span></label>
+          <label><input type="radio" name="q-age" value="teacher"><span>I'm teaching a group</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="set-row">
+        <legend>2. How much time do you have?</legend>
+        <div class="seg">
+          <label><input type="radio" name="q-time" value="45"><span>About 45 minutes</span></label>
+          <label><input type="radio" name="q-time" value="60"><span>About an hour</span></label>
+          <label><input type="radio" name="q-time" value="0"><span>Plenty, over a few days</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="set-row">
+        <legend>3. What sounds most fun?</legend>
+        <div class="seg">
+          <label><input type="radio" name="q-like" value="all"><span>A bit of everything</span></label>
+          <label><input type="radio" name="q-like" value="games"><span>Games and robots</span></label>
+          <label><input type="radio" name="q-like" value="chat"><span>Chatbots</span></label>
+          <label><input type="radio" name="q-like" value="pictures"><span>Pictures and art</span></label>
+          <label><input type="radio" name="q-like" value="brains"><span>How brains work</span></label>
+          <label><input type="radio" name="q-like" value="data"><span>Data and maths</span></label>
+          <label><input type="radio" name="q-like" value="fair"><span>Fairness and safety</span></label>
+        </div>
+      </fieldset>
+      <div><button type="submit" class="btn primary" style="--b: var(--intro)"><i data-icon="sparkles"></i> Pick a plan for me</button></div>
+      <div id="pick-out" class="pick-out" aria-live="polite"></div>
+    </form>
+
+    <h2 class="section-title" id="browse-title"><i data-icon="layers"></i> Browse all plans</h2>
+    <form class="plan-filters card" id="plan-filters" aria-label="Filter plans" onsubmit="return false">
+      <fieldset class="set-row">
+        <legend>Who is learning?</legend>
+        <div class="seg">
+          <label><input type="radio" name="aud" value="all" checked><span>Everyone</span></label>
+          <label><input type="radio" name="aud" value="kids"><span>Kids</span></label>
+          <label><input type="radio" name="aud" value="teens"><span>Teens</span></label>
+          <label><input type="radio" name="aud" value="adults"><span>Adults</span></label>
+          <label><input type="radio" name="aud" value="teachers"><span>Teachers</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="set-row">
+        <legend>How much time?</legend>
+        <div class="seg">
+          <label><input type="radio" name="time" value="0" checked><span>Any</span></label>
+          <label><input type="radio" name="time" value="45"><span>Up to 45 min</span></label>
+          <label><input type="radio" name="time" value="60"><span>Up to 1 hour</span></label>
+          <label><input type="radio" name="time" value="150"><span>Up to 2½ hours</span></label>
+        </div>
+      </fieldset>
+      <div class="plan-filter-foot">
+        <span class="muted" id="plan-count" role="status"></span>
+        <button type="button" class="reset-link" id="plan-reset">Clear filters</button>
+      </div>
+    </form>
+
+    <h2 class="section-title" id="paths-title"><i data-icon="footprints"></i> Self-paced paths</h2>
+    <p class="muted plan-intro">Go at your own speed. Each step says what to notice, and some have a challenge to try. Times add up the lessons in the path.</p>
+    <div class="plans" id="paths"></div>
+    <p class="muted hidden plan-empty" id="paths-empty">No path matches those filters. Try a longer time or "Everyone".</p>
+
+    <h2 class="section-title" id="classes-title"><i data-icon="teacher"></i> Classroom plans</h2>
+    <p class="muted plan-intro">For teachers, club leaders and parents. Every session has objectives, an unplugged warm-up, the lessons to use, discussion questions, an exit ticket and ideas for younger and older learners. Use "Print this plan" for a paper copy.</p>
+    <div class="plans" id="classes"></div>
+    <p class="muted hidden plan-empty" id="classes-empty">No classroom plan matches those filters.</p>
+
+    <div class="next-nav">
+      <a href="index.html#course"><span class="ne"><i data-icon="map"></i></span><span><small>Or explore freely</small>The course map</span></a>
+      <a class="right" href="demos/intro-ml.html"><span><small>Brand new?</small>What is Machine Learning?</span><span class="ne"><i data-icon="bulb"></i></span></a>
+    </div>
+  </main>
+
+  <script src="js/catalog.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/plans.js"></script>
+</body>
+</html>

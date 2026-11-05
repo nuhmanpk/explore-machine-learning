@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/</loc><lastmod>2026-10-24</lastmod><priority>1.0</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/plans.html</loc><lastmod>2026-11-05</lastmod><priority>0.8</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=intro</loc><lastmod>2026-10-24</lastmod><priority>0.8</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=sup</loc><lastmod>2026-10-24</lastmod><priority>0.8</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=unsup</loc><lastmod>2026-10-24</lastmod><priority>0.8</priority></url>
@@ -44,11 +45,15 @@
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/lang-rlhf.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/vlm-match.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/vlm-caption.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/vlm-ask.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/diff-train.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/diff-noise.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/audio-ear.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/audio-music.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/audio-pitch.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/video-next.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/video-flow.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/video-interp.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ai-agent.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ai-pathfinder.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ai-minimax.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
@@ -72,16 +77,21 @@
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/vision-scan.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/lang-embed.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/lang-attend.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/lang-temp.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/sup-traintest.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/sup-spam.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/sup-metrics.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/unsup-recommend.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/unsup-pca.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/unsup-dbscan.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/nn-lr.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/nn-backprop.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/nn-activation.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/nn-dropout.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/rl-hack.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/vision-detect.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/diff-gan.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/diff-guide.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ai-fails.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ai-privacy.html</loc><lastmod>2026-10-24</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/data-clean.html</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>
@@ -104,6 +114,9 @@
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ens-bagging.html</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ens-boost.html</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ens-compare.html</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ens-gbm.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ens-xgb.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
+  <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/ens-cat.html</loc><lastmod>2026-11-05</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/gen-compress.html</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/gen-latent.html</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>
   <url><loc>https://nuhmanpk.github.io/explore-machine-learning/demos/gen-vae.html</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>

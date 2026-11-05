@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hide and Seek · Explore ML</title>
+  <meta name="description" content="Hide in the garden while a seeker robot learns where you like to hide. Watch its 'where do they hide?' map glow, switch habits and see it adapt, and discover why hiding at random is the best strategy.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="rl-games.css">
+  <style>
+    .howto { background: var(--accent-soft); border-radius: 12px; padding: 10px 12px 10px 30px; margin: 0; font-weight: 700; font-size: .86rem; display: grid; gap: 4px; }
+    #garden { max-width: 760px; cursor: pointer; }
+    .spots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 10px; }
+    .spots .btn { padding: 7px 4px; font-size: .8rem; flex-direction: column; gap: 0; line-height: 1.15; white-space: normal; }
+    .spots .btn kbd { font-size: .68rem; }
+    .spots .btn:disabled { opacity: .45; cursor: default; }
+    .under { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .toggle { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: .92rem; cursor: pointer; }
+    .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .strip { display: flex; gap: 4px; flex-wrap: wrap; min-height: 22px; margin-top: 8px; }
+    .strip i { width: 22px; height: 22px; border-radius: 7px; display: inline-grid; place-items: center; font-style: normal; font-size: .7rem; font-weight: 800; color: #fff; background: var(--muted); }
+    .strip i.hard { background: var(--good); }
+    .strip i.easy { background: var(--bad); }
+    .panel.left .card, .chals, .bots { min-width: 0; }
+    .bots { display: grid; gap: 6px; }
+    .bots button { justify-content: flex-start; width: 100%; text-align: left; flex-wrap: wrap; white-space: normal; }
+    .bots button small { display: block; width: 100%; font-weight: 700; color: var(--muted); font-size: .74rem; }
+    .chals { display: grid; gap: 10px; }
+    .chal { border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 6px; font-size: .86rem; font-weight: 700; }
+    .chal h4 { margin: 0; display: flex; gap: 8px; align-items: center; font-size: .95rem; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; }
+    .chal.done { border-color: var(--good); background: color-mix(in srgb, var(--good) 8%, var(--card)); }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal .btn { white-space: normal; max-width: 100%; justify-content: center; }
+    .chal .prog { color: var(--muted); font-size: .8rem; }
+    .chal .try { display: none; color: var(--accent); }
+    .chal.done .try { display: block; }
+    .chal .quiz { display: grid; gap: 6px; }
+    .chal .quiz button { justify-content: flex-start; text-align: left; width: 100%; font-size: .82rem; white-space: normal; }
+    .chal .quiz button.wrong { border-color: var(--bad); color: var(--bad); }
+    #tour { width: 100%; background: var(--bg-2); border-radius: 10px; }
+    .trust { display: grid; gap: 6px; margin-top: 8px; }
+    .trust .row1 { display: grid; grid-template-columns: 1fr 50px; gap: 6px; align-items: center; font-size: .8rem; font-weight: 700; color: var(--ink-2); }
+    .trust .bar { height: 10px; border-radius: 999px; background: var(--bg-2); overflow: hidden; grid-column: 1 / -1; }
+    .trust .bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+    .trust .num { font-family: var(--font-mono); font-size: .74rem; text-align: right; color: var(--muted); }
+    .belief { display: grid; gap: 4px; margin-top: 10px; }
+    .belief .b { display: grid; grid-template-columns: 1.4em 6.6em 1fr 2.8em; gap: 6px; align-items: center; font-size: .78rem; font-weight: 800; color: var(--ink-2); }
+    .belief .b .o { color: var(--muted); font-family: var(--font-mono); }
+    .belief .b .t { height: 9px; border-radius: 999px; background: var(--bg-2); overflow: hidden; }
+    .belief .b .t span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+    .belief .b .n { font-family: var(--font-mono); text-align: right; color: var(--muted); }
+    .belief .b.top { color: var(--ink); }
+    #chart { max-height: 190px; }
+    .canvas-box .stats { margin-top: 10px; }
+    @media (max-width: 560px) { .spots { grid-template-columns: repeat(3, 1fr); } }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-hide">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="eye"></i> Game Lab · Learning your habits</span>
+      <h1>Hide and <span class="em">Seek</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">Let's play hide and seek in the garden! I'm the seeker. I <b>plan my search before you hide</b>, so I can't cheat. My only trick is remembering <b>where you like to hide</b>. Tap a spot (or press <kbd>1</kbd>–<kbd>0</kbd>) to hide!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="info"></i> How to play</h3>
+          <ol class="howto">
+            <li>Tap a hiding spot in the garden, or press <kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd>.</li>
+            <li>Robo counts, then checks spots one by one, most likely first.</li>
+            <li>Your score is how many spots it had to check. <b>More checks = better hiding!</b></li>
+            <li>After each round, Robo's glowing map updates. Can you stay hard to find?</li>
+            <li>Then send in robot hiders and try the challenges.</li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Who hides?</h3>
+          <div class="seg" id="mode" role="group" aria-label="Who hides"><button data-m="you" class="on" aria-pressed="true">You</button><button data-m="bot" aria-pressed="false">A robot hider</button></div>
+          <div class="field">
+            <div class="bots" id="bots" role="group" aria-label="Robot hiders"></div>
+            <div class="hint">Each robot hider has a hiding habit, except the Dice roller. Tap one and press Play to watch Robo learn it.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <div class="chals" id="chals">
+            <div class="chal" id="c-hard">
+              <h4><span class="tick"></span> 1. Be hard to find</h4>
+              <span>Hide yourself (no peeking). Make Robo need <b>5 or more checks</b> on average over your last 10 rounds.</span>
+              <span class="prog" id="p-hard">Hide 10 times to start.</span>
+              <span class="try"><b>Try this:</b> now hide in the same spot 5 times in a row. Watch that spot glow brighter and brighter on Robo's map.</span>
+            </div>
+            <div class="chal" id="c-switch">
+              <h4><span class="tick"></span> 2. Switch habits</h4>
+              <span>Give Robo a favourite spot to learn, then suddenly change it. Watch the chart dip, then see how many rounds Robo needs to catch up.</span>
+              <button class="btn small" id="go-switch"><i data-icon="shuffle"></i> Start the switch</button>
+              <span class="prog" id="p-switch"></span>
+              <span class="try"><b>Try this:</b> drag <b>Memory</b> to short and switch again. Robo adapts faster, but one odd hide fools it more easily.</span>
+            </div>
+            <div class="chal" id="c-best">
+              <h4><span class="tick"></span> 3. What's the best way to hide?</h4>
+              <span>Run a tournament: four robot hiders, 300 rounds each, against a fresh Robo. Who's hardest to find, and why?</span>
+              <button class="btn small" id="go-best"><i data-icon="trophy"></i> Run the hider tournament</button>
+              <canvas id="tour" class="hidden" role="img" aria-label="Bar chart: average checks Robo needed for each robot hider"></canvas>
+              <div class="quiz hidden" id="quiz" role="group" aria-label="Why is the Dice roller hardest to find?">
+                <b>Why is the Dice roller hardest to find?</b>
+                <button class="btn small" data-a="luck">It just got lucky this time.</button>
+                <button class="btn small" data-a="right">Every spot is equally likely, so Robo's map has nothing to learn. Any search order needs about 5.5 checks.</button>
+                <button class="btn small" data-a="spot">It found the one secret best spot.</button>
+              </div>
+              <span class="prog" id="p-best"></span>
+              <span class="try"><b>Try this:</b> hide yourself and try to be a dice. Do you secretly avoid the spot you just used? Robo's "what comes next" clue can catch that!</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="garden" role="img" aria-label="The garden with ten hiding spots. A glow under each spot shows how likely Robo thinks you are to hide there."></canvas>
+          <div class="spots" id="spots" role="group" aria-label="Pick a hiding spot"></div>
+          <div class="under">
+            <div class="field" style="gap:2px;max-width:420px">
+              <label class="toggle"><input type="checkbox" id="peek" aria-describedby="peek-hint"> <i data-icon="eye"></i> Peek at Robo's map before hiding</label>
+              <div class="hint" id="peek-hint">Shows Robo's glowing map and search plan before you choose. Peeked rounds don't count for challenge 1. (That would be cheating!)</div>
+            </div>
+          </div>
+          <div class="strip" id="strip" aria-label="Last rounds: number of checks. Green = hard to find, red = found fast"></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="trend"></i> How many checks Robo needs</h3>
+          <canvas id="chart" role="img" aria-label="Line chart of how many checks Robo needed to find the hider, round by round, compared with the 5.5 checks a random hider gets"></canvas>
+          <div class="legend" style="margin-top:8px">
+            <span><i style="background:var(--accent)"></i>Checks to find the hider (average of last 5)</span>
+            <span><i style="background:var(--muted)"></i>A random hider: 5.5</span>
+            <span><i style="background:var(--bad);height:3px"></i>Something changed</span>
+          </div>
+          <div class="hint" style="font-size:.82rem;color:var(--muted);font-weight:700;margin-top:6px">Line going <b>down</b> = Robo is learning your habit and finding you faster.</div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play" disabled><i data-icon="play"></i> Play</button>
+            <button class="btn small" id="step" disabled><i data-icon="step"></i> 1 round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed" role="group" aria-label="Speed"><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="60">Turbo</button></div>
+            <div class="hint">How fast rounds play. Turbo skips the walking and plays lots of rounds at once.</div>
+          </div>
+          <div class="field">
+            <label for="mem">Robo's memory <span class="val" data-for="mem"></span></label>
+            <input type="range" id="mem" min="0.6" max="1" step="0.01" value="0.85" aria-describedby="mem-hint">
+            <div class="hint" id="mem-hint">Short memory notices a new hiding habit fast but gets fooled by one-off hides. Long memory is steady but slow to change its mind.</div>
+          </div>
+          <div class="field">
+            <label for="cur">Robo's curiosity <span class="val" data-for="cur"></span></label>
+            <input type="range" id="cur" min="0" max="0.4" step="0.01" value="0.05" aria-describedby="cur-hint">
+            <div class="hint" id="cur-hint">How much Robo likes checking spots you haven't used lately, "just in case". A little is fine. Too much and it wastes checks.</div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Rounds</div><div class="v" id="st-n">0</div></div>
+            <div class="stat"><div class="k">Checks (last 10)</div><div class="v" id="st-avg">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside" style="height:auto;min-height:120px"></div>
+          <div class="trust" id="trust" aria-label="How much Robo trusts each clue"></div>
+          <div class="belief" id="belief" aria-label="Robo's map: chance for each spot, in search order"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— Robo's map saved along the way. Tap one to see what a younger Robo believed, and how it would do today.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="pencil"></i></div><h3>Count</h3><p>Robo keeps a tally for every spot: how often you hid there. It starts with a tiny pretend tally everywhere, so no spot is ever "impossible".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="clock"></i></div><h3>Fade</h3><p>Every round, old tallies shrink a little. Recent hides count more, so a new habit shows up quickly.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Two clues</h3><p>Clue 1 is "your favourite spots". Clue 2 is "where you go after the spot you used last". Robo trusts whichever clue has been guessing better.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="map"></i></div><h3>Search</h3><p>It turns the tallies into chances, adds a pinch of curiosity, and checks spots from most likely to least likely.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first every spot looked the same to Robo, so it needed about 5 or 6 checks: just guessing.</li>
+        <li>Each round it wrote down where you hid. Spots you used a lot started to glow, and Robo checked them first.</li>
+        <li>If you had a habit, like a favourite spot or a fixed order, Robo found you in 1 or 2 checks.</li>
+        <li>When the habit changed, Robo was fooled for a few rounds, then <b>adapted</b>, because old memories fade.</li>
+        <li>Against a truly random hider, Robo is stuck at about 5.5 checks. No search order can beat a fair dice. Being random is the best way to hide!</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The seeker is a small <span class="term">Bayesian</span> predictor over 10 hiding spots, used to choose a search order.</p>
+        <ul>
+          <li><b>Clue 1 (marginal):</b> a categorical distribution with a symmetric <span class="term">Dirichlet</span> prior, &alpha; = 0.5 per spot. The belief is the posterior mean <code>p<sub>i</sub> = (c<sub>i</sub> + &alpha;) / (&Sigma;c + 10&alpha;)</code>.</li>
+          <li><b>Recency:</b> before each update all counts are multiplied by the memory <code>&gamma;</code> (slider, default 0.85), an effective window of about 1/(1&minus;&gamma;) &asymp; 7 rounds. This is exponential forgetting, a standard fix for <span class="term">non-stationary</span> behaviour. &gamma; = 1 is the plain Dirichlet&ndash;multinomial.</li>
+          <li><b>Clue 2 (order-1 Markov):</b> one Dirichlet-smoothed table per previous spot, <code>P(next | last)</code>, with the same forgetting applied to the row that is updated. It catches sequences such as alternating or going round the garden, which pure counting cannot see.</li>
+          <li><b>Mixing:</b> <span class="term">Bayesian model averaging</span> with forgetting: each clue's weight is updated as <code>w &larr; w<sup>0.85</sup> &middot; P<sub>clue</sub>(observed spot)</code>, renormalised with a floor of 0.03, and the belief is <code>&Sigma; w &middot; p</code>.</li>
+          <li><b>Search order:</b> sort spots by <code>p<sub>i</sub> + &beta; / (1 + c<sub>i</sub>)</code> where &beta; is curiosity (default 0.05), an optimism-style exploration bonus for rarely used spots. With &beta; = 0 this is the optimal order for a known distribution: checking in decreasing probability minimises the expected number of checks <code>&Sigma; rank(i) &middot; p<sub>i</sub></code>.</li>
+          <li><b>Why random wins:</b> if the hider is uniform, every order has expected checks <code>(1 + 2 + &hellip; + 10)/10 = 5.5</code>. That uniform mixed strategy is the hider's <span class="term">minimax</span> (Nash) strategy in this zero-sum game: nothing the seeker learns can do better.</li>
+          <li><b>Measured in Node</b> (seeded, 20 runs, default settings): rounds 11&ndash;300 averaged about 2.1 checks against Shed lover, 1.6 against Ping-pong, 1.5 against Round the garden, and 5.5 against Dice roller (first 10 rounds: 2.4, 2.9, 4.9, 5.3). After a switch from Shed to Pond lover, the top guess moved to the pond in about 4.5 rounds at &gamma; = 0.85 and about 2.7 rounds at &gamma; = 0.6. A random hider meets challenge 1 (&ge; 5 checks over 10 rounds) about 70% of the time per 10-round window.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-hide-core.js"></script>
+  <script src="js/game-hide.js"></script>
+</body>
+</html>

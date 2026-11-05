@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask the Picture · Explore ML</title>
+  <meta name="description" content="Place coloured shapes in a picture, ask a question, and watch a tiny visual question answering model, trained live in your browser, decide which puzzle pieces to look at.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <link rel="stylesheet" href="vlm-shared.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    #scene { max-width: 420px; margin: 0 auto; cursor: pointer; touch-action: manipulation; }
+    #scene:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .chal .try { display: none; font-weight: 600; color: var(--ink-2); font-size: .86rem; margin-top: 2px; }
+    .chal.done .try { display: block; }
+    .cap { margin: 6px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-top: 10px; }
+    .tools .seg button { display: inline-flex; align-items: center; gap: 6px; }
+    .sw.red { background: #ef3b4f; } .sw.blue { background: #2f7bff; } .sw.green { background: #22b455; }
+    .how { margin: 0; padding-left: 20px; font-size: .9rem; font-weight: 700; display: grid; gap: 4px; }
+    .how li.now { color: var(--accent); }
+    .qsel { width: 100%; font: inherit; font-weight: 800; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+    .verdict { font-weight: 800; font-size: .95rem; margin-top: 8px; min-height: 1.4em; }
+    .verdict .ok { color: var(--good); } .verdict .bad { color: var(--bad); }
+    .eyes-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 14px; }
+    @media (max-width: 560px) { .eyes-row { grid-template-columns: 1fr; } }
+    .eyes-row figure { margin: 0; min-width: 0; }
+    .eyes-row figcaption { font-weight: 800; font-size: .85rem; margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
+    .toggle-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="vlm" data-demo="vlm-ask">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="question"></i> Vision-Language Models · Visual Question Answering</span>
+      <h1>Ask the <span class="em">Picture</span></h1>
+      <p class="hero-sub">Robo chops a picture into 16 puzzle pieces. When you ask a question, it decides which pieces to look at, then answers. It learns all of this right here, from zero.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">My brain is brand new, so my answers are wild guesses. Press <b>Teach Robo</b> and watch me practise on thousands of made-up pictures!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3><i data-icon="image"></i> The picture</h3>
+          <div class="btn-row">
+            <button class="btn small" id="rand" title="Make a new random picture"><i data-icon="shuffle"></i> Random</button>
+            <button class="btn ghost small" id="clear" title="Remove every shape"><i data-icon="eraser"></i> Clear</button>
+          </div>
+        </div>
+        <canvas id="scene" class="cv" tabindex="0" role="img" aria-label="A 4 by 4 picture grid with coloured shapes. Use the arrow keys to move and Enter to place or remove a shape."></canvas>
+        <div class="tools">
+          <div class="seg" id="shape-tools" role="group" aria-label="Shape to place">
+            <button data-s="circle" class="on" title="Place circles">● Circle</button><button data-s="square" title="Place squares">■ Square</button><button data-s="triangle" title="Place triangles">▲ Triangle</button><button data-s="erase" title="Rub shapes out"><i data-icon="eraser"></i></button>
+          </div>
+          <div class="swatches" id="colours" role="group" aria-label="Colour">
+            <button class="sw red on" data-c="red" title="Red" aria-label="Red"></button><button class="sw blue" data-c="blue" title="Blue" aria-label="Blue"></button><button class="sw green" data-c="green" title="Green" aria-label="Green"></button>
+          </div>
+        </div>
+        <p class="cap" style="text-align:center">Tap a square to put a shape there. Tap it again to take it away.</p>
+        <div class="toggle-row">
+          <button class="btn small on" id="tg-heat" aria-pressed="true" title="Glow on the pieces Robo is looking at"><i data-icon="eye"></i> Show where Robo looks</button>
+        </div>
+
+        <div class="eyes-row">
+          <figure>
+            <figcaption><i data-icon="noise"></i> What Robo really sees</figcaption>
+            <canvas id="eyes" class="cv" role="img" aria-label="The picture as Robo sees it: 16 tiny blurry puzzle pieces of 5 by 5 coloured dots"></canvas>
+            <p class="cap">Each piece is just 5 × 5 coloured dots. That's all the clues Robo gets.</p>
+          </figure>
+          <figure>
+            <figcaption><i data-icon="trend"></i> Quiz score while practising</figcaption>
+            <canvas id="chart" class="cv" role="img" aria-label="Line chart of quiz accuracy against practice questions"></canvas>
+            <p class="cap">A quiz of 200 pictures Robo never practised on. Guessing would score about 33%.</p>
+          </figure>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="map"></i> How to play</h3>
+          <ol class="how" id="how">
+            <li data-k="0" class="now">Press <b>Teach Robo</b> and watch the quiz score climb.</li>
+            <li data-k="1">Pick a question and read Robo's answer.</li>
+            <li data-k="2">Change the picture. Does the glow follow the shape?</li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="cpu"></i> Teach Robo</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="train"><i data-icon="play"></i> Teach Robo</button>
+            <button class="btn" id="reset" title="Forget everything and start with a brand-new brain"><i data-icon="reset"></i> New brain</button>
+          </div>
+          <div class="stats" style="margin-top:10px">
+            <div class="stat"><div class="k">Practice questions</div><div class="v" id="seen">0</div></div>
+            <div class="stat"><div class="k">Quiz score</div><div class="v" id="acc">–</div></div>
+          </div>
+          <div class="hint">Every practice question is a brand-new random picture with its right answer. Robo guesses, checks, and nudges its numbers.</div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="chat"></i> Ask a question</h3>
+          <label class="sr-only" for="q">Question</label>
+          <select id="q" class="qsel"></select>
+          <div class="hint">Robo only knows these 15 questions. Each one becomes a special list of numbers that tells it what to look for.</div>
+          <div class="bars" id="bars" style="margin-top:10px" aria-live="polite"></div>
+          <div class="verdict" id="verdict"></div>
+          <p class="cap" id="lookcap"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-train"><span class="tick"></span><span>Good student: teach Robo until its quiz score reaches 85%.
+        <span class="try"><b>Try this:</b> press New brain and teach again. Every brain learns a little differently, but they all get there.</span></span></div>
+      <div class="chal" id="c-look"><span class="tick"></span><span>Spotlight: ask "What colour is the …?" and get a right answer where the shape you asked about glows brightest.
+        <span class="try"><b>Try this:</b> drag your shape somewhere else (tap to remove, tap to place). The glow should follow it.</span></span></div>
+      <div class="chal" id="c-trick"><span class="tick"></span><span>Catch it out: once Robo scores 85%, build a picture where it gives a wrong answer. Hint: Robo only ever practised with 1 to 5 shapes.
+        <span class="try"><b>Try this:</b> count how many shapes your tricky picture has. Models often go wrong on things unlike their practice.</span></span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Robo cut the picture into <b>16 puzzle pieces</b> and turned each one into a short list of numbers.</li>
+      <li>Your question became a list of numbers too: a little note saying <b>what to look for</b>.</li>
+      <li>Robo compared the note with every piece. Pieces that matched got a big share of its attention (the glow), and it mixed those pieces together.</li>
+      <li>A small answer brain read that mix and picked a word or a number.</li>
+      <li>Nobody told it where to look. It discovered looking at the right piece helps, just by practising and being corrected.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="scissors"></i></div><h3>Chop</h3><p>Cut the picture into 16 pieces. Each piece is 5 × 5 coloured dots.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Describe</h3><p>Turn every piece into 24 numbers, like a tiny description: "reddish, roundish".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Look</h3><p>The question's numbers are compared with each piece. Good matches get more attention, and the attention always adds up to 100%.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="chat"></i></div><h3>Answer</h3><p>Mix the pieces by their attention, then a small brain picks the answer: a colour, yes / no, or a number.</p></div>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a miniature <span class="term">visual question answering</span> (VQA) model, written in plain JavaScript with hand-derived backpropagation and trained with <span class="term">Adam</span> on freshly generated (scene, question, answer) triples. Nothing is downloaded.</p>
+        <ul>
+          <li><b>Patches, ViT-style:</b> the 20×20 RGB image is split into a 4×4 grid of 5×5 patches. Each flattened patch (75 values, with a little Gaussian pixel noise during training) passes through a learned <span class="term">patch embedding</span> <code>e = ReLU(W<sub>p</sub>x + b)</code> to 24 dimensions. No positional embedding is used, since no question asks <i>where</i>.</li>
+          <li><b>Question as a query:</b> each of the 15 questions has a learned embedding <code>q</code> (a stand-in for a text encoder).</li>
+          <li><b>Cross-attention:</b> keys <code>k<sub>i</sub> = W<sub>k</sub>e<sub>i</sub></code>, values <code>v<sub>i</sub> = W<sub>v</sub>e<sub>i</sub></code>, weights <code>a = softmax(q·k<sub>i</sub> / √d)</code>, pooled <code>c = Σ a<sub>i</sub>v<sub>i</sub></code>. The glow is exactly <code>a</code>. This is one head of the cross-attention that VLMs such as Flamingo, BLIP-2 and LLaVA-style models use to let text tokens read image tokens.</li>
+          <li><b>Answer head:</b> an MLP on <code>[c; q]</code> (32 ReLU units) gives logits over 9 answers (red, blue, green, yes, no, 0, 1, 2, 3+), trained with softmax cross-entropy, batch 16.</li>
+          <li><b>Counting with softmax:</b> attention weights sum to 1, so counting is indirect: the share of attention landing on matching patches versus background grows with the count, and the MLP decodes that. This is why counts are the hardest questions here, as in real VQA benchmarks.</li>
+          <li><b>Generalisation:</b> the quiz is a fixed held-out set of 200 generated examples. Training scenes hold 1 to 5 shapes, so crowded scenes are out of distribution and errors rise, a small taste of distribution shift.</li>
+        </ul>
+        <p>Further reading: <a href="https://arxiv.org/abs/2010.11929" target="_blank" rel="noopener">ViT (Dosovitskiy et al.)</a> · <a href="https://arxiv.org/abs/1505.00468" target="_blank" rel="noopener">VQA (Antol et al.)</a> · <a href="https://arxiv.org/abs/1612.06890" target="_blank" rel="noopener">CLEVR</a>, the synthetic-shapes benchmark this lesson is modelled on.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/vlm-ask-core.js"></script>
+  <script src="js/vlm-ask.js"></script>
+</body>
+</html>

@@ -27,10 +27,11 @@ Every lesson is a live simulation where a real algorithm runs in your browser. Y
 
 It's written so a five-year-old can follow the story, while the **"For grown-ups"** section of every lesson names the real algorithms and the maths.
 
-- **100 lessons**: a starting lesson plus **22 chapters**, in a syllabus order: from "what is machine learning?" up to language models, vision-language models, diffusion, video, the wider world of AI, data, forecasting, agents, AI ethics, ensembles, generative models, graphs, robotics, optimisation and probability.
+- **120 lessons**: a starting lesson plus **22 chapters**, in a syllabus order: from "what is machine learning?" up to language models, vision-language models, diffusion, video, the wider world of AI, data, forecasting, agents, AI ethics, ensembles, generative models, graphs, robotics, optimisation and probability.
 - **Everything is interactive.** Drag, draw, drive, kick, break things.
 - **Every model is open.** A built-in **Model X-ray** shows which signals a trained model pays attention to, the rules it discovered, a decision map, and a what-if lab.
-- **Real learning, no fakes.** Q-learning, neuroevolution, backpropagation, k-means, decision trees, ant colony optimisation, diffusion, CLIP and more all run live.
+- **Real learning, no fakes.** Q-learning, neuroevolution, backpropagation, k-means, PCA, DBSCAN, dropout, decision trees, ant colony optimisation, diffusion with guidance, optical flow, FFT pitch detection, CLIP and more all run live.
+- **Learning plans.** Guided paths ("First hour of ML", "How ChatGPT works", "Games that learn"...) with progress tracking, plus ready-to-teach classroom plans with warm-ups, discussion questions and exit tickets. See [plans.html](https://nuhmanpk.github.io/explore-machine-learning/plans.html).
 - **Nothing downloads by default.** Lessons that need a big pretrained model show a button that tells you the size first.
 
 ## How each lesson works
@@ -74,6 +75,8 @@ _Unsupervised learning: spotting patterns with no answers given._
 
 - **2.1 [Pizza Shop Planner](https://nuhmanpk.github.io/explore-machine-learning/demos/unsup-kmeans.html)** — Where should the pizza shops go so every house gets pizza fast? Watch k-means move the shops step by step.
 - **2.2 [Movie Recommender](https://nuhmanpk.github.io/explore-machine-learning/demos/unsup-recommend.html)** — People like you also liked... Rate a few movies and watch the model find your taste twins and suggest what to watch next.
+- **2.3 [Squash to See](https://nuhmanpk.github.io/explore-machine-learning/demos/unsup-pca.html)** — Lots of numbers are hard to picture. Spin a cloud of dots and find the best shadow to cast, so the most spread-out direction shows up flat on the page.
+- **2.4 [Crowds and Loners](https://nuhmanpk.github.io/explore-machine-learning/demos/unsup-dbscan.html)** — Some groups are not round blobs. Let Robo find crowds by how packed the dots are, and spot the loners who belong to no crowd at all.
 
 ### Chapter 3 · [Neural Networks](https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=nn)
 
@@ -85,6 +88,7 @@ _Pretend brains made of tiny number-switches._
 - **3.4 [Learning Rate Race](https://nuhmanpk.github.io/explore-machine-learning/demos/nn-lr.html)** — A ball rolls downhill to find the lowest spot. Too slow, too wild, or just right? Race different step sizes and add momentum.
 - **3.5 [Backprop, Step by Step](https://nuhmanpk.github.io/explore-machine-learning/demos/nn-backprop.html)** — Follow one tiny network as it guesses, sees how wrong it was, and sends the blame backwards to fix each weight.
 - **3.6 [Why Brains Need a Bend](https://nuhmanpk.github.io/explore-machine-learning/demos/nn-activation.html)** — A network with no bend can only draw straight lines. Switch on a bend and watch it paint curvy shapes.
+- **3.7 [Forgetful on Purpose](https://nuhmanpk.github.io/explore-machine-learning/demos/nn-dropout.html)** — A brain that memorises every dot fails on new ones. Make some brain cells nap at random during practice and watch it learn the real pattern instead.
 
 ### Chapter 4 · [Reinforcement Learning](https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=rl)
 
@@ -116,6 +120,7 @@ _Guessing the next word, really, really well._
 - **6.3 [Puppy Trainer (RLHF)](https://nuhmanpk.github.io/explore-machine-learning/demos/lang-rlhf.html)** — Pick which puppy trick earns a treat. A treat predictor learns your taste, then the puppy practises until it does what you love.
 - **6.4 [Word Map](https://nuhmanpk.github.io/explore-machine-learning/demos/lang-embed.html)** — Words become points on a map where friends sit close together. Watch a model learn the map, then try word maths: king minus man plus woman.
 - **6.5 [Where to Look](https://nuhmanpk.github.io/explore-machine-learning/demos/lang-attend.html)** — When a model reads a sentence, which words does it look at? Watch attention light up the words that matter, and the model learn where to look.
+- **6.6 [Hot or Cold Words](https://nuhmanpk.github.io/explore-machine-learning/demos/lang-temp.html)** — A language model gives every next word a chance. Turn the temperature dial from cold and boring to hot and silly, and see how it picks.
 
 ### Chapter 7 · [Vision-Language Models](https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=vlm)
 
@@ -123,6 +128,7 @@ _Models that can see pictures and talk about them._
 
 - **7.1 [Words ↔ Pictures](https://nuhmanpk.github.io/explore-machine-learning/demos/vlm-match.html)** — Draw or show a picture and type some words. Watch a real model turn both into numbers and find the best match.
 - **7.2 [Picture Talker](https://nuhmanpk.github.io/explore-machine-learning/demos/vlm-caption.html)** — A model looks at your picture and writes what it sees, one word at a time.
+- **7.3 [Ask the Picture](https://nuhmanpk.github.io/explore-machine-learning/demos/vlm-ask.html)** — Chop a picture into puzzle pieces, ask a question, and watch a tiny model look at the right pieces to answer. Trained live, nothing to download.
 
 ### Chapter 8 · [Image Generation](https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=diff)
 
@@ -131,6 +137,7 @@ _Diffusion models: making pictures by cleaning up static._
 - **8.1 [Watch a Diffusion Model Learn](https://nuhmanpk.github.io/explore-machine-learning/demos/diff-train.html)** — Pick a shape. A little model practises un-fuzzing it, and you watch its drawings go from fog to a perfect shape.
 - **8.2 [Fuzz & Un-Fuzz](https://nuhmanpk.github.io/explore-machine-learning/demos/diff-noise.html)** — Draw a little picture, fuzz it into static, then watch it get cleaned up frame by frame.
 - **8.3 [Forger vs Detective](https://nuhmanpk.github.io/explore-machine-learning/demos/diff-gan.html)** — Two models compete: a forger makes fake pictures and a detective tries to catch them. Watch both get better.
+- **8.4 [Steer the Drawing](https://nuhmanpk.github.io/explore-machine-learning/demos/diff-guide.html)** — A diffusion model makes dots from static. Tell it which shape you want and turn up the steering knob: too little and it ignores you, too much and it goes weird.
 
 ### Chapter 9 · [Sound & Music](https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=audio)
 
@@ -138,12 +145,15 @@ _Teaching computers to hear and to make music._
 
 - **9.1 [Teach the Ear](https://nuhmanpk.github.io/explore-machine-learning/demos/audio-ear.html)** — See your voice as a picture, then teach the computer to tell claps, whistles and hums apart.
 - **9.2 [Tune Finisher](https://nuhmanpk.github.io/explore-machine-learning/demos/audio-music.html)** — Play a few notes on the piano. Robo learns from tunes and finishes your song, note by note.
+- **9.3 [Find the Note](https://nuhmanpk.github.io/explore-machine-learning/demos/audio-pitch.html)** — Play a sound and turn it into a rainbow of frequencies. Watch Robo find the note, even with buzzing noise and missing notes.
 
 ### Chapter 10 · [Video Generation](https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=video)
 
 _Making movies by predicting the next frame._
 
 - **10.1 [Next-Frame Dreamer](https://nuhmanpk.github.io/explore-machine-learning/demos/video-next.html)** — A little model watches a bouncing ball and learns physics by itself. Then it dreams up its own videos.
+- **10.2 [Spot the Motion](https://nuhmanpk.github.io/explore-machine-learning/demos/video-flow.html)** — Compare two video frames block by block and draw little arrows where things moved. That is how computers see motion.
+- **10.3 [In-Between Frames](https://nuhmanpk.github.io/explore-machine-learning/demos/video-interp.html)** — Make a smooth slow-motion video from two frames. Simple fading gives ghosts; following the motion arrows gives smooth in-between frames.
 
 ### Chapter 11 · [Artificial Intelligence](https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=ai)
 
@@ -201,6 +211,9 @@ _Many simple models, voting together, beat one clever model._
 - **16.2 [Vote of Many Trees](https://nuhmanpk.github.io/explore-machine-learning/demos/ens-bagging.html)** — Give lots of little decision trees a shuffled copy of the data and let them vote. The vote is calmer than any one tree.
 - **16.3 [Learn from Mistakes](https://nuhmanpk.github.io/explore-machine-learning/demos/ens-boost.html)** — Tiny helpers make one cut each. Dots they get wrong grow bigger, so the next helper tries harder on them.
 - **16.4 [Bagging vs Boosting](https://nuhmanpk.github.io/explore-machine-learning/demos/ens-compare.html)** — Same noisy dots, two team styles. Turn up the wrong labels and see which team keeps its cool.
+- **16.5 [Chase the Leftovers](https://nuhmanpk.github.io/explore-machine-learning/demos/ens-gbm.html)** — Gradient boosting: each new little tree learns only what the team still gets wrong. Watch the leftovers shrink and a wiggly curve appear.
+- **16.6 [The Careful Booster](https://nuhmanpk.github.io/explore-machine-learning/demos/ens-xgb.html)** — The idea behind XGBoost. Race a wild booster against one with brakes, and see which copes better with noisy dots.
+- **16.7 [No Peeking, Snacks!](https://nuhmanpk.github.io/explore-machine-learning/demos/ens-cat.html)** — The idea behind CatBoost. Turn snack names into numbers without peeking at the answer, and catch a booster that fools itself.
 
 ### Chapter 17 · [Generative Models](https://nuhmanpk.github.io/explore-machine-learning/topic.html?t=gen)
 
@@ -265,7 +278,6 @@ _Games where the computer learns, gets better, and adapts when you make it harde
 - **22.12 [Auto-Parking](https://nuhmanpk.github.io/explore-machine-learning/demos/game-parking.html)** — Little cars with distance sensors learn to steer into a bay and stop inside the lines. Then add parked neighbours, posts or a tight bay!
 - **22.13 [Lane Keeper](https://nuhmanpk.github.io/explore-machine-learning/demos/game-lane.html)** — Little cars learn to follow a winding road and stay in their lane. Then add hairpin bends, rain or cones in the road!
 
-
 ## Run it locally
 
 There is **no build step and no dependencies.** It is plain HTML, CSS and JavaScript.
@@ -294,6 +306,12 @@ python3 serve.py 8000
 
 It is a static site, so any static host works. For GitHub Pages: **Settings → Pages → Deploy from a branch → `main` / root.**
 
+### Live room
+
+The help sheet ("Stuck? Ask Robo") has a **Live** tab where visitors can wave at everyone else on the site. It works on plain GitHub Pages: messages travel through the free public relay [ntfy.sh](https://ntfy.sh) (WebSocket to receive, HTTPS POST to send), so there is no server to run.
+
+Nobody can type. The words live in `js/common.js`; the wire only carries numbers (which message, which nickname). Because the relay topic is public, every incoming payload is strictly validated and anything else is dropped, so injected text can never appear on the page.
+
 ## Pretrained models
 
 Most lessons train their own tiny models live in your browser, so nothing is downloaded. A few use real pretrained models and ask before downloading:
@@ -309,11 +327,13 @@ Most lessons train their own tiny models live in your browser, so nothing is dow
 
 ```text
 index.html          Home page: the course map
+plans.html          Learning plans: guided paths + classroom plans
 topic.html          Chapter page: explainer + words to know + lesson list
 css/style.css       Shared design system (light/dark themes, game layout, X-ray)
 js/catalog.js       The whole syllabus + the "Meet the model" text for each lesson
 js/common.js        Page chrome: top bar, icons, mascot, lesson path, footer
 js/xray.js          The shared Model X-ray
+js/plans.js         Learning-plan data and rendering
 demos/<id>.html     One page per lesson
 demos/js/<id>.js    The lesson's UI and drawing
 demos/js/<id>-core.js   The model and simulation (also runs in Node for testing)

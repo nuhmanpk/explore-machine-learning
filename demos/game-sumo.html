@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sumo Bots · Explore ML</title>
+  <meta name="description" content="Wrestle a little sumo robot yourself, then watch forty robot brains teach themselves to push, dodge and outsmart each other by self-play neuroevolution. Add an icy ring, a smaller ring or a heavier opponent and watch them adapt.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="rl-games.css">
+  <style>
+    .howto { background: var(--accent-soft); border-radius: 12px; padding: 8px 12px 8px 30px; font-weight: 700; font-size: .86rem; margin: 0; display: grid; gap: 4px; }
+    .howto li::marker { color: var(--accent); font-weight: 800; }
+    .howto-t { font-weight: 800; font-size: .86rem; margin: 0 0 -4px; }
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; text-align: left; }
+    .chal button .tag { margin-left: auto; font-size: .72rem; font-weight: 800; color: var(--muted); white-space: nowrap; }
+    .chal button.on .tag { color: var(--accent); }
+    .chal button.done::after { content: "✓"; margin-left: 6px; color: var(--good); font-weight: 900; }
+    .try { background: color-mix(in srgb, var(--good) 12%, var(--card)); border: 2px dashed color-mix(in srgb, var(--good) 50%, var(--line)); border-radius: 12px; padding: 8px 10px; font-weight: 700; font-size: .86rem; }
+    #arena { touch-action: none; max-width: 540px; }
+    .joy-row { display: none; align-items: center; justify-content: center; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+    .joy-row.show { display: flex; }
+    #joy { width: 132px; height: 132px; border-radius: 50%; background: var(--bg-2); border: 3px solid var(--line); position: relative; touch-action: none; cursor: grab; }
+    #joy .knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: var(--accent); border: 3px solid var(--ink); box-shadow: var(--shadow-sm); pointer-events: none; }
+    #joy:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .joy-tip { max-width: 220px; font-weight: 700; font-size: .84rem; color: var(--ink-2); margin: 0; }
+    .score { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-top: 10px; font-weight: 800; }
+    .score .side { background: var(--bg-2); border: 2px solid var(--line); border-radius: 14px; padding: 6px 12px; min-width: 0; }
+    .score .side:last-child { text-align: right; }
+    .score .nm { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+    .score .side:last-child .nm { justify-content: flex-end; }
+    .score .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex: none; }
+    .score .big { font-family: var(--font-head); font-size: 1.5rem; line-height: 1.1; }
+    .score .vs { color: var(--muted); font-family: var(--font-head); }
+    .ylabel { margin: 0 0 6px; font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .ylabel span { text-transform: none; letter-spacing: 0; }
+    .toggle { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: .9rem; cursor: pointer; }
+    .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+    #brain { width: 100%; background: var(--bg-2); border-radius: 10px; }
+    .field .hint { margin-top: 2px; }
+    #opp { width: 100%; }
+    #opp button { flex: 1; font-size: .84rem; padding: 7px 6px; white-space: normal; line-height: 1.15; }
+    .howto kbd { font-size: .72rem; padding: 0 4px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-sumo">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="robot"></i> Game Lab · Self-play neuroevolution</span>
+      <h1>Sumo <span class="em">Bots</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">Two little sumo robots, one round ring. Push the other one <b>out</b> to win! You go first: drive the <b style="color:var(--good)">green</b> bot with the arrow keys or the joystick.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Who's wrestling?</h3>
+          <div class="seg" id="mode" role="group" aria-label="Who wrestles in the ring">
+            <button data-m="you" class="on" aria-pressed="true">You wrestle</button>
+            <button data-m="robo" aria-pressed="false">Robots learn</button>
+          </div>
+          <p class="howto-t">How to play</p>
+          <ol class="howto" id="howto">
+            <li>Point the way with <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> (or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>), or drag the joystick. Your green bot turns and drives that way.</li>
+            <li>Bump the pink robot over the straw edge. Don't fall out yourself!</li>
+            <li>After a third of the bout the ring <b>shrinks</b>, so be brave.</li>
+            <li>Then pick <b>Robots learn</b> and watch the robots practise on each other.</li>
+            <li>Come back and wrestle the new champion. Is it harder now?</li>
+          </ol>
+          <div class="field" style="margin:0">
+            <span class="lbl">Wrestle against</span>
+            <div class="seg" id="opp" role="group" aria-label="Which robot you wrestle">
+              <button data-o="latest" class="on" aria-pressed="true">Newest champion</button>
+              <button data-o="first" aria-pressed="false">Gen 1 rookie</button>
+            </div>
+            <div class="hint">The rookie is the very first champion: almost no practice yet.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.86rem">Change the ring while the robots train. The chart marks the moment. Can they adapt?</p>
+          <div class="chal" id="chal">
+            <button class="btn small" id="c-icy" data-c="icy" aria-pressed="false"><i data-icon="wave"></i> Icy ring <span class="tag">slippery!</span></button>
+            <button class="btn small" id="c-small" data-c="small" aria-pressed="false"><i data-icon="ruler"></i> Smaller ring <span class="tag">less room</span></button>
+            <button class="btn small" id="c-heavy" data-c="heavy" aria-pressed="false"><i data-icon="target"></i> Heavier opponent <span class="tag">twice the weight</span></button>
+          </div>
+          <div class="try hidden" id="try" aria-live="polite"></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> Breeding knobs</h3>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.3" aria-describedby="mut-hint">
+            <div class="hint" id="mut-hint">Small = careful copies of the best wrestlers. Big = wild new moves (and more silly ones).</div>
+          </div>
+          <div class="field">
+            <label class="toggle"><input type="checkbox" id="hof" checked aria-describedby="hof-hint"> Practise against old champions</label>
+            <div class="hint" id="hof-hint">On: every robot also wrestles champions from the past, so it doesn't forget how to beat old tricks. Off: they only wrestle each other.</div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="arena" role="img" tabindex="0" aria-label="A round sumo ring seen from above with two round robots. Push the other robot outside the straw edge to win."></canvas>
+          <div class="joy-row show" id="joyrow">
+            <div id="joy" role="slider" tabindex="0" aria-label="Joystick: drag or use arrow keys to steer your green bot" aria-valuetext="centre"><div class="knob"></div></div>
+            <p class="joy-tip">Drag the joystick the way you want to go. Let go to stop. On a laptop the arrow keys work too.</p>
+          </div>
+          <div class="score" id="score">
+            <div class="side"><div class="nm"><i class="dot" id="sc-a-dot" style="background:var(--good)"></i><span id="sc-a-name">You</span></div><div class="big" id="sc-a">0</div></div>
+            <div class="vs">vs</div>
+            <div class="side"><div class="nm"><span id="sc-b-name">Gen 1 rookie</span><i class="dot" style="background:#ff5c9a"></i></div><div class="big" id="sc-b">0</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How good is the champion? Generation by generation</h3>
+          <p class="ylabel">Champion's win rate <span>(%, each generation's best robot plays 12 test bouts against each opponent, averaged over 3 generations)</span></p>
+          <canvas id="chart"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>vs the first 3 champions</span><span><i style="background:var(--warn)"></i>vs Charging Chuck (a robot that never learns)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span><span><i style="background:transparent;border:3px solid var(--bad);border-radius:50%"></i>Old champion's score right when it hit</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play" aria-label="Start a new bout"><i data-icon="play"></i> New bout</button>
+            <button class="btn ghost small" id="reset" aria-label="Forget everything and start with random brains"><i data-icon="reset"></i> Forget</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Bout speed</span>
+            <div class="seg" id="speed" role="group" aria-label="How fast the bout on screen plays"><button data-v="0.5">0.5×</button><button data-v="1" class="on">1×</button><button data-v="2">2×</button><button data-v="4">4×</button></div>
+            <div class="hint">Slow it down to spot the tricks. This only changes the bout you watch.</div>
+          </div>
+          <div class="field">
+            <span class="lbl">Practice speed</span>
+            <div class="seg" id="tspeed" role="group" aria-label="How fast the robots practise behind the scenes"><button data-v="2">Steady</button><button data-v="6" class="on">Fast</button><button data-v="12">Turbo</button></div>
+            <div class="hint">While you watch one bout, hundreds more happen out of sight. Turbo = more generations per second.</div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Generation</div><div class="v" id="st-gen">1</div></div>
+            <div class="stat"><div class="k">Bouts practised</div><div class="v" id="st-bouts">0</div></div>
+            <div class="stat"><div class="k">Beats first champs</div><div class="v" id="st-early">–</div></div>
+            <div class="stat"><div class="k">Beats Chuck</div><div class="v" id="st-chuck">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="inside-state" id="inside-state"></div>
+          <canvas id="brain" aria-label="The pink robot's brain: twelve senses on the left, eight thinking neurons, two answers on the right"></canvas>
+          <div class="decision" id="decision">Press <b>New bout</b> or start a wrestle to peek inside the pink robot's brain.</div>
+          <p class="ylabel" style="margin:4px 0 0">How the robots win (last generation)</p>
+          <div class="qbars" id="ways"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— champions saved along the way. Tap one to watch it wrestle today's champion.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Twelve senses</h3><p>Each robot feels where its rival is (ahead? to the left? how close?), how much room both have before the edge, where the middle of the ring is, how fast it is sliding, where the rival is aiming, and if the rival is heavier.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>Those 12 numbers flow through 8 thinking neurons to 2 answers: drive forward or back, and turn left or right. At first all its connections are random, so it wobbles about.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="groups"></i></div><h3>Practise on each other</h3><p>40 robots each wrestle 16 bouts every generation: some against teammates, some against old champions. Nobody shows them how. That's called <b>self-play</b>.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Score the bouts</h3><p>A quick push-out scores most. Lasting longer before losing scores a little. If time runs out, being nearer the middle scores a bit.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Copy with changes</h3><p>The best wrestlers have babies: copies of their brains with small random changes. Over generations the team invents pushing, circling and dodging at the edge.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In generation 1 the robots had random brains. Most of them drove straight out of the ring all by themselves.</li>
+        <li>Robots that stayed in and pushed their rival out had more babies. Their babies tried slightly different moves, and the best of <i>those</i> had babies too.</li>
+        <li>Their only teachers were each other. As one robot found a trick, the others had to find an answer to it. That race is why <b>self-play</b> can invent strategies nobody programmed, like stepping aside at the edge so a charging rival flies out.</li>
+        <li>Practising against <b>old champions</b> stops them forgetting how to beat old tricks.</li>
+        <li>When you made the ring icy, smaller, or the rival heavier, some old tricks stopped working. The robots kept practising and <b>adapted</b>, with no one re-programming them.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span> with <span class="term">competitive self-play</span> and a <span class="term">hall of fame</span>. A population of 40 feed-forward networks <code>[12 &rarr; 8 &rarr; 2]</code> (tanh, 122 weights each) is improved by a genetic algorithm. No gradients and no labelled examples are used.</p>
+        <ul>
+          <li><b>Physics:</b> 2D, 30 steps per simulated second, ring radius 1. Each bot has a heading θ, velocity v and mass m. Each step: <code>θ += 0.09·turn</code>, <code>v = (v + a·thr·u(θ))·(1 − drag)</code>, <code>x += v</code>. Overlapping bots are separated in inverse proportion to mass and exchange an impulse <code>j = −(1+e)·v<sub>rel</sub>·n / (1/m<sub>a</sub> + 1/m<sub>b</sub>)</code>. Normal ring: a = 0.0036, drag = 0.08, e = 0.15. Icy: a = 0.0013 (less grip), drag = 0.022 (keeps sliding), e = 0.5. Small ring: radius 0.72. Heavy opponent: m = 2, radius ×1.3, 85% power.</li>
+          <li><b>Shrinking ring:</b> after 35% of the 11 s bout the radius shrinks linearly to 30%. Without it, evolved bots learned to circle in the middle until time ran out. A bot is out when its centre leaves the ring. Time-up is judged by distance from the centre.</li>
+          <li><b>Inputs (12), in the bot's own frame:</b> distance to rival, rival's bearing (cos, sin), own and rival's radial room to the edge, bearing to the ring centre (2), forward and sideways speed, where the rival's nose points relative to me (2), and the mass ratio. Egocentric inputs mean one policy works from any start angle.</li>
+          <li><b>Outputs (2):</b> throttle and turn rate, both in [−1, 1].</li>
+          <li><b>Fitness:</b> per bout, ring-out win <code>1 + 0.5·(1 − t/T)</code>, ring-out loss <code>−1 + 0.3·t/T</code>, time-up <code>±(0.15 + margin) + 0.5·(mean radial advantage)</code>. Summed over 16 bouts on shared random starts (the same starts for every brain in a generation): 8 against hall-of-fame champions (always including the newest, plus random older ones, even the very first) and 8 against random teammates. Starts are mirror images, so two identical brains always draw.</li>
+          <li><b>Champion choice:</b> fitness from 16 bouts is still noisy, so the top 4 play an extra 24-bout final against six hall-of-fame members. The winner joins the hall of fame (first 3 kept forever, up to 40 stored).</li>
+          <li><b>Genetic algorithm:</b> 3 elites copied unchanged; the rest are children of the top quarter (rank-biased choice, 30% uniform crossover), each weight mutated with probability 0.3 by Gaussian noise of size σ·U(0.25, 2), σ = 0.3 by default (the slider).</li>
+          <li><b>The chart:</b> the champion's win rate (draws count half) over 12 fixed start positions against the first three champions, and against a scripted policy ("Charging Chuck": steer at the rival, full throttle, retreat when near the edge). Chuck never trains, so he is an outside exam rather than a training partner.</li>
+          <li><b>Measured in Node</b> (seeded runs, 30 generations, roughly 0.1–0.2 s per generation): the final champion beat the generation-1 champion in 83–100% of 12 mirrored test bouts (3 seeds), and the exam score (mean of the two chart lines) rose from 25–75% at generation 1 to 87–98% averaged over generations 21–30. Against random brains even the generation-1 champion wins over 90%, because random brains usually drive out on their own. Win rate against Chuck is not monotone: self-play can drift into strategies that beat teammates but not an outside opponent (non-transitive "rock-paper-scissors" cycles), a known weakness that the hall of fame only partly fixes. After each challenge, the three-generation average of the exam got back to 70% or more within 3–7 generations in our runs.</li>
+          <li><b>Real research:</b> self-play is how TD-Gammon learned backgammon and AlphaZero learned chess and Go. Simulated sumo was also a classic multi-agent RL benchmark. Big systems use policy-gradient methods (PPO) and keep a large league of past opponents for the same reason as our hall of fame.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-sumo-core.js"></script>
+  <script src="js/game-sumo.js"></script>
+</body>
+</html>

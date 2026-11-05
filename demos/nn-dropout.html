@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forgetful on Purpose · Explore ML</title>
+  <meta name="description" content="Race two little neural networks on a few noisy dots. One memorises every dot; the other lets brain cells nap at random (dropout) and keeps its weights small (weight decay), so it learns the real pattern.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.3rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .gridmaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .gridmaps figure { margin: 0; min-width: 0; }
+    .gridmaps figcaption { font-weight: 800; font-size: .9rem; margin-bottom: 4px; display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+    .gridmaps figcaption .sc { font-family: var(--font-mono); font-size: .8rem; color: var(--muted); }
+    .shows { display: flex; flex-wrap: wrap; gap: 6px 14px; font-weight: 700; font-size: .86rem; margin: 6px 0 10px; }
+    .shows label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+    .howto { background: var(--accent-soft); border-radius: 12px; padding: 8px 12px; font-weight: 700; font-size: .88rem; margin: 0 0 10px; }
+    .stepc { font-family: var(--font-mono); font-weight: 700; color: var(--muted); font-size: .85rem; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="nn" data-demo="nn-dropout">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="network"></i> Neural Networks</span>
+      <h1>Forgetful on <span class="em">Purpose</span></h1>
+      <p class="hero-sub">A big brain with only a few dots to study can learn every single dot by heart, even the ones that are wrong. Then it fails on new dots. Making brain cells nap at random stops the cramming.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Two brains have already practised <b>200 steps</b> on the <b>same 40 dots</b>. Some dots are fibbing: they have the wrong colour. The left brain never naps, and look how wiggly its map is! The right brain lets some cells <b>nap</b> each step. Press <b>Practise</b> to keep going and watch the chart below.</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <p class="howto"><b>How to play:</b> press <b>Practise</b> and compare the two maps. Then tick <b>New (test) dots</b> to see which brain really learned the pattern. Move the sliders on the right to change how the napping brain practises.</p>
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="image"></i> What each brain thinks <span class="stepc" id="steps">step 0</span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="run" aria-pressed="false"><i data-icon="play"></i> Practise</button>
+            <button class="btn ghost small" id="restart"><i data-icon="reset"></i> Start again</button>
+            <button class="btn ghost small" id="newdots"><i data-icon="shuffle"></i> New dots</button>
+          </div>
+        </div>
+        <div class="shows" role="group" aria-label="What to show on the maps">
+          <label><input type="checkbox" id="showTest"> New (test) dots</label>
+          <label><input type="checkbox" id="showBorder" checked> The real border</label>
+          <label><input type="checkbox" id="showFib"> Circle the fibbing dots</label>
+        </div>
+        <div class="gridmaps">
+          <figure>
+            <figcaption><span style="color:var(--bad)">Know-it-all brain</span><span class="sc" id="capA">no naps</span></figcaption>
+            <canvas id="mapA" class="cv" role="img" aria-label="Colour map of how the know-it-all brain without dropout splits the board into red and blue, with the practice dots on top"></canvas>
+          </figure>
+          <figure>
+            <figcaption><span style="color:var(--accent)">Napping brain</span><span class="sc" id="capB">40% nap</span></figcaption>
+            <canvas id="mapB" class="cv" role="img" aria-label="Colour map of how the napping brain with dropout and weight decay splits the board, with the practice dots on top"></canvas>
+          </figure>
+        </div>
+        <div class="two">
+          <div class="stat"><div class="k">Know-it-all: practice / new dots</div><div class="v"><span id="aTr">0%</span> <small>/</small> <span id="aTe" style="color:var(--bad)">0%</span></div></div>
+          <div class="stat"><div class="k">Napping: practice / new dots</div><div class="v"><span id="bTr">0%</span> <small>/</small> <span id="bTe" style="color:var(--accent)">0%</span></div></div>
+        </div>
+        <p class="cap">Filled dots = the 40 practice dots. Hollow dots = 300 new dots the brains never study. The dashed line is the real border that made the dots.</p>
+        <h3 style="margin:14px 0 6px"><i data-icon="trend"></i> Oops-score (loss) while practising</h3>
+        <canvas id="loss" class="cv" role="img" aria-label="Line chart of training and test loss for both brains over the practice steps"></canvas>
+        <div class="legend" style="margin-top:6px">
+          <span><i style="background:var(--bad);opacity:.5"></i>know-it-all, practice dots</span>
+          <span><i style="background:var(--bad)"></i>know-it-all, new dots</span>
+          <span><i style="background:var(--accent);opacity:.5"></i>napping, practice dots</span>
+          <span><i style="background:var(--accent)"></i>napping, new dots</span>
+        </div>
+        <p class="cap" id="gapline" aria-live="polite"></p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="field">
+            <label for="drop">Nap chance (dropout) <span class="val"><b data-for="drop">40%</b></span></label>
+            <input type="range" id="drop" min="0" max="70" step="10" value="40">
+            <div class="hint">Each practice step, every brain cell in the napping brain falls asleep with this chance.</div>
+          </div>
+          <div class="field">
+            <label for="decay">Shrink weights (weight decay) <span class="val"><b data-for="decay">0</b></span></label>
+            <input type="range" id="decay" min="0" max="5" step="1" value="0">
+            <div class="hint">A gentle pull that keeps every connection small, so the map cannot get too wiggly.</div>
+          </div>
+          <p class="cap" style="margin:0">Moving a slider starts both brains again from the same first guess, so the race stays fair.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="network"></i> Who is napping right now?</h3>
+          <canvas id="net" class="cv" role="img" aria-label="Diagram of the napping brain: two inputs, two layers of sixteen cells and one output. Napping cells are grey and their wires are switched off."></canvas>
+          <p class="cap" id="napcount" style="margin:0">Press Practise to see naps.</p>
+          <div class="legend"><span><i style="background:var(--sup)"></i>plus wire</span><span><i style="background:var(--rl)"></i>minus wire</span><span><i style="background:var(--muted)"></i>napping cell</span></div>
+        </div>
+      </aside>
+    </section>
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-memo"><span class="tick"></span><span>Catch the crammer: get the know-it-all brain to 100% on practice dots while it scores at least 10 points lower on new dots.</span></div>
+      <div class="chal" id="c-nap"><span class="tick"></span><span>Nap time: with a nap chance of 30% or more, practise 300+ steps. The napping brain's new-dot score must be at least as good, and its oops gap (new minus practice) less than half the know-it-all's.</span></div>
+      <div class="chal" id="c-decay"><span class="tick"></span><span>No naps, just small weights: set nap chance to 0% and weight decay to 0.01 or more. After 300+ steps, beat the know-it-all's oops gap by half again.</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The know-it-all brain has lots of cells and only 40 dots, so it can bend its border around <b>every</b> dot, even the fibbing ones. Practice score: 100%. New dots: much worse.</li>
+      <li>On the chart, its practice oops-line drops to almost zero while its new-dot line turns round and climbs. When those two lines pull apart, the brain is memorising, not learning.</li>
+      <li>In the napping brain, a different random group of cells is asleep every step. No cell can count on its neighbours, so no single cell can memorise one odd dot. The border stays smooth and close to the real one.</li>
+      <li>Weight decay does a similar job in a different way: it keeps every wire small, and small wires can only draw gentle curves.</li>
+      <li>When the brain is used for real, nobody naps. Every cell is awake, and the answer is like an average of all the smaller brains it practised as.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>We make 40 practice dots and 300 new dots from the same wavy border, then flip about 1 in 8 colours to act as fibbers.</li>
+      <li>Both brains start from exactly the same random wires: 2 inputs, two layers of 16 cells, 1 output.</li>
+      <li>Every step, each brain looks at all 40 practice dots, measures its oops-score, and nudges every wire downhill.</li>
+      <li>For the napping brain, each cell flips a coin first. Nappers send out nothing, and the awake cells shout a little louder to make up for it.</li>
+      <li>After each step we score both brains on practice dots and new dots with every cell awake, and draw the lines.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Both models are multilayer perceptrons <code>2 → 16 → 16 → 1</code> with tanh hidden units and a sigmoid output, trained full-batch on <span class="term">binary cross-entropy</span> with Adam (lr 0.02). Data: <code>y &gt; 0.35·sin(2.2x) + ε</code> with 12% label noise, 40 training and 300 test points.</p>
+        <ul>
+          <li><span class="term">Dropout</span> (Srivastava et al., 2014) multiplies each hidden activation by a mask <code>m ~ Bernoulli(1−p)</code>. This page uses <span class="term">inverted dropout</span>: kept units are scaled by <code>1/(1−p)</code> during training, so the expected activation is unchanged and inference simply uses all units with no rescaling. A fresh mask is drawn per example per step; the diagram shows the mask for one example.</li>
+          <li>Dropout trains an implicit ensemble of <code>2<sup>32</sup></code> thinned sub-networks with shared weights and discourages <span class="term">co-adaptation</span>; the full network at test time approximates their geometric-mean prediction.</li>
+          <li><span class="term">Weight decay</span> adds <code>λ·w</code> to each weight's gradient (L2 penalty <code>½λ‖w‖²</code>; biases excluded). Note that with Adam this is coupled L2, not the decoupled AdamW variant. Smaller weights keep tanh units in their near-linear range, limiting curvature of the decision boundary.</li>
+          <li>The widening gap between training and test loss is the classic signature of <span class="term">overfitting</span> (high variance). Regularisation trades a slightly worse training fit for lower variance. Test loss for the unregularised net blows up because it becomes confidently wrong on noisy regions.</li>
+        </ul>
+        <p>Everything is seeded (mulberry32), so the same dots and starting weights give the same race. Weight decay slider values: 0, 0.001, 0.003, 0.01, 0.03, 0.1.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/nn-dropout-core.js"></script>
+  <script src="js/nn-dropout.js"></script>
+</body>
+</html>

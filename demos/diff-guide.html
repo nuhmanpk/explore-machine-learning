@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Steer the Drawing · Explore ML</title>
+  <meta name="description" content="Train a tiny diffusion model on labelled dot shapes, then turn the steering knob (classifier-free guidance) and watch fog become a ring, a heart, moons or a star, or go weird when you steer too hard.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--canvas-bg); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    #view { max-width: 460px; margin: 0 auto; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .chal .try { display: none; font-weight: 600; color: var(--ink-2); font-size: .86rem; margin-top: 2px; }
+    .chal.done .try { display: block; }
+    .cap { margin: 6px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .how { margin: 0; padding-left: 20px; font-size: .9rem; font-weight: 700; display: grid; gap: 4px; }
+    .how li.now { color: var(--accent); }
+    .shape-seg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .shape-seg .btn { padding: 8px 6px; justify-content: center; }
+    .shape-seg .btn.on { outline: 3px solid var(--accent); }
+    .playbar { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin-top: 12px; }
+    .playbar .field { margin: 0; }
+    .toggles { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
+    .ladder { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    @media (max-width: 640px) { .ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .ladder figure { margin: 0; min-width: 0; text-align: center; }
+    .ladder figcaption { font-weight: 800; font-size: .85rem; margin-top: 4px; }
+    .ladder figcaption small { display: block; font-weight: 700; color: var(--muted); }
+    .knob-words { display: flex; justify-content: space-between; font-size: .75rem; font-weight: 800; color: var(--muted); margin-top: 2px; }
+    #loss { height: auto; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="diff" data-demo="diff-guide">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="wand"></i> Image Generation · Guidance</span>
+      <h1>Steer the <span class="em">Drawing</span></h1>
+      <p class="hero-sub">Picture-making AIs start from fuzzy static and clean it up. You also tell them <i>what</i> to draw. A secret steering knob decides how hard they listen.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">These are the four shapes I'll practise: a <b>ring</b>, a <b>heart</b>, two <b>moons</b> and a <b>star</b>. Press <b>Start learning</b> so I can learn to make them out of fog!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 id="view-title"><i data-icon="sparkles"></i> Robo's drawing board</h3>
+          <span class="chip accent" id="view-chip">practice shapes</span>
+        </div>
+        <canvas id="view" class="cv" role="img" aria-label="Dots moving from random fog into the chosen shape"></canvas>
+        <div class="playbar">
+          <button class="btn small" id="replay" title="Watch the cleaning-up again from fog"><i data-icon="repeat"></i> Replay</button>
+          <div class="field">
+            <label for="scrub">Fog level <span class="val" data-for="scrub"></span></label>
+            <input type="range" id="scrub" min="0" max="50" value="0" step="1" disabled>
+          </div>
+        </div>
+        <div class="hint" style="text-align:center">Slide the fog level to rewind: 100% is pure static, 0% is the finished drawing.</div>
+        <div class="toggles">
+          <button class="btn small on" id="tg-trails" aria-pressed="true" title="Draw the path a few dots took"><i data-icon="trend"></i> Trails</button>
+          <button class="btn small on" id="tg-ghost" aria-pressed="true" title="Show the real shape faintly underneath"><i data-icon="target"></i> Real shape</button>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="map"></i> How to play</h3>
+          <ol class="how" id="how">
+            <li data-k="0" class="now">Press <b>Start learning</b> (about 15 seconds).</li>
+            <li data-k="1">Pick a shape and press <b>Draw it!</b></li>
+            <li data-k="2">Turn the <b>steering knob</b> and draw again.</li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="cpu"></i> Training</h3>
+          <div class="btn-row">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Start learning</button>
+            <button class="btn" id="reset" title="Forget everything and start with a brand-new brain"><i data-icon="reset"></i> New brain</button>
+          </div>
+          <div class="stats" style="margin-top:10px">
+            <div class="stat"><div class="k">Practice rounds</div><div class="v" id="st-step">0</div></div>
+            <div class="stat"><div class="k">Oops score</div><div class="v" id="st-loss">–</div></div>
+          </div>
+          <canvas id="loss" class="cv"></canvas>
+          <div class="hint">Oops score = how wrong Robo's fuzz guesses are. Lower is better. One time in five Robo practises <b>without</b> being told the shape, so it also learns "any shape".</div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="target"></i> What to draw</h3>
+          <div class="shape-seg" id="shapes">
+            <button class="btn small" data-c="0"><i data-icon="target"></i> Ring</button>
+            <button class="btn small on" data-c="1"><i data-icon="heart"></i> Heart</button>
+            <button class="btn small" data-c="2"><i data-icon="moon"></i> Moons</button>
+            <button class="btn small" data-c="3"><i data-icon="star"></i> Star</button>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label for="w">Steering knob <span class="val"><b data-for="w">1.5</b></span></label>
+            <input type="range" id="w" min="0" max="8" step="0.5" value="1.5" aria-describedby="w-hint">
+            <div class="knob-words" aria-hidden="true"><span>ignore me</span><span>just right</span><span>way too much</span></div>
+            <div class="hint" id="w-hint">How hard Robo listens to the shape you picked. 0 = it ignores you and draws any of its shapes. Very high = it tries so hard the drawing goes strange.</div>
+          </div>
+          <button class="btn primary" id="draw" style="width:100%;margin-top:6px"><i data-icon="wand"></i> Draw it!</button>
+          <div class="stats" style="margin-top:10px">
+            <div class="stat"><div class="k">On the shape</div><div class="v" id="st-on">–</div></div>
+            <div class="stat"><div class="k">Fills the shape</div><div class="v" id="st-fill">–</div></div>
+          </div>
+          <div class="hint"><b>On the shape</b>: how many dots landed on the real shape. <b>Fills the shape</b>: how much of the shape got covered. A great drawing scores high on both.</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <div class="cp-head" style="margin-bottom:8px">
+        <h3><i data-icon="gauge"></i> Four knobs at once</h3>
+        <button class="btn small" id="ladder-go" title="Draw the same shape with four different knob settings"><i data-icon="wand"></i> Try four knobs</button>
+      </div>
+      <div class="ladder" id="ladder"></div>
+      <p class="cap">Same brain, same starting fog, same shape. Only the steering knob changes.</p>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-steer"><span class="tick"></span><span>Nice and crisp: with the knob at 1 or more, draw any shape with 85% or more of the dots on the shape.
+        <span class="try"><b>Try this:</b> draw each of the four shapes. Which one is hardest for Robo?</span></span></div>
+      <div class="chal" id="c-ignore"><span class="tick"></span><span>Are you listening? Draw a shape with the knob at 0, then the same shape at 2 or more, and see "On the shape" jump by 20 points.
+        <span class="try"><b>Try this:</b> at knob 0, look closely. Can you spot bits of the <i>other</i> shapes mixed in?</span></span></div>
+      <div class="chal" id="c-over"><span class="tick"></span><span>Too much! Turn the knob to 6 or more and get "Fills the shape" down to 65% or less.
+        <span class="try"><b>Try this:</b> watch the trails at knob 8. The dots get shoved too hard and bunch up or fly off. Real AIs use a knob of about 3 to 8 on pictures, but too much makes colours harsh.</span></span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Robo learned one job: look at a fuzzy dot and <b>guess which way the fuzz pushed it</b>.</li>
+      <li>Most of the time we told it the shape name. Sometimes we didn't, so it also learned to clean up towards <b>any</b> of its shapes.</li>
+      <li>When drawing, Robo makes two guesses for every dot: "with your shape" and "any shape". The knob <b>stretches the difference</b> between them.</li>
+      <li>Knob 0: it ignores you and you get a mix. Knob 1 to 3: crisp, tidy shape. Huge knob: it pushes so hard the drawing breaks.</li>
+      <li>Big picture-making AIs use this exact trick so your words steer the picture.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="noise"></i></div><h3>Shake</h3><p>Take dots from a shape and shake them with random fuzz. Remember the fuzz!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="question"></i></div><h3>Guess</h3><p>Show Robo the shaken dot, how fuzzy it is, and usually the shape name. It guesses the fuzz.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="wand"></i></div><h3>Two guesses</h3><p>When drawing, Robo guesses the fuzz twice: knowing the shape, and not knowing it.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="gauge"></i></div><h3>Steer</h3><p>Start at "not knowing", then move towards "knowing" by the knob amount, and clean a little. Repeat 50 times.</p></div>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a 2-D <span class="term">DDPM</span> (Ho et al. 2020) with <span class="term">classifier-free guidance</span> (Ho &amp; Salimans 2022), trained live in plain JavaScript.</p>
+        <ul>
+          <li><b>ε-prediction:</b> an MLP (3 ReLU layers of 64) predicts the noise <code>ε̂<sub>θ</sub>(x<sub>t</sub>, t, c)</code> from Fourier features of the 2-D point, a sinusoidal timestep embedding and a one-hot class. Loss: <code>‖ε − ε̂<sub>θ</sub>(√ᾱ<sub>t</sub> x<sub>0</sub> + √(1−ᾱ<sub>t</sub>) ε, t, c)‖²</code>, linear β schedule 1e-4 → 0.08, T = 100, Adam, batch 64.</li>
+          <li><b>Label dropout:</b> with probability 0.2 the class is replaced by a null token (all zeros), so the same network learns the unconditional model <code>ε<sub>u</sub> = ε̂(x<sub>t</sub>, t, ∅)</code> and the conditional <code>ε<sub>c</sub> = ε̂(x<sub>t</sub>, t, c)</code>.</li>
+          <li><b>Guidance:</b> at sampling time <code>ε̃ = ε<sub>u</sub> + w(ε<sub>c</sub> − ε<sub>u</sub>)</code>. <code>w = 0</code> is the unconditional model (a mixture of all four shapes), <code>w = 1</code> is plain conditional sampling, and <code>w &gt; 1</code> amounts to sampling from roughly <code>p(x)·p(c|x)<sup>w</sup></code>, which sharpens towards points the implicit classifier is sure about. Too large a <code>w</code> overshoots: samples leave the data manifold and lose diversity. (Some papers write <code>(1+w)</code>; this lesson's <code>w</code> is the "guidance scale" used by Stable Diffusion, typically 5 to 9 for images.)</li>
+          <li><b>Sampler:</b> ancestral DDPM with 50 respaced steps, <code>x<sub>t−1</sub> = (x<sub>t</sub> − β<sub>t</sub>/√(1−ᾱ<sub>t</sub>) · ε̃)/√α<sub>t</sub> + σ<sub>t</sub>z</code>.</li>
+          <li><b>Scores:</b> "On the shape" is the share of samples within 0.12 of a real point (a precision proxy); "Fills the shape" is the share of 600 real points with a sample within 0.12 (a recall / coverage proxy). Guidance trades recall for precision, the same fidelity-versus-diversity trade-off seen in FID / IS curves for image models.</li>
+        </ul>
+        <p>Further reading: <a href="https://arxiv.org/abs/2207.12598" target="_blank" rel="noopener">Classifier-Free Diffusion Guidance</a> · <a href="https://arxiv.org/abs/2006.11239" target="_blank" rel="noopener">DDPM</a> · <a href="https://poloclub.github.io/diffusion-explainer/" target="_blank" rel="noopener">Diffusion Explainer</a> (which has a guidance-scale slider for Stable Diffusion).</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/diff-guide-core.js"></script>
+  <script src="js/diff-guide.js"></script>
+</body>
+</html>

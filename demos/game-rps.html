@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rock, Paper, Mind Reader · Explore ML</title>
+  <meta name="description" content="Play rock, paper, scissors against Robo. Five little pattern spotters learn your habits and Robo starts winning. Watch it crush robot players with patterns, and find out why truly random play can't be beaten.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="rl-games.css">
+  <style>
+    .howto { background: var(--accent-soft); border-radius: 12px; padding: 10px 12px 10px 30px; margin: 0; font-weight: 700; font-size: .86rem; display: grid; gap: 4px; }
+    .moves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+    .moves .btn { flex-direction: column; gap: 2px; padding: 10px 4px 8px; font-size: 1rem; }
+    .moves .btn canvas { width: 54px; height: 54px; background: transparent !important; }
+    .moves .btn kbd { font-size: .72rem; }
+    .moves .btn:disabled { opacity: .45; cursor: default; }
+    .under { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .toggle { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: .92rem; cursor: pointer; }
+    .panel.left .card, .chal, .bots { min-width: 0; }
+    .bots button, .chal .btn { white-space: normal; max-width: 100%; }
+    .chal .btn { justify-content: center; }
+    .field label.toggle { justify-content: flex-start; }
+    .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .toggle.locked { opacity: .5; cursor: not-allowed; }
+    .strip { display: flex; gap: 4px; flex-wrap: wrap; min-height: 22px; margin-top: 8px; }
+    .strip i { width: 22px; height: 22px; border-radius: 7px; display: inline-grid; place-items: center; font-style: normal; font-size: .7rem; font-weight: 800; color: #fff; }
+    .strip i.w { background: var(--good); }
+    .strip i.l { background: var(--bad); }
+    .strip i.t { background: var(--muted); }
+    .bots { display: grid; gap: 6px; }
+    .bots button { justify-content: flex-start; width: 100%; text-align: left; flex-wrap: wrap; }
+    .bots button small { display: block; width: 100%; font-weight: 700; color: var(--muted); font-size: .74rem; }
+    .chals { display: grid; gap: 10px; }
+    .chal { border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 6px; font-size: .86rem; font-weight: 700; }
+    .chal h4 { margin: 0; display: flex; gap: 8px; align-items: center; font-size: .95rem; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; }
+    .chal.done { border-color: var(--good); background: color-mix(in srgb, var(--good) 8%, var(--card)); }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal .prog { color: var(--muted); font-size: .8rem; }
+    .chal .try { display: none; color: var(--accent); }
+    .chal.done .try { display: block; }
+    .chal .quiz { display: grid; gap: 6px; }
+    .chal .quiz button { justify-content: flex-start; text-align: left; width: 100%; font-size: .82rem; }
+    .chal .quiz button.wrong { border-color: var(--bad); color: var(--bad); }
+    .trust { display: grid; gap: 6px; }
+    .trust .row1 { display: grid; grid-template-columns: 1fr 62px; gap: 6px; align-items: center; font-size: .8rem; font-weight: 700; color: var(--ink-2); }
+    .trust .row1.top { color: var(--ink); font-weight: 800; }
+    .trust .bar { height: 10px; border-radius: 999px; background: var(--bg-2); overflow: hidden; grid-column: 1 / -1; }
+    .trust .bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+    .trust .hits { font-family: var(--font-mono); font-size: .74rem; text-align: right; color: var(--muted); }
+    .ptable { width: 100%; border-collapse: separate; border-spacing: 4px; font-size: .86rem; font-weight: 800; }
+    .ptable th { font-size: .74rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; text-align: center; padding: 2px; }
+    .ptable th.rowh { text-align: right; white-space: nowrap; }
+    .ptable td { text-align: center; border-radius: 10px; padding: 8px 2px; border: 2px solid transparent; font-family: var(--font-mono); }
+    .ptable tr.now td { border-color: var(--accent); }
+    .ptable tr.now th.rowh { color: var(--accent); }
+    .tabs { width: 100%; }
+    .peekbox { font-weight: 800; font-size: .88rem; }
+    #arena { max-width: 680px; }
+    #chart { max-height: 190px; }
+    .canvas-box .stats { margin-top: 10px; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-rps">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="gamepad"></i> Game Lab · Learning your habits</span>
+      <h1>Rock, Paper, <span class="em">Mind Reader</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">Let's play rock, paper, scissors! I always <b>lock in my move before you choose</b>, so I can't cheat. My only trick is spotting your <b>habits</b>. Press <b>R</b>, <b>P</b> or <b>S</b> to start!</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="info"></i> How to play</h3>
+          <ol class="howto">
+            <li>Pick <b>Rock</b>, <b>Paper</b> or <b>Scissors</b> (buttons, or keys <kbd>R</kbd> <kbd>P</kbd> <kbd>S</kbd>).</li>
+            <li>Robo has already locked its move in the box. Then both are shown.</li>
+            <li>Play 20 rounds. Is Robo's line on the chart above the dashed 33% line? Then it is reading you!</li>
+            <li>Send in a robot player, then try the challenges.</li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Who plays Robo?</h3>
+          <div class="seg" id="mode" role="group" aria-label="Who plays against Robo"><button data-m="you" class="on" aria-pressed="true">You</button><button data-m="bot" aria-pressed="false">A robot player</button></div>
+          <div class="field" id="bot-field">
+            <div class="bots" id="bots" role="group" aria-label="Robot players"></div>
+            <div class="hint">Each robot player has a habit, except one. Tap one and press Play to watch Robo learn it.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <div class="chals" id="chals">
+            <div class="chal" id="c-teach">
+              <h4><span class="tick"></span> 1. Teach Robo a habit</h4>
+              <span>Play the same way on purpose (always rock, or rock-paper-scissors in order). Get Robo to win <b>70%</b> of your last 20 rounds.</span>
+              <span class="prog" id="p-teach">Robo has won 0 of your last 0.</span>
+              <span class="try"><b>Try this:</b> now suddenly change your habit and count how many rounds Robo needs to catch on.</span>
+            </div>
+            <div class="chal" id="c-cycler">
+              <h4><span class="tick"></span> 2. Crush the Cycler</h4>
+              <span>Send in the Cycler robot. Watch Robo win <b>80%</b> of 20 rounds in a row against it.</span>
+              <button class="btn small" id="go-cycler"><i data-icon="repeat"></i> Send in the Cycler</button>
+              <span class="prog" id="p-cycler"></span>
+              <span class="try"><b>Try this:</b> switch to Copycat. Which spotter does Robo start trusting in "What's happening inside"?</span>
+            </div>
+            <div class="chal" id="c-hard">
+              <h4><span class="tick"></span> 3. Be hard to read</h4>
+              <span>A 30-round test, no peeking. Keep Robo's wins <b>under 40%</b> (11 wins or fewer).</span>
+              <button class="btn small" id="go-hard"><i data-icon="target"></i> Start the 30-round test</button>
+              <span class="prog" id="p-hard"></span>
+              <span class="try"><b>Try this:</b> look at "same again" in the Win / lose table. A dice repeats a third of the time. People usually repeat less, and Robo can spot that!</span>
+            </div>
+            <div class="chal" id="c-dice">
+              <h4><span class="tick"></span> 4. Why can't Robo beat random?</h4>
+              <span>Send in the Truly random player for 60 rounds, then answer Robo's question.</span>
+              <button class="btn small" id="go-dice"><i data-icon="dice"></i> Send in Truly random</button>
+              <span class="prog" id="p-dice"></span>
+              <div class="quiz hidden" id="quiz" role="group" aria-label="Why is Robo stuck near 33 percent?">
+                <b>Why is Robo stuck near 33%?</b>
+                <button class="btn small" data-a="broken">Robo's brain is broken.</button>
+                <button class="btn small" data-a="right">Every move is equally likely whatever happened before, so there's no pattern to learn.</button>
+                <button class="btn small" data-a="peek">The random player is peeking at Robo's box.</button>
+              </div>
+              <span class="try"><b>Try this:</b> open the "After 1 move" table while it plays. Every row stays about 33 / 33 / 33.</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="arena" role="img" aria-label="The game: your move on the left, Robo's locked box on the right"></canvas>
+          <div class="moves" id="moves" role="group" aria-label="Your move">
+            <button class="btn" data-m="0" aria-label="Play rock (key R)"><canvas width="108" height="108"></canvas>Rock <kbd>R</kbd></button>
+            <button class="btn" data-m="1" aria-label="Play paper (key P)"><canvas width="108" height="108"></canvas>Paper <kbd>P</kbd></button>
+            <button class="btn" data-m="2" aria-label="Play scissors (key S)"><canvas width="108" height="108"></canvas>Scissors <kbd>S</kbd></button>
+          </div>
+          <div class="under">
+            <div class="field" style="gap:2px">
+              <label class="toggle" id="peek-lbl"><input type="checkbox" id="peek" aria-describedby="peek-hint"> <i data-icon="eye"></i> Peek at Robo's guess</label>
+              <div class="hint" id="peek-hint">Shows what Robo thinks you'll play before you choose. (Knowing its guess makes winning easy. That's cheating!)</div>
+            </div>
+          </div>
+          <div class="strip" id="strip" aria-label="Last rounds: green you won, red Robo won, grey tie"></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="trend"></i> How often Robo wins</h3>
+          <canvas id="chart" role="img" aria-label="Line chart of Robo's win rate over the rounds, compared with the 33 percent chance line"></canvas>
+          <div class="legend" style="margin-top:8px">
+            <span><i style="background:var(--accent)"></i>Robo wins (last 10 rounds)</span>
+            <span><i style="background:var(--rl)"></i>You win</span>
+            <span><i style="background:transparent;border:2px dashed var(--muted)"></i>Lucky guessing, 33%</span>
+            <span><i style="background:var(--bad);height:3px"></i>Something changed</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="layers"></i> The pattern table Robo learned</h3>
+          <div class="seg tabs" id="tabs" role="tablist" aria-label="Which pattern table"></div>
+          <div class="hint" id="tab-hint" style="font-size:.84rem;color:var(--muted);font-weight:700"></div>
+          <div style="overflow-x:auto"><table class="ptable" id="ptable"></table></div>
+          <div class="hint" style="font-size:.8rem;color:var(--muted);font-weight:700">Darker = happens more. Numbers are shares, old rounds fade. The outlined row is the situation right now.</div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play" disabled><i data-icon="play"></i> Play</button>
+            <button class="btn small" id="step" disabled><i data-icon="step"></i> 1 round</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Forget</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Robot speed</span>
+            <div class="seg" id="speed" role="group" aria-label="Robot speed"><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="60">Turbo</button></div>
+            <div class="hint">How fast robot players play. Turbo plays many rounds each frame.</div>
+          </div>
+          <div class="field">
+            <label for="mem">Robo's memory <span class="val" data-for="mem"></span></label>
+            <input type="range" id="mem" min="0.6" max="0.99" step="0.01" value="0.9" aria-describedby="mem-hint">
+            <div class="hint" id="mem-hint">Short memory notices a new habit fast but gets fooled by flukes. Long memory is steady but slow to change its mind.</div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Rounds</div><div class="v" id="st-n">0</div></div>
+            <div class="stat"><div class="k">Robo wins (last 20)</div><div class="v" id="st-rate">–</div></div>
+            <div class="stat"><div class="k">You · Robo · Tie</div><div class="v" id="st-score" style="font-size:1.15rem">0 · 0 · 0</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside" style="height:auto;min-height:130px"></div>
+          <div class="trust" id="trust" aria-label="How much Robo trusts each spotter"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— Robo's brain saved along the way. Tap one to see how that younger Robo would do today.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Remember</h3><p>Robo writes down every round: what you played, what it played, and who won.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Five spotters</h3><p>Each spotter looks for one kind of habit: a favourite move, what you play after a move, after two moves, after winning or losing, and whether you copy Robo.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Trust who's right</h3><p>Spotters that guessed right lately are trusted more. Robo mixes their guesses into one.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Lock in</h3><p>Robo locks in the move that beats its best guess, <b>before</b> you choose. Old rounds slowly fade, so new habits get noticed.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>At first Robo knew nothing, so it won about 1 round in 3, just like guessing.</li>
+        <li>As soon as you (or a robot player) had a habit, one of its spotters saw it, Robo trusted that spotter, and its wins shot up.</li>
+        <li>When the habit changed, Robo lost for a few rounds, then <b>adapted</b>: another spotter took over.</li>
+        <li>Against truly random play Robo stays near 33%. That's not Robo being silly: <b>no one</b> can predict a fair dice. Being random is the best defence, and it's surprisingly hard for people!</li>
+        <li>Phone keyboards, video sites and shops use the same idea: they look at what you did before to guess what you'll do next.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">online sequence prediction</span> with a <span class="term">mixture of experts</span>. Every round Robo predicts a distribution over the opponent's next move, plays the best response to the most likely move, then updates.</p>
+        <ul>
+          <li><b>Experts (5):</b> frequency counts over moves (order-0); an <span class="term">order-1 Markov</span> model conditioned on the opponent's last move; an <span class="term">order-2 Markov</span> model conditioned on their last two moves; a <span class="term">win-stay / lose-shift</span> detector that counts the opponent's move <i>relative</i> to their own last move (same / the move that beats it / the move it beats), conditioned on the last result; and a "copies Robo" detector that counts their move relative to Robo's last move.</li>
+          <li><b>Counts:</b> per context, with exponential forgetting: before each update the context's counts are multiplied by the memory <code>&gamma;</code> (slider, default 0.9, an effective window of about 1/(1&minus;&gamma;) = 10 visits). Predictions use add-0.2 smoothing: <code>p = (c + 0.2) / (n + 0.6)</code>.</li>
+          <li><b>Gating by recent accuracy:</b> each expert keeps an exponentially weighted hit rate <code>a &larr; 0.85&middot;a + 0.15&middot;hit</code> (hit = 1 if its argmax was right, split on ties). Mixing weights are a softmax <code>w<sub>e</sub> &prop; exp(10&middot;a<sub>e</sub>)</code>, and the prediction is <code>&Sigma; w<sub>e</sub> p<sub>e</sub></code>. This is a simple cousin of the Hedge / multiplicative-weights algorithm.</li>
+          <li><b>Decision:</b> Robo commits <code>beats(argmax p)</code> before seeing the opponent's move (ties broken at random), so it never sees the move it is answering.</li>
+          <li><b>Measured in Node</b> (seeded, 200 rounds each): against Always-rock, Cycler, Copycat and Sore loser, Robo won 100% of the last 50 rounds; it first hit 80% over a 20-round window right at round 20. Against Truly random, Robo averaged about 33% (32&ndash;34% depending on the seed) over 40 runs of 300 rounds. A simulated "human-style" player who avoids repeating a move 85% of the time lost about 39% of rounds.</li>
+          <li><b>Game theory:</b> the <span class="term">Nash equilibrium</span> of rock-paper-scissors is the uniform mixed strategy. Against it, every strategy, however clever, has expected win rate 1/3. Any detectable bias, even a subtle one like avoiding repeats, is exploitable, which is why RPS bots in online competitions use ensembles of exactly these kinds of predictors.</li>
+          <li><b>Peeking</b> shows Robo's committed move. Knowing a model's prediction lets you exploit it, a small taste of <span class="term">adversarial</span> attacks on predictors.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-rps-core.js"></script>
+  <script src="js/game-rps.js"></script>
+</body>
+</html>

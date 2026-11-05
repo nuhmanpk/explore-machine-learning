@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Squash to See · Explore ML</title>
+  <meta name="description" content="Spin a 3-D cloud of dots, shine a torch to cast its shadow, and watch Robo find the widest shadow with principal component analysis (PCA).">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    #cloud { cursor: grab; touch-action: none; }
+    #cloud:active { cursor: grabbing; }
+    #cloud:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .stat .v { font-size: 1.35rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .sets .btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-col { display: grid; gap: 8px; margin-top: 10px; }
+    .btn-col .btn { justify-content: flex-start; white-space: normal; text-align: left; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="unsup" data-demo="unsup-pca">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="layers"></i> Finding Groups</span>
+      <h1>Squash to <span class="em">See</span></h1>
+      <p class="hero-sub">A cloud of dots floats in 3-D, but paper is flat. Shine a torch through it and look at the shadow. Which way should the torch point so the shadow shows the most?</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">This is a <b>pancake</b> of dots, tipped on its side. <b>Drag</b> the cloud to spin it. Then turn your <b>torch</b> with the sliders and make its shadow as <b>wide</b> as you can. A wide shadow keeps the most of the picture!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="eye"></i> The dot cloud <span class="muted" id="setname"></span></h3>
+          <div class="btn-row sets" role="group" aria-label="Pick a dot cloud">
+            <button class="btn small" data-set="pancake" aria-pressed="true"><i data-icon="layers"></i> Pancake</button>
+            <button class="btn small" data-set="fruit" aria-pressed="false"><i data-icon="apple"></i> Fruit</button>
+            <button class="btn small" data-set="pencil" aria-pressed="false"><i data-icon="pencil"></i> Pencil</button>
+            <button class="btn small" data-set="ball" aria-pressed="false"><i data-icon="target"></i> Ball</button>
+          </div>
+        </div>
+        <canvas id="cloud" class="cv" tabindex="0" role="img" aria-label="A 3-D cloud of dots. Drag or use the arrow keys to spin it."></canvas>
+        <p class="cap">Drag (or use arrow keys) to spin. <span style="color:var(--warn)">Yellow line</span> = your torch, with each dot's shadow on it. <span style="color:var(--accent)">Robo's arrows</span> appear when Robo looks.</p>
+        <h3 style="margin:14px 0 6px"><i data-icon="ruler"></i> The shadows, laid flat</h3>
+        <canvas id="shadow" class="cv" role="img" aria-label="Number lines showing every dot's shadow on your torch and on Robo's best direction"></canvas>
+        <p class="cap" id="legendFruit" hidden><span class="swatch" style="background:var(--nn)"></span>grape <span class="swatch" style="background:var(--bad)"></span>apple <span class="swatch" style="background:var(--lang)"></span>banana</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="bulb"></i> Your torch</h3>
+          <p class="hint" style="margin:0 0 8px"><b>How to play:</b> 1. spin the cloud, 2. move both sliders until the yellow shadow is as wide as you can get it, 3. ask Robo to check.</p>
+          <div class="field">
+            <label for="turn">Turn around <span class="val"><b data-for="turn">0°</b></span></label>
+            <input type="range" id="turn" min="0" max="179" step="1" value="0" title="Spin the torch round, like turning a lighthouse">
+            <div class="hint">Swings the torch round in a circle, like a lighthouse.</div>
+          </div>
+          <div class="field" style="margin-top:8px">
+            <label for="tilt">Tilt up or down <span class="val"><b data-for="tilt">0°</b></span></label>
+            <input type="range" id="tilt" min="-90" max="90" step="1" value="0" title="Point the torch up at the sky or down at the floor">
+            <div class="hint">Points the torch up at the sky or down at the floor.</div>
+          </div>
+          <div class="btn-col">
+            <button class="btn primary" id="find"><i data-icon="search"></i> Robo, find the widest shadow</button>
+            <button class="btn" id="squash" disabled><i data-icon="layers"></i> Squash it flat</button>
+            <button class="btn ghost small" id="reseed"><i data-icon="shuffle"></i> New dots</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How much spread is kept?</h3>
+          <div class="stats">
+            <div class="stat"><div class="k">Your shadow</div><div class="v" id="yours" style="color:var(--warn)">0%</div></div>
+            <div class="stat"><div class="k">Widest possible</div><div class="v" id="best" style="color:var(--accent)">?</div></div>
+          </div>
+          <canvas id="bars" class="cv" style="margin-top:10px" role="img" aria-label="Bar chart of how much spread each of Robo's three directions keeps, with your torch shown as a dashed line"></canvas>
+          <p class="cap" id="barnote">Robo has not looked yet.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="image"></i> The flat picture</h3>
+          <canvas id="flat" class="cv" role="img" aria-label="The dots drawn flat using Robo's two best directions"></canvas>
+          <p class="cap" id="flatnote">After Robo looks, this shows the cloud squashed onto a flat page using its two best directions.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-hunt"><span class="tick"></span><span>Beat Robo: on the pancake, fruit or pencil, turn your torch until your shadow keeps at least 95% of the widest one, <i>before</i> Robo looks.</span></div>
+      <div class="chal" id="c-thin"><span class="tick"></span><span>Thinnest shadow: on the pancake, aim your torch so its shadow keeps less than 3% of the spread. Hint: shine it straight through the flat side.</span></div>
+      <div class="chal" id="c-ball"><span class="tick"></span><span>No best side: ask Robo to study the ball. See that no direction is much better than the others (the top bar stays under 50%).</span></div>
+      <p class="cap" id="trynext" aria-live="polite">Try this: start with the pancake. Spin it until you can see its wide flat side, then swing your torch along it.</p>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Each dot had three numbers, so it lived in 3-D. A page only has room for fewer numbers.</li>
+      <li>Shining a torch makes a shadow: one number per dot. Some torch directions squash dots on top of each other; others keep them nicely spread out.</li>
+      <li>The widest shadow keeps the most information. Robo found it by itself, then found the next-widest direction at right angles to the first.</li>
+      <li>With the pancake, fruit and pencil, one or two directions kept almost everything, so the flat picture still shows the real pattern (you can even see the three kinds of fruit apart).</li>
+      <li>The ball is round, so every shadow is about as wide. Squashing it always loses a lot. PCA helps most when the numbers move together.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="target"></i></div><h3>Find the middle</h3><p>Robo slides the whole cloud so its middle sits at zero.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="ruler"></i></div><h3>Measure the stretch</h3><p>It makes a little table of how much the cloud stretches in each direction, and how the numbers move together.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Swing the arrow</h3><p>It starts from your torch and keeps nudging the arrow towards the stretchiest way, until it stops moving.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="layers"></i></div><h3>Squash</h3><p>Keep the widest one or two directions, drop the rest, and draw the flat picture.</p></div>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">principal component analysis (PCA)</span>. With centred data <code>X</code> (n × 3), the sample <span class="term">covariance matrix</span> is <code>C = XᵀX / (n − 1)</code>. Projecting onto a unit vector <code>u</code> gives a 1-D "shadow" whose variance is <code>uᵀCu</code>. The <span class="term">first principal component</span> maximises that, and by the Rayleigh quotient it is the eigenvector of <code>C</code> with the largest eigenvalue <code>λ₁</code>.</p>
+        <ul>
+          <li>"Your shadow keeps X%" is <code>uᵀCu / tr(C)</code>. The bars are the <span class="term">explained variance ratios</span> <code>λᵢ / Σλ</code>. The dashed line shows that your torch can never beat bar 1, nor go below bar 3.</li>
+          <li>Robo's animated search is <span class="term">power iteration</span>, <code>v ← Cv / ‖Cv‖</code>, started from your torch direction. It converges to the top eigenvector at a rate set by <code>λ₂/λ₁</code>, which is why the ball (nearly equal eigenvalues) wanders.</li>
+          <li>All three components come from a cyclic <span class="term">Jacobi eigen decomposition</span> of the symmetric 3 × 3 covariance matrix. They are orthogonal. In practice libraries use the <span class="term">SVD</span> of <code>X</code>, which is more stable.</li>
+          <li>"Squash it flat" removes the third component: each point becomes <code>x − (x·v₃)v₃</code>. The mean squared error of that reconstruction equals the dropped variance, <code>λ₃</code> (up to the n − 1 factor).</li>
+          <li>PCA is linear and depends on units: on real data with mixed units (cm, grams) you usually standardise each feature first. Curved structure needs non-linear methods such as kernel PCA, t-SNE or UMAP.</li>
+        </ul>
+        <p>Every cloud is generated from a seeded random generator (mulberry32), so the same seed always gives the same dots.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/unsup-pca-core.js"></script>
+  <script src="js/unsup-pca.js"></script>
+</body>
+</html>

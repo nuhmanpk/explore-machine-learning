@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Busy Bees · Explore ML</title>
+  <meta name="description" content="Bees must pick flowers with hidden nectar. Play as a bee, then race four hives that use different ways to balance trying new flowers and sticking with the best: random, epsilon-greedy, UCB and Thompson sampling.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; }
+    .chal button .tag { margin-left: auto; font-size: .75rem; font-weight: 800; color: var(--muted); }
+    .chal button.on { border-color: var(--accent); }
+    .chal button.on .tag { color: var(--accent); }
+    .chal button:disabled { opacity: .55; cursor: default; }
+    .howto { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: .86rem; font-weight: 700; color: var(--ink-2); }
+    .howto li::marker { color: var(--accent); font-weight: 800; }
+    .try-this { margin: 0; font-size: .86rem; font-weight: 700; color: var(--ink-2); background: var(--accent-soft); border-radius: 10px; padding: 8px 10px; }
+    .try-this:empty { display: none; }
+    .flower-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .flower-keys .btn { padding: 7px 0; font-size: .8rem; justify-content: center; }
+    .flower-keys .btn i.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .board { display: grid; gap: 6px; }
+    .board .row { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 8px; align-items: center; font-size: .82rem; font-weight: 700; color: var(--ink-2); }
+    .board .row i { width: 12px; height: 12px; border-radius: 4px; display: block; }
+    .board .row b { font-family: var(--font-mono); font-size: .8rem; color: var(--ink); min-width: 3.4em; text-align: right; }
+    .board .row.head { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; }
+    .chart-label { margin: 14px 0 6px; font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .chart-label span { text-transform: none; }
+    #why { font-size: .86rem; font-weight: 700; color: var(--ink-2); margin: 0; min-height: 3.2em; }
+    .switch { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: .92rem; cursor: pointer; }
+    .switch input { width: 18px; height: 18px; accent-color: var(--accent); }
+    #kid-box.hidden, #auto-box.hidden { display: none; }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-bees">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="star"></i> Game Lab · Try or stick?</span>
+      <h1>Busy <span class="em">Bees</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Six flowers, and each one hides a secret: <b>how often it has nectar</b>. You can't see it, you have to visit and find out. Be the bee first: <b>tap a flower!</b></p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="info"></i> How to play</h3>
+          <ol class="howto">
+            <li>Be the bee: tap flowers (or press <kbd>1</kbd>–<kbd>8</kbd>) for 20 visits. Find the sweetest one!</li>
+            <li>Press <b>Watch the hives</b>, then <b>Play</b>. Four hives, four ways of choosing.</li>
+            <li>Watch the charts: who gets close to 100%?</li>
+            <li>Hit a <b>challenge</b> and see which hive adapts.</li>
+            <li>Tap a <b>checkpoint</b> to see what a hive believed earlier.</li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Who flies?</h3>
+          <div class="seg" id="mode" role="group" aria-label="Who flies"><button data-m="kid" class="on">I'm the bee</button><button data-m="auto">Watch the hives</button></div>
+          <div id="kid-box">
+            <p class="muted" style="margin:0 0 8px;font-size:.86rem">Tap a flower in the meadow or a button below. Each visit: nectar or nothing.</p>
+            <div class="flower-keys" id="flower-keys"></div>
+            <p class="muted" style="margin:8px 0 0;font-size:.86rem" id="kid-score">Visits: 0 / 20 · Nectar: 0</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.86rem">Change the meadow while the hives are learning. The chart marks the moment.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="drift"><i data-icon="sun"></i> Time of day <span class="tag">nectar moves</span></button>
+            <button class="btn small" data-c="bloom"><i data-icon="sparkles"></i> New flower blooms <span class="tag">a better one?</span></button>
+            <button class="btn small" data-c="trick"><i data-icon="gift"></i> Jackpot flower <span class="tag">big but rare</span></button>
+          </div>
+          <p class="try-this" id="try-this" aria-live="polite"></p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="settings"></i> Bee settings</h3>
+          <div class="field">
+            <label for="eps">Greedy+dice: how often to explore <span class="val" data-for="eps"></span></label>
+            <input type="range" id="eps" min="0" max="0.5" step="0.01" value="0.1" aria-describedby="eps-hint">
+            <div class="hint" id="eps-hint">How often the yellow bee rolls a dice and visits a random flower instead of its favourite.</div>
+          </div>
+          <div class="field">
+            <span class="lbl">Memory</span>
+            <div class="seg" id="memory" role="group" aria-label="Memory"><button data-v="1" class="on">Remember all</button><button data-v="0.99">Forget slowly</button></div>
+            <div class="hint">Forgetting old visits helps when flowers change during the day.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="peek"> Peek at the secret nectar</label>
+          <div class="hint" style="font-size:.82rem;color:var(--muted)">Shows how full each flower really is. The bees never see this!</div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="meadow" role="img" aria-label="A meadow with flowers and a beehive. Bees fly to the flowers they choose."></canvas>
+          <div class="legend" style="margin-top:10px" id="legend"></div>
+          <p class="chart-label">How close to perfect <span>(100% = always picks the best flower · each dot = 25 visits)</span></p>
+          <canvas id="chart" role="img" aria-label="Chart of how close each hive gets to the best possible nectar"></canvas>
+          <p class="chart-label">Nectar missed so far <span>(regret: lower is better, flat = stopped making mistakes)</span></p>
+          <canvas id="regret" role="img" aria-label="Chart of total missed nectar for each hive"></canvas>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card" id="auto-card">
+          <div class="btn-row">
+            <button class="btn primary" id="play" aria-label="Play or pause the hives"><i data-icon="play"></i> Play</button>
+            <button class="btn ghost small" id="step" aria-label="Send one bee from each hive"><i data-icon="step"></i> Step</button>
+            <button class="btn ghost small" id="reset" aria-label="New meadow, forget everything"><i data-icon="reset"></i> New meadow</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed" role="group" aria-label="Speed"><button data-v="2">Slow</button><button data-v="5">1×</button><button data-v="15" class="on">3×</button><button data-v="50">10×</button><button data-v="300">Turbo</button></div>
+            <div class="hint">Slow lets you follow each bee. Turbo shows the long run.</div>
+          </div>
+          <div class="board" id="board"></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="seg" id="focus" role="group" aria-label="Which hive to look inside"><button data-v="eps">Greedy</button><button data-v="ucb">Curious</button><button data-v="ts" class="on">Dreamer</button></div>
+          <canvas id="belief" role="img" aria-label="What the chosen hive believes about each flower"></canvas>
+          <p id="why"></p>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the Dreamer hive's beliefs saved along the way. Tap one to see what it thought back then.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>No bee could see the nectar. Every hive had to <b>try</b> flowers to learn about them, and every try at a bad flower costs nectar.</li>
+        <li>The <b>Random</b> hive never learns, so it stays stuck around 50-60%.</li>
+        <li>The <b>Greedy+dice</b> hive mostly sticks with its favourite but keeps wasting a few visits on random flowers forever.</li>
+        <li>The <b>Curious</b> hive gives a bonus to flowers it knows little about. The <b>Dreamer</b> imagines how good each flower <i>might</i> be and goes with its best dream. Both quickly stop making mistakes: their "missed nectar" line goes flat.</li>
+        <li>When the meadow changed, hives that <b>forget slowly</b> noticed sooner. Remembering everything makes you stubborn!</li>
+      </ul>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Try</h3><p>Visit a flower. Did it have nectar? Write it down.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="pencil"></i></div><h3>Keep score</h3><p>For each flower: how many visits, how much nectar. Few visits = still unsure.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="dice"></i></div><h3>Choose</h3><p>Go to the best-looking flower, but give unsure flowers a chance too. That's the <b>try or stick</b> balance.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Repeat</h3><p>The more you visit, the surer you get, and the less you need to explore.</p></div>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is the <span class="term">multi-armed bandit</span> problem: <i>K</i> arms (flowers) with unknown reward distributions, and the goal is to maximise total reward, i.e. minimise <span class="term">regret</span> <code>R(T) = Σ<sub>t</sub> (μ* − μ<sub>a<sub>t</sub></sub>)</code>, where μ* is the best arm's mean. The charts use expected (not sampled) regret, so lines are smooth. It is reinforcement learning with a single state: the pure exploration–exploitation trade-off.</p>
+        <ul>
+          <li><b>Rewards:</b> normal flowers are Bernoulli(<i>p</i>), one drop or none. The jackpot flower pays 4 drops with probability 0.15 (mean 0.6, high variance) so a lucky early jackpot can fool greedy estimates.</li>
+          <li><b>Random:</b> uniform choice; linear regret.</li>
+          <li><b>ε-greedy:</b> with probability ε pick uniformly, otherwise argmax of the sample mean. With fixed ε regret still grows linearly (≈ ε·average gap per step).</li>
+          <li><b>UCB1</b> (Auer et al. 2002): pick argmax of <code>x̄<sub>i</sub> + c·b<sub>i</sub>·√(2 ln N / n<sub>i</sub>)</code>, untried arms first. Here <i>c</i> = 0.5 and <i>b<sub>i</sub></i> is the arm's payout size (range scaling). Logarithmic regret.</li>
+          <li><b>Thompson sampling:</b> Beta(1,1) priors, posterior Beta(1+successes, 1+failures). Each step draw θ<sub>i</sub> ~ Beta and pick argmax θ<sub>i</sub>·b<sub>i</sub>. Payouts in [0, b] use the <span class="term">Bernoulli trick</span> (Agrawal &amp; Goyal): a reward <i>r</i> counts as a success of weight r/b. The curves in "What's happening inside" are these posteriors.</li>
+          <li><b>Time of day</b> makes the problem <span class="term">non-stationary</span>: every 300 visits the arm means are swapped so a different flower is best. "Forget slowly" applies a discount γ = 0.99 to all counts each step (discounted UCB, Garivier &amp; Moulines; discounted Thompson sampling), an effective memory of ≈ 1/(1−γ) = 100 visits. A sliding window of the last <i>W</i> visits works similarly.</li>
+          <li><b>New flower:</b> a new arm with μ = 0.88. UCB tries it immediately (n = 0 gives an infinite bonus), Thompson's flat prior makes it likely to be sampled high, ε-greedy only finds it by its random ε steps.</li>
+          <li>Lai &amp; Robbins showed no strategy can beat order log T regret on stationary bandits; UCB1 and Thompson sampling both achieve it. Bandits run real A/B tests, ad selection and clinical-trial designs.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-bees-core.js"></script>
+  <script src="js/game-bees.js"></script>
+</body>
+</html>

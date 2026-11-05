@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hot or Cold Words · Explore ML</title>
+  <meta name="description" content="A tiny language model gives every next word a chance. Turn the temperature dial, switch on top-k and top-p, and watch it write stories that are boring, sensible or silly.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.3rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .howto { background: var(--accent-soft); border-radius: 12px; padding: 8px 12px; font-weight: 700; font-size: .88rem; margin: 0 0 10px; }
+    .starts { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+    .starts button.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 3px 0 var(--ink); }
+    .story { min-height: 92px; background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 1.15rem; line-height: 1.9; font-weight: 700; margin-bottom: 10px; }
+    .story .pr { color: var(--muted); }
+    .story .w { border-radius: 8px; padding: 1px 3px; }
+    .story .w.cold { background: color-mix(in srgb, var(--sup) 14%, transparent); }
+    .story .w.hot { background: color-mix(in srgb, var(--bad) 16%, transparent); }
+    .story .w.now { outline: 3px solid var(--accent); background: var(--accent-soft); }
+    .story .caret { display: inline-block; width: 10px; height: 1.1em; vertical-align: -3px; background: var(--accent); border-radius: 3px; margin-left: 4px; animation: blink 1s steps(2) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .reps { display: grid; gap: 6px; margin: 8px 0; padding: 0; list-style: none; counter-reset: rep; }
+    .reps li { background: var(--bg-2); border: 2px solid var(--line); border-radius: 12px; padding: 6px 10px; font-weight: 700; font-size: .95rem; counter-increment: rep; }
+    .reps li::before { content: counter(rep) ". "; color: var(--muted); }
+    .reps li .pr { color: var(--muted); }
+    .reps li .odd { text-decoration: underline wavy var(--bad); text-underline-offset: 3px; }
+    .meter { height: 12px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); overflow: hidden; }
+    .meter i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+    .meters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .meters .lbl { font-weight: 800; font-size: .85rem; display: flex; justify-content: space-between; margin-bottom: 3px; }
+    .toggle { display: flex; align-items: center; gap: 8px; font-weight: 800; cursor: pointer; }
+    .quick { display: flex; gap: 6px; flex-wrap: wrap; }
+    .field.off { opacity: .5; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } .story .caret { animation: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="lang" data-demo="lang-temp">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="chat"></i> Language Models &amp; LLMs</span>
+      <h1>Hot or Cold <span class="em">Words</span></h1>
+      <p class="hero-sub">A language model never knows the next word for sure. It gives every word a chance, then rolls a dice. The temperature dial decides how wild that dice is.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I read some little stories and counted which words come after which. Look at the bars: those are my chances for the <b>next word</b>. Press <b>Pick next word</b> and I will roll my word dice!</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <p class="howto"><b>How to play:</b> pick some starting words, press <b>Pick next word</b> a few times, then turn the <b>temperature dial</b> and see the bars change shape.</p>
+        <div class="cp-head">
+          <h3 style="margin:0"><i data-icon="pencil"></i> The story so far</h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="next"><i data-icon="dice"></i> Pick next word</button>
+            <button class="btn small" id="write"><i data-icon="play"></i> Write 12 words</button>
+            <button class="btn ghost small" id="clear"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <div class="starts" id="starts" role="group" aria-label="Starting words"></div>
+        <div class="story" id="story" aria-live="polite" aria-label="The story the model is writing"></div>
+        <div class="cp-head" style="margin-bottom:6px">
+          <h3 style="margin:0"><i data-icon="gauge"></i> Chances for the next word <span class="muted" id="ctxlbl"></span></h3>
+        </div>
+        <canvas id="bars" class="cv" role="img" aria-label="Bar chart of the chance of each possible next word"></canvas>
+        <div class="legend" style="margin-top:6px">
+          <span><i style="background:var(--accent)"></i>chance now</span>
+          <span><i style="background:transparent;border:2px dashed var(--muted)"></i>chance at normal temperature (1)</span>
+          <span><i style="background:var(--line)"></i>thrown out of the hat</span>
+          <span><i style="background:var(--good)"></i>the word just picked</span>
+        </div>
+        <p class="cap" id="pickline" aria-live="polite"></p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Temperature dial</h3>
+          <canvas id="gauge" class="cv" style="background:transparent;border:0" role="img" aria-label="Dial showing the temperature from cold to hot"></canvas>
+          <div class="field">
+            <label for="temp">Temperature <span class="val"><b data-for="temp">1.0</b></span></label>
+            <input type="range" id="temp" min="0" max="3" step="0.1" value="1" aria-describedby="temp-hint">
+            <div class="hint" id="temp-hint">Cold = always pick the biggest bar (safe but boring). Hot = small bars get bigger too (surprising, then silly).</div>
+          </div>
+          <div class="quick">
+            <button class="btn ghost small" data-t="0">Ice cold 0</button>
+            <button class="btn ghost small" data-t="0.6">Cool 0.6</button>
+            <button class="btn ghost small" data-t="1">Normal 1</button>
+            <button class="btn ghost small" data-t="2.5">Hot 2.5</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="scissors"></i> Throw words out of the hat</h3>
+          <label class="toggle"><input type="checkbox" id="useK"> Only the top few words (top-k)</label>
+          <div class="field off" id="kf">
+            <label for="k">Keep the top <span class="val"><b data-for="k">5</b> words</span></label>
+            <input type="range" id="k" min="1" max="20" step="1" value="5" disabled>
+            <div class="hint">Keep only this many of the biggest bars. Everything else is never picked.</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="useP"> Only words that fill the hat (top-p)</label>
+          <div class="field off" id="pf">
+            <label for="p">Fill up to <span class="val"><b data-for="p">60%</b></span></label>
+            <input type="range" id="p" min="0.1" max="1" step="0.05" value="0.6" disabled>
+            <div class="hint">Add the biggest bars one by one until their chances reach this much. A sure guess keeps 1 or 2 words, an unsure guess keeps more.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="info"></i> Right now</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Words in the hat</div><div class="v" id="inhat">0</div></div>
+            <div class="stat"><div class="k">Top word's chance</div><div class="v" id="topc">0%</div></div>
+            <div class="stat"><div class="k">Spread</div><div class="v" id="spread">0</div></div>
+          </div>
+          <p class="cap" style="margin:0">Spread is how unsure the dice is. 0 means it always picks the same word.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <div class="cp-head">
+        <h3><i data-icon="repeat"></i> Same start, 5 tries</h3>
+        <button class="btn primary small" id="rep"><i data-icon="repeat"></i> Repeat 5 times</button>
+      </div>
+      <p class="cap">Write the same start five times with your settings. Are the stories all the same? Do they make sense? Words that never follow each other in the stories get a <span style="text-decoration:underline wavy var(--bad)">wavy line</span>.</p>
+      <ol class="reps" id="reps"></ol>
+      <div class="meters">
+        <div><div class="lbl"><span>Different-ness</span><span id="divv">-</span></div><div class="meter" role="meter" aria-label="Different-ness" aria-valuemin="0" aria-valuemax="100" id="divm"><i></i></div></div>
+        <div><div class="lbl"><span>Makes sense</span><span id="senv">-</span></div><div class="meter" role="meter" aria-label="Makes sense" aria-valuemin="0" aria-valuemax="100" id="senm"><i style="background:var(--good)"></i></div></div>
+      </div>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-cold"><span class="tick"></span><span>Ice cold: set the temperature to 0.1 or lower and press Repeat 5 times. All five stories should be exactly the same.</span></div>
+      <div class="chal" id="c-hot"><span class="tick"></span><span>Hot mess: temperature 2 or more, no top-k or top-p. Repeat 5 times: five different stories, and "makes sense" below 60%.</span></div>
+      <div class="chal" id="c-tame"><span class="tick"></span><span>Tame the heat: keep the temperature at 2 or more, but switch on top-p (60% or less) or top-k (5 or less). Repeat 5 times: at least 4 different stories that make sense 70% or more.</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The model looked at the last two words and listed every word it knows with a chance for each. The chances add up to 100%.</li>
+      <li>It picks the next word like a lucky dip: big bars are picked often, small bars sometimes.</li>
+      <li><b>Cold</b> makes the biggest bar even bigger. At 0 it always picks the top word, so every try is the same, and it can get stuck in loops.</li>
+      <li><b>Hot</b> squashes the bars flatter, so odd words sneak in. Fun at first, then nonsense.</li>
+      <li><b>Top-k</b> and <b>top-p</b> throw the tiny bars out of the hat before the dice is rolled. That lets you be a bit hot and still make sense.</li>
+      <li>Big chat models do exactly this, one word piece at a time, with many thousands of possible pieces.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>We read five little stories (about 4,000 words) and count which word comes after each pair of words, and after each single word.</li>
+      <li>For the next word, we mix those counts: mostly "after these two words", some "after this one word", and a tiny bit of "how common is this word anyway".</li>
+      <li>The temperature re-shapes the chances: each chance is raised to the power 1 ÷ temperature, then they are scaled to add to 100% again.</li>
+      <li>Top-k keeps only the k biggest bars. Top-p keeps the biggest bars until they add up to p. The kept bars are scaled up to 100%.</li>
+      <li>We roll a dice on what is left, add the word to the story, and repeat.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>The model is an interpolated <span class="term">trigram language model</span>: <code>P(w | u,v) = 0.6·P₃(w|u,v) + 0.37·P₂(w|v) + 0.03·P₁(w)</code> with maximum-likelihood counts (weights renormalised when the trigram context is unseen). The unigram term gives every vocabulary word a small non-zero probability, which is what high temperature brings to the surface.</p>
+        <ul>
+          <li><span class="term">Temperature</span>: treating <code>z = log P</code> as logits, sampling uses <code>softmax(z / T)</code>, i.e. <code>q ∝ P<sup>1/T</sup></code>. As <code>T → 0</code> this tends to <span class="term">greedy decoding</span> (argmax); <code>T = 1</code> is the model's own distribution; <code>T → ∞</code> tends to uniform. Here <code>T ≤ 0.01</code> is treated as exact argmax.</li>
+          <li><span class="term">Top-k sampling</span> (Fan et al., 2018) truncates to the k most likely tokens and renormalises.</li>
+          <li><span class="term">Nucleus (top-p) sampling</span> (Holtzman et al., 2019) keeps the smallest set of most likely tokens whose cumulative probability is at least p, so the candidate set adapts: narrow when the model is confident, wide when it is not. Filters are applied after temperature, as in most LLM libraries.</li>
+          <li>"Different-ness" is <span class="term">distinct-2</span> (unique bigrams ÷ all bigrams across the five runs). "Makes sense" is a crude fluency proxy: the share of adjacent word pairs that occur in the training text. Real evaluations use perplexity under a stronger model or human judgement.</li>
+        </ul>
+        <p>Greedy decoding maximises per-step likelihood but is prone to repetition loops; this diversity–coherence trade-off is why production LLMs typically sample with <code>T ≈ 0.7–1</code> plus top-p ≈ 0.9.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/lang-corpus.js"></script>
+  <script src="js/lang-temp-core.js"></script>
+  <script src="js/lang-temp.js"></script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fish School vs Shark · Explore ML</title>
+  <meta name="description" content="Forty little fish with tiny brains learn to find plankton and dodge a hungry shark by evolution. Be a fish yourself, watch schools form, drive the shark to test them, and throw a faster shark, two sharks or murky water at them.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="rl-games.css">
+  <style>
+    .howto { background: var(--accent-soft); border-radius: 12px; padding: 8px 12px 8px 30px; font-weight: 700; font-size: .86rem; margin: 0; display: grid; gap: 4px; }
+    .howto li::marker { color: var(--accent); font-weight: 800; }
+    .howto-t { font-weight: 800; font-size: .86rem; margin: 0 0 -4px; }
+    #mode { width: 100%; }
+    #mode button { flex: 1; padding: 7px 4px; font-size: .84rem; white-space: nowrap; }
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; text-align: left; }
+    .chal button .tag { margin-left: auto; font-size: .72rem; font-weight: 800; color: var(--muted); white-space: nowrap; }
+    .chal button.on .tag { color: var(--accent); }
+    .chal button.done::after { content: "✓"; margin-left: 6px; color: var(--good); font-weight: 900; }
+    .try { background: color-mix(in srgb, var(--good) 12%, var(--card)); border: 2px dashed color-mix(in srgb, var(--good) 50%, var(--line)); border-radius: 12px; padding: 8px 10px; font-weight: 700; font-size: .86rem; }
+    #tank { background: #0f4c6e; cursor: crosshair; touch-action: none; border-radius: 14px; }
+    .swim-pad { display: none; grid-template-columns: repeat(3, 52px); grid-template-rows: 46px 46px; gap: 6px; justify-content: center; margin-top: 10px; }
+    .swim-pad.show { display: grid; }
+    .swim-pad .btn { padding: 0; }
+    .swim-pad .up { grid-column: 2; grid-row: 1; } .swim-pad .left { grid-column: 1; grid-row: 2; }
+    .swim-pad .down { grid-column: 2; grid-row: 2; } .swim-pad .right { grid-column: 3; grid-row: 2; }
+    .score-row { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-weight: 800; font-size: .86rem; color: var(--ink-2); }
+    .score-row b { color: var(--ink); font-family: var(--font-head); font-size: 1.05rem; }
+    .eyes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .eye { border: 2px solid var(--line); border-radius: 10px; padding: 5px 6px; background: var(--card); font-size: .72rem; font-weight: 800; color: var(--muted); min-width: 0; }
+    .eye .nm { display: block; text-align: center; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .eye .ch { display: grid; grid-template-columns: 12px 1fr; gap: 4px; align-items: center; margin: 2px 0; }
+    .eye .ch i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+    .eye .bar { height: 6px; border-radius: 99px; background: var(--bg-2); overflow: hidden; }
+    .eye .bar span { display: block; height: 100%; border-radius: 99px; transition: width .12s; }
+    .eye.alarm { border-color: var(--bad); }
+    .eye-key { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: .74rem; font-weight: 800; color: var(--ink-2); margin: 6px 0 2px; }
+    .eye-key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+    .ylabel { margin: 0 0 6px; font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .ylabel span { text-transform: none; letter-spacing: 0; }
+    .toggle, .field label.toggle { display: flex; gap: 10px; align-items: center; justify-content: flex-start; font-weight: 800; font-size: .9rem; cursor: pointer; }
+    #alive-field .alive-toggle { justify-content: flex-start; }
+    .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .field .hint { margin-top: 2px; }
+    @media (prefers-reduced-motion: reduce) { .eye .bar span { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-fish">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="fish"></i> Game Lab · Neuroevolution</span>
+      <h1>Fish School <span class="em">vs Shark</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">Welcome to the tank! <b>You</b> are the yellow fish. Steer with the arrow keys (or press on the water) to gobble <b>green plankton</b> and stay away from the <b>shark</b>. How long can you last?</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <div class="seg" id="mode" role="group" aria-label="What happens in the tank">
+            <button data-m="fish" class="on" aria-pressed="true">Be a fish</button>
+            <button data-m="learn" aria-pressed="false">Fish learn</button>
+            <button data-m="shark" aria-pressed="false">Be the shark</button>
+          </div>
+          <p class="howto-t">How to play</p>
+          <ol class="howto" id="howto">
+            <li><b>Be a fish:</b> arrow keys / WASD, or press and hold on the water, to swim. Eat plankton, dodge the shark.</li>
+            <li><b>Fish learn:</b> 40 robot fish try, the best ones have babies. Watch the chart climb.</li>
+            <li>Speed it up to <b>Turbo</b>, then tap old <b>checkpoints</b> to compare.</li>
+            <li><b>Be the shark:</b> hunt the trained fish yourself. Then try a <b>challenge</b>.</li>
+          </ol>
+          <div class="swim-pad" id="pad" aria-label="Swim buttons">
+            <button class="btn up" data-k="up" aria-label="Swim up"><i data-icon="arrow-up"></i></button>
+            <button class="btn left" data-k="left" aria-label="Swim left"><i data-icon="arrow-left"></i></button>
+            <button class="btn down" data-k="down" aria-label="Swim down"><i data-icon="arrow-down"></i></button>
+            <button class="btn right" data-k="right" aria-label="Swim right"><i data-icon="arrow-right"></i></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.86rem">Best after about 15 generations. Each one starts next generation; the chart marks the moment.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="fast" aria-pressed="false"><i data-icon="gauge"></i> Faster shark <span class="tag">zoom!</span></button>
+            <button class="btn small" data-c="two" aria-pressed="false"><i data-icon="groups"></i> Two sharks <span class="tag">double trouble</span></button>
+            <button class="btn small" data-c="murky" aria-pressed="false"><i data-icon="eye"></i> Murky water <span class="tag">short sight</span></button>
+          </div>
+          <div class="try hidden" id="try" aria-live="polite"></div>
+        </div>
+
+        <div class="card" id="knobs">
+          <h3><i data-icon="sparkles"></i> Evolution knobs</h3>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.3" aria-describedby="mut-hint">
+            <div class="hint" id="mut-hint">Small = babies are careful copies of their parents. Big = wild new ideas (good and bad!).</div>
+          </div>
+          <div class="field">
+            <label class="toggle"><input type="checkbox" id="rays" checked aria-describedby="rays-hint"> Show the leader's eyes</label>
+            <div class="hint" id="rays-hint">Draws lines from the crowned fish to everything its six eyes can see right now.</div>
+          </div>
+          <div class="field">
+            <label class="toggle"><input type="checkbox" id="trails" aria-describedby="trails-hint"> Show swim trails</label>
+            <div class="hint" id="trails-hint">Leaves a faint trail behind every fish, so you can spot schools moving together.</div>
+          </div>
+          <div class="field" id="alive-field"></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="tank" role="img" tabindex="0" aria-label="Top-down fish tank with plankton, fish and a shark. Use arrow keys or press on the water to steer."></canvas>
+          <div class="score-row" id="score-row" aria-live="polite"></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How long the fish survive, generation by generation</h3>
+          <p class="ylabel">Percent <span>(1 generation = 20 pretend seconds in the tank)</span></p>
+          <canvas id="chart" aria-label="Chart of average survival per generation"></canvas>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Average time alive (%)</span><span><i style="background:var(--lang)"></i>Still swimming at the end (%)</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row" id="train-btns">
+            <button class="btn primary" id="play" aria-label="Start or pause learning"><i data-icon="play"></i> Watch them learn</button>
+            <button class="btn" id="skip" aria-label="Skip to the next generation"><i data-icon="step"></i> Next gen</button>
+            <button class="btn ghost small" id="reset" aria-label="New random brains, start over"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed" role="group" aria-label="Speed"><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+            <div class="hint">1× to watch every wiggle. Turbo skips drawing so generations fly by.</div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Generation</div><div class="v" id="st-gen">1</div></div>
+            <div class="stat"><div class="k">Swimming now</div><div class="v" id="st-alive">40</div></div>
+            <div class="stat"><div class="k">Last gen survived</div><div class="v" id="st-surv">–</div></div>
+            <div class="stat"><div class="k">Snacks per fish</div><div class="v" id="st-food">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div class="flow" id="inside" style="height:auto;min-height:60px"></div>
+          <div class="eye-key"><span><i style="background:#3ccf6e"></i>plankton</span><span><i style="background:#ff5d5d"></i>shark</span><span><i style="background:#9aa3b8"></i>wall</span><span><i style="background:#ffc93c"></i>fish friend</span></div>
+          <div class="eyes" id="eyes" aria-label="What each of the leader fish's six eyes sees"></div>
+          <div class="decision" id="decision" style="margin-top:8px"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion fish of each generation. Tap one to watch a school of 40 copies of it face today's tank.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Six eyes</h3><p>Each fish has six eyes all around its body. Every eye tells the brain how close the nearest plankton, shark, wall and fish friend is in its direction. Plus: how full its tummy is.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>Those 25 numbers flow through 8 thinking neurons to 2 answers: turn left or right, and swim fast or slow. Fast swimming makes you hungry quicker!</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Score</h3><p>Each fish scores points for every moment it stays alive, a little for each plankton snack, and a bonus for still swimming at the end.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Babies</h3><p>The top fish are copied unchanged. The rest of the new school are babies of the top quarter, sometimes mixing two parents, always with a few random changes.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="zap"></i></div><h3>The shark</h3><p>The shark is not learning. It just chases the nearest fish. But when several fish crowd together it can lose track and miss its bite.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In generation 1 every fish had a <b>random brain</b>. Most swam in circles, bumped the glass, starved or got eaten.</li>
+        <li>After each generation, the fish that lived longest and ate most became the <b>parents</b>. Their babies got copies of their brains with small random changes.</li>
+        <li>Nobody told any fish "plankton is food" or "sharks are scary". Turning toward green dots and away from the shark simply <b>survived</b> better, so those brains spread.</li>
+        <li>Fish that swim near friends are harder to catch: the shark gets confused by a crowd. So <b>school-like swimming</b> can appear on its own, without a rule saying "stay together".</li>
+        <li>When you made the shark faster, added a second shark or clouded the water, survival dipped. The school kept evolving and <b>adapted</b> to the new tank.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">neuroevolution</span>: a population of 40 small fixed-topology networks <code>[25 &rarr; 8 &rarr; 2]</code> (tanh) whose 226 weights are optimised by a <span class="term">genetic algorithm</span> with no gradients, against a hand-written pursuit predator. Group behaviour is not programmed; any schooling is an <span class="term">emergent</span> side effect of individual selection.</p>
+        <ul>
+          <li><b>Senses (25 inputs):</b> six 64&deg; sensor wedges centred at 0&deg;, &plusmn;55&deg;, &plusmn;115&deg; and 180&deg; from the heading. For each wedge and each of four object classes (plankton, shark, wall, other fish) the input is <code>1 &minus; d/R</code> for the nearest object of that class in the wedge (0 if none within range R = 130 px; 45 px in murky water). Walls use one exact ray-cast per wedge; objects use the nearest-angle wedge. The 25th input is energy, mapped to [&minus;1, 1].</li>
+          <li><b>Outputs (2):</b> turn rate (tanh, up to 0.14 rad/step) and thrust in [0, 1], mapped to a target speed of 0.35&ndash;2.1 px/step with first-order lag.</li>
+          <li><b>Energy:</b> drains by 0.0009 + 0.0008&middot;thrust&sup2; per step; each plankton adds 0.3 (capped at 1). Zero energy = starved. Plankton respawns around three slowly drifting patches, so food is clumped.</li>
+          <li><b>Predator:</b> pursuit with turn rate 0.05 rad/step at 1.6 px/step (fast shark: 2.25 px/step, 0.07 rad/step). Targets the nearest fish (fish behind it count as 1.8&times; further), re-targets every 40 steps. After a catch it is slowed for 20 steps. <span class="term">Confusion effect</span>: if <i>k</i> other fish are within 30 px of the bitten fish the bite succeeds with probability <code>1/(1 + 0.3k)</code>; crowds around its target also make it switch targets at random. This is a simplified version of the predator-confusion hypothesis studied in real fish shoals.</li>
+          <li><b>Fitness:</b> <code>t/T + 0.02&middot;snacks + 0.5&middot;[alive at T]</code>, T = 1200 steps. Every fish in a generation shares one tank, so fitness is noisy and depends on the others (a co-evolutionary, frequency-dependent setting).</li>
+          <li><b>GA:</b> top 10% elites copied; the rest are children of the top 25% (rank-biased pick), 30% uniform crossover, Gaussian mutation on 25% of genes with step size drawn from 0.25&ndash;2&times; the slider value. Seeded RNG (mulberry32) so runs repeat exactly.</li>
+          <li><b>Metric on the chart:</b> mean fraction of the generation each fish survived, and the share still alive at the end.</li>
+          <li><b>Measured in Node</b> (seeded, 2 seeds, 50 generations): random brains survive about 67&ndash;69% of a generation on average, eat 2&ndash;5 snacks each and 19&ndash;28% are alive at the end. After 25 generations: 79&ndash;85% survival, 11&ndash;24 snacks, 51&ndash;65% alive at the end, and the average number of other fish within 40 px roughly doubles (1.1 &rarr; 2.1). Re-tested on fresh tanks, the evolved school beats its own random starting brains (about 80% vs 70% survival, 13&ndash;27 vs 3 snacks). Switching a challenge on after generation 25 drops survival to about 69% (two sharks), 70% (murky) or 77% (faster shark); the school then claws part of it back. Single generations are noisy (&plusmn;5 points) because all 40 fish share one tank.</li>
+          <li><b>Related work:</b> evolved prey/predator swarms (e.g. Olson et al. 2013 on predator confusion and the evolution of swarming), boids (Reynolds 1987) as the hand-written alternative, and NEAT, which also evolves the network shape.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-fish-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-fish.js"></script>
+</body>
+</html>

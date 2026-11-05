@@ -107,6 +107,7 @@
     footprints: '<path d="M6 16v-2c0-3 0-5 2-6s3 1 3 3-1 3-1 5"/><path d="M6 20h4v-3H6z"/><path d="M18 12v-2c0-3 0-5-2-6s-3 1-3 3 1 3 1 5"/><path d="M14 16h4v-3h-4z"/>',
     bug: '<rect x="8" y="6" width="8" height="14" rx="4"/><path d="M12 6V3M9 3l1.5 3M15 3l-1.5 3M8 11H3M16 11h5M8 16l-4 2M16 16l4 2M8 9 4 7M16 9l4-2"/>',
     coffee: '<path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M7 2v3M11 2v3M15 2v3"/>',
+    keyboard: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/>',
     robot: '<rect x="4" y="7" width="16" height="12" rx="4"/><path d="M12 3v4"/><circle cx="12" cy="3" r="1"/><path d="M9 12h.01M15 12h.01M10 15.5h4"/>',
   };
   function icon(name, cls = "") {
@@ -212,6 +213,8 @@
     get theme() { return store.get("theme") || "light"; },
     get text() { return store.get("text") || "normal"; },
     get motion() { return store.get("motion") || "auto"; },
+    // words: "on" | "off". Dotted-underline word helpers (glossary popovers) on lessons and chapter pages.
+    get words() { return store.get("words") === "off" ? "off" : "on"; },
   };
   function applyTheme(t) {
     const dark = t === "dark" || (t === "auto" && sysDark && sysDark.matches);
@@ -221,6 +224,7 @@
     applyTheme(prefs.theme);
     document.documentElement.setAttribute("data-text", prefs.text);
     document.documentElement.setAttribute("data-motion", prefs.motion);
+    document.documentElement.setAttribute("data-words", prefs.words);
   }
   // Lessons ask matchMedia("(prefers-reduced-motion: reduce)"); the Reduce motion setting answers yes for them too.
   if (realMatchMedia) window.matchMedia = (q) => {
@@ -253,6 +257,7 @@
       ${seg("theme", "Colours", [["light", "Light"], ["dark", "Dark"], ["auto", "Same as my device"]])}
       ${seg("text", "Text size", [["normal", "Normal"], ["large", "Large"], ["xl", "Extra large"]])}
       ${seg("motion", "Movement", [["auto", "Normal"], ["reduce", "Calm (less motion)"]])}
+      ${seg("words", "Show word helpers <small class=\"muted\">(tap a dotted word to see what it means)</small>", [["on", "On"], ["off", "Off"]])}
       <div class="set-row"><div class="set-lbl">Your progress</div>
         <p class="muted" id="set-prog"></p>
         <div class="btn-row"><button type="button" class="btn small" id="set-reset-prog">${icon("reset")} Reset my progress</button><button type="button" class="btn small ghost" id="set-reset-all">${icon("shuffle")} Restore default settings</button></div>
@@ -261,7 +266,7 @@
     </form>`;
     document.body.appendChild(dlg);
     const sync = () => {
-      for (const k of ["theme", "text", "motion"]) { const r = dlg.querySelector(`input[name="${k}"][value="${prefs[k]}"]`); if (r) r.checked = true; }
+      for (const k of ["theme", "text", "motion", "words"]) { const r = dlg.querySelector(`input[name="${k}"][value="${prefs[k]}"]`); if (r) r.checked = true; }
       const c = progress.count();
       dlg.querySelector("#set-prog").textContent = `${c.done} of ${c.total} lessons marked done.`;
       dlg.querySelector("#set-reset-prog").disabled = c.done === 0;
@@ -269,13 +274,14 @@
     dlg.addEventListener("change", (e) => {
       const r = e.target; if (!r.name) return;
       if (r.name === "theme") { setTheme(r.value); const t = document.getElementById("theme-btn"); if (t) t.innerHTML = icon(isDark() ? "sun" : "moon"); }
+      else if (r.name === "words") { store.set("words", r.value); applyPrefs(); applyWordHelpers(); }
       else { store.set(r.name, r.value); applyPrefs(); if (r.name === "motion") toast(r.value === "reduce" ? "Calm mode on. Reload a lesson to apply it fully." : "Normal movement."); }
     });
     dlg.querySelector("#set-reset-prog").addEventListener("click", () => {
       if (confirm("Clear all your finished lessons on this device? This cannot be undone.")) { progress.reset(); sync(); toast("Progress cleared."); setTimeout(() => location.reload(), 600); }
     });
     dlg.querySelector("#set-reset-all").addEventListener("click", () => {
-      store.set("theme", "light"); store.set("text", "normal"); store.set("motion", "auto"); applyPrefs();
+      store.set("theme", "light"); store.set("text", "normal"); store.set("motion", "auto"); store.set("words", "on"); applyPrefs(); applyWordHelpers();
       document.dispatchEvent(new CustomEvent("themechange"));
       const t = document.getElementById("theme-btn"); if (t) t.innerHTML = icon(isDark() ? "sun" : "moon");
       sync(); toast("Settings restored.");
@@ -394,6 +400,10 @@
         crumbs = `<span class="sep">/</span><a class="crumb-mid" href="${BASE}topic.html?t=${f.topic.id}">${icon(f.topic.icon)} ${f.topic.name}</a>
           <span class="sep">/</span><span class="here">${icon(f.demo.icon)} ${f.demo.name}</span>`;
       }
+    } else if (page === "plans") {
+      crumbs = `<span class="sep">/</span><span class="here">${icon("flag")} Learning plans</span>`;
+    } else if (page === "glossary") {
+      crumbs = `<span class="sep">/</span><span class="here">${icon("book")} Glossary</span>`;
     }
     host.innerHTML = `<div class="topbar-inner">
       <a class="brand" href="${BASE}index.html">Explore ML</a>
@@ -405,6 +415,8 @@
         <a class="icon-btn" href="https://www.kaggle.com/nuhmanpk" target="_blank" rel="noopener" title="Kaggle" aria-label="Kaggle">${icon("kaggle")}</a>
         <a class="icon-btn sponsor" href="https://www.buymeacoffee.com/nuhmanpk" target="_blank" rel="noopener" title="Sponsor" aria-label="Sponsor this project">${icon("heart")}</a>
       </nav>
+      <a class="nav-plans" href="${BASE}plans.html" title="Learning plans"${page === "plans" ? ' aria-current="page"' : ""}>${icon("flag")}<span>Plans</span></a>
+      <a class="nav-plans nav-gloss" href="${BASE}glossary.html" title="Glossary: every word explained" aria-label="Glossary"${page === "glossary" ? ' aria-current="page"' : ""}>${icon("book")}<span>Glossary</span></a>
       <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Open settings" aria-haspopup="dialog">${icon("settings")}</button>
       <button class="icon-btn" id="theme-btn" title="Light / dark" aria-label="Toggle light or dark theme"></button>
     </div>`;
@@ -504,6 +516,664 @@
     document.body.appendChild(f);
   }
 
+  // =====================================================================
+  // ---------- learning helpers ----------
+  // 1. Word helpers: glossary terms on lessons + chapter pages get a dotted underline and a
+  //    small popover (kid meaning, grown-up line, link to glossary.html#id).
+  // 2. "Stuck? Ask Robo": a floating help button + side sheet (this lesson / words / shortcuts).
+  // 3. Site-wide keyboard shortcuts (? t n p g Esc).
+  // 4. A one-time tip pointing at the help button on the first lesson someone opens.
+  // js/glossary.js (window.GLOSSARY) is loaded lazily; if it is missing, helpers stay quiet.
+  // =====================================================================
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const reduceMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const pageKind = () => document.body.dataset.page || "home";
+
+  // ---------- glossary loading + lookup ----------
+  let glossPromise = null, gloss = null; // gloss = { list, byId, find(text), re }
+  function loadGlossary() {
+    if (glossPromise) return glossPromise;
+    glossPromise = new Promise((resolve) => {
+      const ready = () => resolve(Array.isArray(window.GLOSSARY) ? window.GLOSSARY : []);
+      if (Array.isArray(window.GLOSSARY) && window.GLOSSARY.length) return ready();
+      // The glossary page includes the script itself (maybe after this one): wait instead of loading it twice.
+      if (document.querySelector('script[src*="glossary.js"]')) {
+        if (document.readyState === "complete") return ready();
+        return window.addEventListener("load", ready, { once: true });
+      }
+      const s = document.createElement("script");
+      s.src = BASE + "js/glossary.js";
+      s.async = true;
+      s.onload = ready;
+      s.onerror = () => resolve([]); // not written yet / offline: skip helpers silently
+      document.head.appendChild(s);
+    }).then((list) => (gloss = buildGlossIndex(list)));
+    return glossPromise;
+  }
+  const normWord = (w) => String(w).toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, " ").trim();
+  function buildGlossIndex(list) {
+    const byId = new Map(), byWord = new Map();
+    (list || []).forEach((g) => {
+      if (!g || !g.id || !g.term) return;
+      byId.set(g.id, g);
+      [g.term, ...(g.aliases || [])].forEach((w) => { const k = normWord(w); if (k.length > 1 && !byWord.has(k)) byWord.set(k, g); });
+    });
+    if (!byId.size) return null;
+    // Longest words first so "learning rate" wins over "learning". Letters/digits/hyphen form a word.
+    const words = [...byWord.keys()].sort((a, b) => b.length - a.length).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+"));
+    let re = null;
+    try { re = new RegExp(`(^|[^\\p{L}\\p{N}-])(${words.join("|")})(?![\\p{L}\\p{N}-])`, "giu"); } catch (e) { re = null; }
+    const find = (text) => {
+      const k = normWord(text);
+      for (const c of [k, k.replace(/ies$/, "y"), k.replace(/es$/, ""), k.replace(/s$/, "")]) if (byWord.has(c)) return byWord.get(c);
+      return null;
+    };
+    return { list, byId, byWord, find, re };
+  }
+
+  // ---------- 1. word helpers ----------
+  // Where plain-text words are looked for (first occurrence per term per page), and what is never touched.
+  const GLOSS_SCOPES = [".recap", "details.grownups .gu-body", ".steps", "#meet-model .meet",
+    "body[data-page='topic'] .topic-hero .hero-sub", "body[data-page='topic'] .topic-hero .analogy", "body[data-page='topic'] .topic-hero #say", "body[data-page='topic'] #intro", "body[data-page='topic'] .words"].join(",");
+  const GLOSS_SKIP = "a,button,input,textarea,select,option,label,code,pre,kbd,samp,summary,h1,h2,h3,h4,h5,h6,canvas,svg,script,style,dialog,[data-no-gloss],.gloss,.term,.gloss-pop";
+  let glossDone = false;
+  function makeGloss(el, g) {
+    el.classList.add("gloss");
+    el.dataset.gloss = g.id;
+    if (prefs.words === "on") { el.tabIndex = 0; el.setAttribute("role", "button"); }
+  }
+  function annotateGlossary() {
+    if (glossDone || !gloss || prefs.words !== "on") return;
+    const p = pageKind();
+    if (p !== "demo" && p !== "topic") return;
+    glossDone = true;
+    const main = document.querySelector("main") || document.body;
+    // (a) every <span class="term"> whose text is a known term or alias
+    main.querySelectorAll(".term").forEach((el) => {
+      if (el.classList.contains("gloss") || el.closest("a,button,[data-no-gloss]")) return;
+      const g = gloss.find(el.textContent);
+      if (g) makeGloss(el, g);
+    });
+    // (b) the first plain-text mention of each term inside the kid-facing explainer blocks
+    if (!gloss.re) return;
+    const seen = new Set();
+    main.querySelectorAll(GLOSS_SCOPES).forEach((scope) => {
+      const nodes = [];
+      const tw = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => (!n.nodeValue.trim() || (n.parentElement && n.parentElement.closest(GLOSS_SKIP)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+      });
+      while (tw.nextNode()) nodes.push(tw.currentNode);
+      nodes.forEach((node) => {
+        const text = node.nodeValue, re = gloss.re;
+        re.lastIndex = 0;
+        let m, hit = null;
+        while ((m = re.exec(text))) {
+          const g = gloss.find(m[2]);
+          if (g && !seen.has(g.id)) { hit = { g, at: m.index + m[1].length, len: m[2].length }; break; }
+          if (m[0].length === 0) re.lastIndex++;
+        }
+        if (!hit) return; // one term per text node keeps it calm; other terms may match in later nodes
+        seen.add(hit.g.id);
+        const word = node.splitText(hit.at);
+        word.splitText(hit.len);
+        const span = document.createElement("span");
+        span.textContent = word.nodeValue;
+        word.parentNode.replaceChild(span, word);
+        makeGloss(span, hit.g);
+      });
+    });
+  }
+  // Settings toggle: hide/show the underline and make the words (un)focusable.
+  function applyWordHelpers() {
+    const on = prefs.words === "on";
+    if (!on) hidePop();
+    document.querySelectorAll(".gloss").forEach((el) => {
+      if (on) { el.tabIndex = 0; el.setAttribute("role", "button"); }
+      else { el.removeAttribute("tabindex"); el.removeAttribute("role"); }
+    });
+    if (on && !glossDone) loadGlossary().then(annotateGlossary);
+  }
+
+  // One shared popover. role="tooltip"; the word points at it with aria-describedby while it is open.
+  let pop = null, popFor = null, popPinned = false, showTimer = null, hideTimer = null;
+  function ensurePop() {
+    if (pop) return pop;
+    pop = document.createElement("div");
+    pop.id = "gloss-pop";
+    pop.className = "gloss-pop";
+    pop.setAttribute("role", "tooltip");
+    pop.hidden = true;
+    document.body.appendChild(pop);
+    pop.addEventListener("pointerenter", () => clearTimeout(hideTimer));
+    pop.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !popPinned) hideSoon(); });
+    pop.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); const t = popFor; hidePop(); if (t) t.focus(); }
+      if (e.key === "Tab" && e.shiftKey && popFor) { e.preventDefault(); const t = popFor; t.focus(); }
+    });
+    pop.addEventListener("focusout", (e) => { if (!pop.contains(e.relatedTarget) && e.relatedTarget !== popFor) hidePop(); });
+    return pop;
+  }
+  function showPop(el, pinned) {
+    if (prefs.words !== "on" || !gloss) return;
+    const g = gloss.byId.get(el.dataset.gloss);
+    if (!g) return;
+    clearTimeout(hideTimer); clearTimeout(showTimer);
+    ensurePop();
+    if (popFor && popFor !== el) { popFor.classList.remove("open"); popFor.removeAttribute("aria-describedby"); }
+    popFor = el; popPinned = !!pinned;
+    pop.innerHTML = `<div class="gp-term">${icon("book")} ${esc(g.term)}</div>
+      <p class="gp-kid">${g.kid || ""}</p>
+      ${g.grown ? `<p class="gp-grown"><b>For grown-ups:</b> ${g.grown}</p>` : ""}
+      <a class="gp-more" href="${BASE}glossary.html#${encodeURIComponent(g.id)}">More in the glossary ${icon("arrow-right")}</a>`;
+    pop.hidden = false;
+    el.classList.add("open");
+    el.setAttribute("aria-describedby", "gloss-pop");
+    placePop();
+  }
+  function placePop() {
+    if (!pop || pop.hidden || !popFor) return;
+    const r = popFor.getBoundingClientRect(), vw = document.documentElement.clientWidth, vh = window.innerHeight, m = 10;
+    if (r.bottom < 0 || r.top > vh) return hidePop(); // scrolled away
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    const below = r.bottom + 8 + ph <= vh - m || r.top - 8 - ph < m;
+    const top = below ? r.bottom + 8 : r.top - 8 - ph;
+    const left = clamp(r.left + r.width / 2 - pw / 2, m, Math.max(m, vw - pw - m));
+    pop.style.top = Math.round(Math.max(m, top)) + "px";
+    pop.style.left = Math.round(left) + "px";
+    pop.dataset.side = below ? "below" : "above";
+    pop.style.setProperty("--arrow-x", Math.round(clamp(r.left + r.width / 2 - left, 16, pw - 16)) + "px");
+  }
+  function hidePop() {
+    clearTimeout(showTimer); clearTimeout(hideTimer);
+    if (pop) pop.hidden = true;
+    if (popFor) { popFor.classList.remove("open"); popFor.removeAttribute("aria-describedby"); }
+    popFor = null; popPinned = false;
+  }
+  function hideSoon() { clearTimeout(hideTimer); hideTimer = setTimeout(hidePop, 220); }
+  function bindGlossEvents() {
+    const target = (e) => (e.target.closest ? e.target.closest(".gloss[role='button']") : null);
+    document.addEventListener("pointerover", (e) => {
+      const el = target(e);
+      if (!el || e.pointerType !== "mouse" || (popPinned && popFor !== el)) return;
+      clearTimeout(hideTimer); clearTimeout(showTimer);
+      showTimer = setTimeout(() => showPop(el, false), 180);
+    });
+    document.addEventListener("pointerout", (e) => {
+      const el = target(e);
+      if (!el || e.pointerType !== "mouse") return;
+      clearTimeout(showTimer);
+      if (!popPinned && popFor === el && !(pop && pop.contains(e.relatedTarget))) hideSoon();
+    });
+    document.addEventListener("click", (e) => {
+      const el = target(e);
+      if (el) { e.preventDefault(); if (popFor === el && popPinned) hidePop(); else showPop(el, true); return; }
+      if (pop && !pop.hidden && !pop.contains(e.target)) hidePop();
+    });
+    document.addEventListener("keydown", (e) => {
+      const el = target(e);
+      if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); if (popFor === el && popPinned) hidePop(); else showPop(el, true); return; }
+      // Tab from an open word goes into its popover (to reach "More in the glossary").
+      if (el && e.key === "Tab" && !e.shiftKey && popFor === el && pop && !pop.hidden) { e.preventDefault(); pop.querySelector("a").focus(); return; }
+      if (e.key === "Escape" && pop && !pop.hidden) { const t = popFor; hidePop(); if (el && t) t.focus(); }
+    });
+    document.addEventListener("focusin", (e) => {
+      const el = target(e);
+      if (el && el.matches(":focus-visible")) showPop(el, false);
+    });
+    document.addEventListener("focusout", (e) => {
+      const el = target(e);
+      if (el && popFor === el && !(pop && pop.contains(e.relatedTarget))) hidePop();
+    });
+    let raf = 0;
+    const re = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; placePop(); }); };
+    window.addEventListener("scroll", re, { passive: true, capture: true });
+    window.addEventListener("resize", re);
+  }
+
+  // ---------- 2. "Stuck? Ask Robo" help panel ----------
+  let helpDlg = null, helpFab = null, helpTab = "page", jumpTargets = [];
+  const COURSE_STEPS = [
+    // [key, title, kid hint, how to find it on the page]
+    ["play", "Play first", "Press the buttons and poke the game before reading anything.", () => document.querySelector("main .stage, main .canvas-box, main canvas")],
+    ["watch", "Watch it learn", "Look at the live charts and the “inside” card while the robot practises.", () => findHeading(/happening inside|watch it learn|checkpoints/i)],
+    ["chal", "Try the challenges", "Do one challenge at a time. Each one changes the world a little.", () => findHeading(/challenge/i)],
+    ["model", "Meet the model", "See which kind of brain this is and how it learns.", () => document.getElementById("meet-model")],
+    ["recap", "What happened", "Read the short recap. Can you explain it to someone?", () => findHeading(/what just happened|what happened/i)],
+  ];
+  function findHeading(re) {
+    const h = [...document.querySelectorAll("main h2, main h3")].find((x) => re.test(x.textContent));
+    if (!h) return null;
+    // h2.section-title sits above its content; an h3 usually lives inside its card.
+    return h.matches("h2") ? h : h.closest(".card, section") || h;
+  }
+  const kbdRow = (keys, what) => `<tr><td>${keys.map((k) => `<kbd>${esc(k)}</kbd>`).join(" ")}</td><td>${what}</td></tr>`;
+  const plain = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
+
+  function lessonPanelHTML(f) {
+    const d = f.demo, t = f.topic;
+    const chap = f.chapter === 0 ? t.name : `Chapter ${f.chapter} · Lesson ${f.index + 1}`;
+    let html = `<div class="hs-lesson"><div class="hs-ic" style="--c:${t.color || "var(--accent)"}">${icon(d.icon)}</div>
+      <div><small>${esc(chap)}</small><h3>${esc(d.name)}</h3><p>${d.kid || ""}</p>${d.time ? `<span class="chip accent">${icon("clock")} ${esc(d.time)}</span>` : ""}</div></div>`;
+    const said = plain(document.getElementById("say"));
+    if (said) html += `<div class="hs-said"><b>${icon("chat")} Robo just said</b><p>${esc(said)}</p></div>`;
+    // How to play: a .howto box, or any heading/bold label that starts with "How to play".
+    const how = new Set(document.querySelectorAll("main .howto"));
+    document.querySelectorAll("main h2, main h3, main h4, main b, main strong").forEach((h) => {
+      if (/^\s*how to play/i.test(h.textContent)) how.add(h.closest(".howto, .card, p, li") || h.parentElement);
+    });
+    // Game Lab pages keep their controls in a "Your turn" card.
+    document.querySelectorAll("main .card h3").forEach((h) => { if (/your turn/i.test(h.textContent)) { const p = h.parentElement.querySelector("p"); if (p) how.add(p); } });
+    const howTxt = [...how].map(plain).filter(Boolean);
+    if (howTxt.length) html += `<h4 class="hs-h">${icon("gamepad")} How to play</h4>${howTxt.map((s) => `<p class="hs-how">${esc(s)}</p>`).join("")}`;
+    // The course pattern, each a jump link when that part exists on this page.
+    jumpTargets = [];
+    html += `<h4 class="hs-h">${icon("map")} Your path through this lesson</h4><ol class="hs-path">`;
+    COURSE_STEPS.forEach(([key, title, hint, find]) => {
+      const el = find();
+      if (el) { jumpTargets.push(el); html += `<li><button type="button" class="hs-jump" data-jump="${jumpTargets.length - 1}"><b>${title}</b><span>${hint}</span>${icon("arrow-down")}</button></li>`; }
+      else html += `<li class="missing"><div><b>${title}</b><span>Not on this page.</span></div></li>`;
+    });
+    html += `</ol>`;
+    // Challenges, read live: tick-style (.chal.done) and Game Lab toggle buttons inside .chal.
+    const items = [], toggles = [];
+    document.querySelectorAll("main .chal").forEach((c) => {
+      const btns = c.querySelectorAll("button");
+      if (btns.length && !c.querySelector(".tick")) btns.forEach((b) => { const n = b.cloneNode(true); n.querySelectorAll(".tag").forEach((x) => x.remove()); toggles.push({ name: plain(n), on: b.classList.contains("on") || b.getAttribute("aria-pressed") === "true" }); });
+      else { const n = c.cloneNode(true); n.querySelectorAll(".tick").forEach((x) => x.remove()); items.push({ name: plain(n), done: c.classList.contains("done") }); }
+    });
+    if (items.length) {
+      const done = items.filter((x) => x.done).length;
+      html += `<h4 class="hs-h">${icon("zap")} Challenges <span class="chip">${done} of ${items.length} done</span></h4><ul class="hs-chal">${items.map((x) => `<li class="${x.done ? "done" : ""}"><span class="hs-tick" aria-hidden="true">${x.done ? icon("check") : ""}</span><span>${esc(x.name)}<span class="sr-only">${x.done ? " (done)" : " (not done yet)"}</span></span></li>`).join("")}</ul>`;
+    }
+    if (toggles.length) {
+      html += `<h4 class="hs-h">${icon("zap")} Challenges you can switch on</h4><p class="hs-note">Make the world harder, then watch the robots adapt.</p><ul class="hs-chal">${toggles.map((x) => `<li class="${x.on ? "done" : ""}"><span class="hs-tick" aria-hidden="true">${x.on ? icon("check") : ""}</span><span>${esc(x.name)}<span class="sr-only">${x.on ? " (switched on)" : " (off)"}</span></span></li>`).join("")}</ul>`;
+    }
+    html += `<h4 class="hs-h">${icon("bulb")} Still stuck?</h4><ul class="hs-tips">
+      <li>Press <b>Reset</b> or <b>Start again</b> and change just one thing.</li>
+      <li>Read Robo's bubble at the top. It changes as you play.</li>
+      <li>Tap a <span class="hs-dotted">dotted word</span> to see what it means.</li>
+      <li>Open <b>For grown-ups</b> at the bottom for the real maths.</li></ul>`;
+    return html;
+  }
+  function topicPanelHTML(t) {
+    const ti = CATALOG.indexOf(t);
+    const next = t.demos.find((d) => !progress.isDone(d.id)) || t.demos[0];
+    const c = progress.count(t);
+    return `<div class="hs-lesson"><div class="hs-ic" style="--c:${t.color || "var(--accent)"}">${icon(t.icon)}</div>
+        <div><small>${ti === 0 ? "Start here" : "Chapter " + ti}</small><h3>${esc(t.name)}</h3><p>${t.kid || t.tagline || ""}</p></div></div>
+      ${progress.bar("Chapter progress", c.done, c.total)}
+      <a class="btn primary hs-next" href="${BASE}demos/${next.id}.html">${icon("play")} ${c.done && c.done < c.total ? "Carry on with" : "Start with"} ${esc(next.name)}</a>
+      <h4 class="hs-h">${icon("map")} Lessons in this chapter</h4>
+      <ol class="hs-lessons">${t.demos.map((d, i) => `<li class="${progress.isDone(d.id) ? "done" : ""}"><a href="${BASE}demos/${d.id}.html"><b>${ti}.${i + 1}</b> ${esc(d.name)}</a>${progress.isDone(d.id) ? `<span class="hs-tick">${icon("check")}<span class="sr-only">done</span></span>` : ""}</li>`).join("")}</ol>
+      ${guideSteps()}`;
+  }
+  function guideSteps() {
+    return `<h4 class="hs-h">${icon("gamepad")} How every lesson works</h4><ol class="hs-guide">
+      <li><b>Play first.</b> Poke the game before you read.</li>
+      <li><b>Watch it learn.</b> A robot practises and gets better.</li>
+      <li><b>Challenges.</b> Change the world and see what breaks.</li>
+      <li><b>Meet the model.</b> Find out which brain it was.</li>
+      <li><b>What happened.</b> A short recap, plus a corner for grown-ups.</li></ol>`;
+  }
+  function sitePanelHTML() {
+    const c = progress.count();
+    const start = CATALOG[0];
+    return `<div class="hs-lesson"><div class="hs-ic">${icon("map")}</div><div><small>Site guide</small><h3>Welcome to Explore ML</h3>
+        <p>Short games where you watch a computer learn. No sign-up, nothing to install. Everything runs right here.</p></div></div>
+      ${progress.bar("Course progress", c.done, c.total)}
+      <h4 class="hs-h">${icon("flag")} Where to start</h4><ul class="hs-tips">
+        <li><a href="${BASE}topic.html?t=${start.id}"><b>${esc(start.name)}</b></a>: the very first chapter. Perfect if you are new.</li>
+        <li><a href="${BASE}plans.html"><b>Learning plans</b></a>: ready-made paths for kids, classes and grown-ups.</li>
+        <li><a href="${BASE}index.html#course"><b>The course map</b></a>: every chapter and lesson in order.</li>
+        <li><a href="${BASE}glossary.html"><b>Glossary</b></a>: every tricky word, explained simply.</li></ul>
+      ${guideSteps()}
+      <h4 class="hs-h">${icon("settings")} Make it comfy</h4>
+      <p class="hs-note">The <b>Settings</b> button at the top changes colours, text size and movement. Your progress stays only on this device.</p>`;
+  }
+  function wordsPanelHTML() {
+    const p = pageKind();
+    const f = p === "demo" ? findDemo(document.body.dataset.demo) : null;
+    const t = f ? f.topic : p === "topic" ? findTopic(new URLSearchParams(location.search).get("t")) || CATALOG[0] : null;
+    const more = (g) => (g ? ` <a class="hs-more" href="${BASE}glossary.html#${encodeURIComponent(g.id)}" aria-label="More about ${esc(g.term)} in the glossary">${icon("book")}</a>` : "");
+    let html = "";
+    if (t && t.words && t.words.length) {
+      html += `<h4 class="hs-h">${icon("book")} Words for “${esc(t.name)}”</h4><dl class="hs-words">${t.words.map(([w, d]) => `<div><dt>${esc(w)}${more(gloss && gloss.find(w))}</dt><dd>${d}</dd></div>`).join("")}</dl>`;
+    }
+    if (gloss) {
+      const ids = [...new Set([...document.querySelectorAll("main .gloss[data-gloss]")].map((el) => el.dataset.gloss))];
+      const shown = new Set(((t && t.words) || []).map(([w]) => { const g = gloss.find(w); return g && g.id; }));
+      const list = ids.filter((id) => !shown.has(id)).map((id) => gloss.byId.get(id)).filter(Boolean).sort((a, b) => a.term.localeCompare(b.term));
+      if (list.length) html += `<h4 class="hs-h">${icon("search")} Words on this page</h4><dl class="hs-words">${list.map((g) => `<div><dt><a href="${BASE}glossary.html#${encodeURIComponent(g.id)}">${esc(g.term)}</a></dt><dd>${g.kid || ""}</dd></div>`).join("")}</dl>`;
+      if (!t) {
+        // Home, plans, glossary: a word of the day (same word all day, changes tomorrow).
+        const day = Math.floor(Date.now() / 864e5), g = gloss.list.filter((x) => x && x.id)[day % gloss.list.length];
+        if (g) html += `<h4 class="hs-h">${icon("star")} Word of the day</h4><dl class="hs-words"><div><dt><a href="${BASE}glossary.html#${encodeURIComponent(g.id)}">${esc(g.term)}</a></dt><dd>${g.kid || ""}</dd></div></dl>`;
+      }
+    }
+    if (!html) html = `<p class="hs-note">No special words here. Every word in the course lives in the glossary.</p>`;
+    return html + `<p class="hs-note">${prefs.words === "on" ? "Tip: tap any dotted word on a lesson to see what it means." : "Word helpers are switched off. Turn them on in Settings."}</p>
+      <a class="btn small" href="${BASE}glossary.html">${icon("book")} Open the glossary</a>`;
+  }
+  function shortcutsPanelHTML() {
+    return `<table class="hs-keys"><tbody>
+      ${kbdRow(["?"], "Open or close this help")}
+      ${kbdRow(["t"], "Switch light / dark colours")}
+      ${kbdRow(["n"], "Next lesson")}
+      ${kbdRow(["p"], "Previous lesson")}
+      ${kbdRow(["g"], "Go to the glossary")}
+      ${kbdRow(["Esc"], "Close a popup")}
+      ${kbdRow(["Tab"], "Move between buttons; <kbd>Enter</kbd> presses one")}
+      </tbody></table>
+      <p class="hs-note">Games keep their own keys (arrows, space, letters). While you are playing a game, or typing in a box, these shortcuts step aside so they never get in the way.</p>`;
+  }
+  function renderHelp() {
+    const p = pageKind();
+    const f = p === "demo" ? findDemo(document.body.dataset.demo) : null;
+    const t = p === "topic" ? findTopic(new URLSearchParams(location.search).get("t")) || CATALOG[0] : null;
+    const label = f ? "This lesson" : t ? "This chapter" : "Site guide";
+    helpDlg.querySelector('[data-tab="page"] span').textContent = label;
+    helpDlg.querySelector("#hs-p-page").innerHTML = f ? lessonPanelHTML(f) : t ? topicPanelHTML(t) : sitePanelHTML();
+    helpDlg.querySelector("#hs-p-words").innerHTML = wordsPanelHTML();
+    helpDlg.querySelector("#hs-p-keys").innerHTML = shortcutsPanelHTML();
+  }
+  function selectTab(name, focus) {
+    helpTab = name;
+    helpDlg.querySelectorAll("[role=tab]").forEach((b) => {
+      const on = b.dataset.tab === name;
+      b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      if (on && focus) b.focus();
+    });
+    helpDlg.querySelectorAll("[role=tabpanel]").forEach((pn) => (pn.hidden = pn.id !== "hs-p-" + name));
+    if (name === "live") live.open();
+  }
+
+  // ---------- Live room: wave at everyone on the site ----------
+  // Works on a static host (GitHub Pages): messages travel through the free public relay ntfy.sh,
+  // received over a WebSocket and sent with a plain HTTPS POST. Nobody can type. The relay is public,
+  // so every incoming payload is checked strictly: only numbers are accepted (which message, which
+  // nickname), and the words are always taken from the lists below. Any other text is thrown away.
+  const live = (() => {
+    const RELAY = "ntfy.sh", TOPIC = "explore-ml-live-room-v1-7f3a9c";
+    const MESSAGES = ["👋 Hello everyone!", "🤖 Robo is learning so fast!", "🎉 I finished a lesson!", "🏆 I beat a challenge!", "🤔 This one is tricky…",
+      "💡 Ooh, now I get it!", "🐢 Slow and steady wins.", "🚀 Trying the hard mode!", "❤️ I love this site!", "🌙 Good night, learners!"];
+    const COLOURS = ["Sunny", "Rosy", "Minty", "Sky", "Lemon", "Berry", "Coral", "Lilac", "Mossy", "Cocoa"];
+    const ANIMALS = ["Otter", "Panda", "Fox", "Koala", "Penguin", "Owl", "Tiger", "Dolphin", "Hedgehog", "Llama", "Turtle", "Bunny"];
+    const COOLDOWN = 5000, BEAT = 30000, ALIVE = 75000;
+    const ri = (n) => Math.floor(Math.random() * n);
+    const me = { u: Math.random().toString(36).slice(2, 10), n: [ri(COLOURS.length), ri(ANIMALS.length)] };
+    const nameOf = (n) => COLOURS[n[0]] + " " + ANIMALS[n[1]];
+    let ws = null, state = "idle", retry = 0, timer = 0, beatTimer = 0, until = 0, openedAt = 0, popEl = null, popTimer = 0, actx = null;
+    const SOUND_KEY = "ml-live-sound";
+    const soundOn = () => { try { return localStorage.getItem(SOUND_KEY) !== "off"; } catch (e) { return true; } };
+    // Soft two-note chime made with Web Audio (no sound file). Browsers only allow audio after the
+    // visitor has clicked or pressed a key, so the audio context is unlocked on the first interaction.
+    const unlock = () => { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch (e) {} };
+    ["pointerdown", "keydown"].forEach((t) => document.addEventListener(t, unlock, { once: true, capture: true }));
+    function chime() {
+      if (!soundOn() || !actx || actx.state !== "running") return;
+      const t0 = actx.currentTime;
+      [[880, 0], [1318.5, 0.12]].forEach(([f, d]) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t0 + d); g.gain.exponentialRampToValueAtTime(0.18, t0 + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.6);
+        o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(t0 + d + 0.65);
+      });
+    }
+    function hidePopover() { clearTimeout(popTimer); if (popEl) { popEl.remove(); popEl = null; } }
+    // A little speech bubble above Robo's button when someone else waves.
+    function popover(m) {
+      if (!helpFab || (helpDlg && helpDlg.open && helpTab === "live")) return;
+      hidePopover(); dismissTip();
+      popEl = document.createElement("div");
+      popEl.className = "help-tip live-pop" + (helpFab.classList.contains("at-left") ? " at-left" : "");
+      popEl.setAttribute("role", "status");
+      popEl.innerHTML = `<button type="button" class="lp-body"><small>${icon("chat")} ${nameOf(m.n)} says</small><span>${MESSAGES[m.i]}</span></button><button type="button" class="icon-btn" aria-label="Dismiss">${icon("x")}</button>`;
+      popEl.querySelector(".lp-body").addEventListener("click", () => { hidePopover(); openHelp("live"); });
+      popEl.querySelector(".icon-btn").addEventListener("click", hidePopover);
+      document.body.appendChild(popEl);
+      popTimer = setTimeout(hidePopover, 7000);
+    }
+    const feed = [], seen = new Map(), lastFrom = new Map(), ids = new Set();
+    const isIdx = (v, len) => Number.isInteger(v) && v >= 0 && v < len;
+    // Returns a clean {k, u, n, i} or null. Nothing from the wire is ever shown as text.
+    function clean(raw) {
+      let m; try { m = JSON.parse(raw); } catch (e) { return null; }
+      if (!m || (m.k !== "m" && m.k !== "p")) return null;
+      if (typeof m.u !== "string" || !/^[a-z0-9]{4,12}$/.test(m.u)) return null;
+      if (!Array.isArray(m.n) || !isIdx(m.n[0], COLOURS.length) || !isIdx(m.n[1], ANIMALS.length)) return null;
+      if (m.k === "m" && !isIdx(m.i, MESSAGES.length)) return null;
+      return { k: m.k, u: m.u, n: [m.n[0], m.n[1]], i: m.i };
+    }
+    const online = () => { const now = Date.now(); let n = 0; seen.forEach((t) => { if (now - t < ALIVE) n++; }); return Math.max(1, n); };
+    const panel = () => helpDlg && helpDlg.querySelector("#hs-p-live");
+    const ago = (t) => { const s = Math.round((Date.now() - t) / 1000); return s < 10 ? "just now" : s < 60 ? s + "s ago" : s < 3600 ? Math.round(s / 60) + "m ago" : Math.round(s / 3600) + "h ago"; };
+    function render() {
+      const p = panel(); if (!p || p.hidden) return;
+      if (state === "off") { p.innerHTML = `<p class="hs-note">The live room needs a newer browser.</p>`; return; }
+      if (state !== "on") { p.innerHTML = `<p class="hs-note">${state === "down" ? "Can't reach the live room right now. Trying again…" : "Connecting to the live room…"}</p>`; return; }
+      const wait = Math.max(0, until - Date.now()), n = online();
+      p.innerHTML = `<div class="lv-top"><span class="lv-dot" aria-hidden="true"></span><b>${n}</b>&nbsp;${n === 1 ? "learner" : "learners"} here right now · you are <b>${nameOf(me.n)}</b></div>
+        <ol class="lv-feed" aria-live="polite" aria-label="Messages from everyone">${feed.length ? feed.slice().reverse().map((m) => `<li><b>${nameOf(m.n)}${m.u === me.u ? " (you)" : ""}</b><span>${MESSAGES[m.i]}</span><small>${ago(m.t)}</small></li>`).join("") : `<li class="lv-empty">No messages yet. Say hi!</li>`}</ol>
+        <h4 class="hs-h">Send a wave to everyone</h4>
+        <div class="lv-opts">${MESSAGES.map((m, i) => `<button type="button" class="chip" data-say="${i}"${wait ? " disabled" : ""}>${m}</button>`).join("")}</div>
+        <p class="hs-note">${wait ? `Wait ${Math.ceil(wait / 1000)}s before the next one.` : "Pick a message. To keep everyone safe there is no typing, only these."}</p>
+        <button type="button" class="btn small ghost" data-live-sound>${soundOn() ? "🔔 Chime on" : "🔕 Chime off"}</button>`;
+    }
+    function onEvent(ev) {
+      if (!ev || ev.event !== "message" || typeof ev.message !== "string" || ev.message.length > 200) return;
+      if (ev.id && ids.has(ev.id)) return; if (ev.id) ids.add(ev.id);
+      const m = clean(ev.message); if (!m) return;
+      const t = Math.min(Date.now(), (+ev.time || 0) * 1000 || Date.now());
+      seen.set(m.u, Math.max(seen.get(m.u) || 0, t));
+      if (m.k === "m") {
+        if (t - (lastFrom.get(m.u) || 0) < COOLDOWN - 500) return; // ignore anyone spamming faster than the UI allows
+        lastFrom.set(m.u, t);
+        feed.push({ u: m.u, n: m.n, i: m.i, t }); feed.sort((a, b) => a.t - b.t); if (feed.length > 20) feed.shift();
+        // only new waves from other people pop up; the replayed history on connect stays quiet
+        if (m.u !== me.u && openedAt && t >= openedAt - 2000) { popover(m); chime(); }
+      }
+      render();
+    }
+    function post(obj) {
+      return fetch(`https://${RELAY}/${TOPIC}`, { method: "POST", body: JSON.stringify(Object.assign({ u: me.u, n: me.n }, obj)) }).catch(() => {});
+    }
+    function connect() {
+      if (!("WebSocket" in window) || !window.fetch) { state = "off"; render(); return; }
+      state = state === "down" ? "down" : "connecting"; render();
+      try { ws = new WebSocket(`wss://${RELAY}/${TOPIC}/ws?since=30m`); } catch (e) { state = "down"; return; }
+      ws.onopen = () => {
+        retry = 0; state = "on"; openedAt = Date.now(); seen.set(me.u, Date.now()); render();
+        post({ k: "p" }); clearInterval(beatTimer); beatTimer = setInterval(() => { if (!document.hidden) post({ k: "p" }); }, BEAT);
+      };
+      ws.onmessage = (e) => { let ev; try { ev = JSON.parse(e.data); } catch (x) { return; } onEvent(ev); };
+      ws.onclose = () => { ws = null; clearInterval(beatTimer); state = "down"; render(); clearTimeout(timer); timer = setTimeout(connect, Math.min(30000, 1000 * 2 ** retry++)); };
+    }
+    document.addEventListener("click", (e) => {
+      if (e.target.closest && e.target.closest("[data-live-sound]")) {
+        try { localStorage.setItem(SOUND_KEY, soundOn() ? "off" : "on"); } catch (x) {}
+        unlock(); render(); if (soundOn()) setTimeout(chime, 30); return;
+      }
+      const b = e.target.closest && e.target.closest("#hs-p-live [data-say]");
+      if (!b || state !== "on" || Date.now() < until) return;
+      const i = +b.dataset.say; if (!isIdx(i, MESSAGES.length)) return;
+      post({ k: "m", i }); until = Date.now() + COOLDOWN; render();
+      setTimeout(render, COOLDOWN + 50);
+    });
+    setInterval(() => { if (helpDlg && helpDlg.open && helpTab === "live") render(); }, 10000);
+    return { open() { hidePopover(); if (state === "idle") connect(); else render(); }, start() { if (state === "idle") connect(); } };
+  })();
+  function buildHelp() {
+    if (document.getElementById("help-dlg")) return;
+    helpFab = document.createElement("button");
+    helpFab.type = "button";
+    helpFab.id = "help-fab";
+    helpFab.className = "help-fab"; // home has Robo's chat bottom-right
+    helpFab.setAttribute("aria-haspopup", "dialog");
+    helpFab.setAttribute("aria-controls", "help-dlg");
+    helpFab.setAttribute("aria-keyshortcuts", "Shift+?");
+    helpFab.title = "Stuck? Ask Robo (press ?)";
+    helpFab.innerHTML = `<span class="hf-robo">${roboSVG()}</span><span class="hf-q" aria-hidden="true">?</span><span class="sr-only">Stuck? Ask Robo for help</span>`;
+    document.body.appendChild(helpFab);
+
+    helpDlg = document.createElement("dialog");
+    helpDlg.id = "help-dlg";
+    helpDlg.className = "help-sheet";
+    helpDlg.setAttribute("aria-labelledby", "help-title");
+    const tab = (name, ic, text) => `<button type="button" role="tab" id="hs-t-${name}" data-tab="${name}" aria-controls="hs-p-${name}">${icon(ic)}<span>${text}</span></button>`;
+    helpDlg.innerHTML = `<div class="hs-head"><div class="robo">${roboSVG()}</div><div class="hs-title"><h2 id="help-title">Stuck? Ask Robo</h2><small>Hints, words and shortcuts</small></div>
+        <button type="button" class="icon-btn" data-help-close aria-label="Close help">${icon("x")}</button></div>
+      <div class="hs-tabs" role="tablist" aria-label="Help sections">${tab("page", "bulb", "This lesson")}${tab("words", "book", "Words to know")}${tab("keys", "keyboard", "Shortcuts")}${tab("live", "chat", "Live")}</div>
+      <div class="hs-body">
+        <div role="tabpanel" id="hs-p-page" aria-labelledby="hs-t-page" tabindex="0"></div>
+        <div role="tabpanel" id="hs-p-words" aria-labelledby="hs-t-words" tabindex="0" hidden></div>
+        <div role="tabpanel" id="hs-p-keys" aria-labelledby="hs-t-keys" tabindex="0" hidden></div>
+        <div role="tabpanel" id="hs-p-live" aria-labelledby="hs-t-live" tabindex="0" hidden></div>
+      </div>
+      <div class="hs-foot"><a href="${BASE}glossary.html">${icon("book")} Glossary</a><a href="${BASE}plans.html">${icon("flag")} Learning plans</a><a href="${BASE}index.html#course">${icon("map")} Course map</a></div>`;
+    document.body.appendChild(helpDlg);
+
+    helpFab.addEventListener("click", () => openHelp());
+    helpDlg.addEventListener("click", (e) => {
+      if (e.target === helpDlg || e.target.closest("[data-help-close]")) return helpDlg.close();
+      const tb = e.target.closest("[role=tab]");
+      if (tb) return selectTab(tb.dataset.tab);
+      const j = e.target.closest("[data-jump]");
+      if (j) jumpTo(jumpTargets[+j.dataset.jump]);
+    });
+    helpDlg.addEventListener("keydown", (e) => {
+      const tb = e.target.closest && e.target.closest("[role=tab]");
+      if (!tb) return;
+      const tabs = [...helpDlg.querySelectorAll("[role=tab]")], i = tabs.indexOf(tb);
+      const k = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+      if (k === undefined) return;
+      e.preventDefault();
+      selectTab(tabs[(k + tabs.length) % tabs.length].dataset.tab, true);
+    });
+    helpDlg.addEventListener("close", () => { helpFab.setAttribute("aria-expanded", "false"); });
+    helpFab.setAttribute("aria-expanded", "false");
+    setupFabTuck();
+    // join the live room quietly in the background so waves can pop up anywhere on the site
+    setTimeout(() => live.start(), 1500);
+  }
+  function openHelp(tabName) {
+    if (!helpDlg) return;
+    hidePop(); dismissTip();
+    const other = document.querySelector("dialog[open]:not(#help-dlg)");
+    if (other) other.close();
+    renderHelp();
+    selectTab(tabName || helpTab);
+    if (!helpDlg.open) helpDlg.showModal();
+    helpFab.setAttribute("aria-expanded", "true");
+    // Words need the glossary; refresh that tab once it arrives.
+    if (!gloss) loadGlossary().then(() => { if (helpDlg.open) helpDlg.querySelector("#hs-p-words").innerHTML = wordsPanelHTML(); });
+  }
+  function toggleHelp() { if (helpDlg && helpDlg.open) helpDlg.close(); else openHelp(); }
+  function jumpTo(el) {
+    if (!el) return;
+    helpDlg.close();
+    if (el.matches("details")) el.open = true;
+    el.classList.add("help-target");
+    el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+    if (!el.hasAttribute("tabindex") && !el.matches("a,button,input,select,textarea,canvas")) el.setAttribute("tabindex", "-1");
+    try { el.focus({ preventScroll: true }); } catch (e) {}
+    el.classList.remove("help-flash"); void el.offsetWidth; el.classList.add("help-flash");
+    setTimeout(() => el.classList.remove("help-flash"), 1800);
+  }
+  // On small screens the button slides mostly off the edge while the game area fills the bottom of
+  // the screen, or while someone is playing, so it never sits on top of touch controls.
+  function setupFabTuck() {
+    let playing = 0, overStage = false;
+    const paint = () => helpFab.classList.toggle("tucked", overStage || Date.now() < playing);
+    document.addEventListener("pointerdown", (e) => {
+      if (e.target.closest && e.target.closest("main .stage, main canvas, main .pad, main [data-game]")) { playing = Date.now() + 4000; paint(); setTimeout(paint, 4100); }
+    }, true);
+    const stages = document.querySelectorAll("main .stage");
+    if (!stages.length || !("IntersectionObserver" in window) || !window.matchMedia) return;
+    const narrow = window.matchMedia("(max-width: 760px)");
+    let io = null;
+    const watch = () => {
+      if (io) io.disconnect();
+      overStage = false; paint();
+      if (!narrow.matches) return;
+      // Only the bottom 130px of the viewport counts: that is where the button lives.
+      const visible = new Set();
+      io = new IntersectionObserver((entries) => {
+        entries.forEach((en) => (en.isIntersecting ? visible.add(en.target) : visible.delete(en.target)));
+        overStage = visible.size > 0; paint();
+      }, { rootMargin: `-${Math.max(0, window.innerHeight - 130)}px 0px 0px 0px` });
+      stages.forEach((s) => io.observe(s));
+    };
+    watch();
+    let rt = 0;
+    window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(watch, 200); });
+  }
+
+  // ---------- 3. keyboard shortcuts ----------
+  // Listens on window in the bubble phase, so lesson handlers on document run first and can claim a
+  // key with preventDefault(). Single letters (t n p g) also stand aside when:
+  //  - a modifier is held, or focus is in a text box / contenteditable;
+  //  - focus is inside a game area (.stage, canvas, [role=application], [data-game]);
+  //  - the lesson uses that letter itself. Lessons that bind letters without preventDefault are listed
+  //    in KEYS_TAKEN; a page can also declare its own with <body data-keys="rps">, and any single-letter
+  //    <kbd> hint or aria-keyshortcuts on the page counts as taken.
+  const KEYS_TAKEN = { "ai-twenty": "yn", "audio-music": "asdfghjkl;'wetyuop", "audio-pitch": "asdfghjkwetyu", "rl-hack": "wasd", "rl-balance": "adw" };
+  function keysTaken() {
+    const s = new Set((KEYS_TAKEN[document.body.dataset.demo] || "") + (document.body.dataset.keys || "").toLowerCase());
+    document.querySelectorAll("main kbd").forEach((k) => { const t = k.textContent.trim().toLowerCase(); if (t.length === 1) s.add(t); });
+    document.querySelectorAll("main [aria-keyshortcuts]").forEach((el) => el.getAttribute("aria-keyshortcuts").toLowerCase().split(/\s+/).forEach((t) => { if (t.length === 1) s.add(t); }));
+    return s;
+  }
+  const isTyping = (el) => !!(el && el.closest && (el.closest("input, textarea, select") || el.isContentEditable));
+  const inGame = (el) => !!(el && el.closest && el.closest("main .stage, canvas, [role='application'], [data-game]"));
+  function onShortcut(e) {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.repeat) return;
+    const el = document.activeElement;
+    if (isTyping(e.target) || isTyping(el)) return;
+    if (e.key === "?") { e.preventDefault(); toggleHelp(); return; }
+    if (e.shiftKey || e.key.length !== 1) return;
+    const k = e.key.toLowerCase();
+    if (!"tnpg".includes(k)) return;
+    const dlg = document.querySelector("dialog[open]");
+    if ((dlg && dlg !== helpDlg) || inGame(el) || inGame(e.target) || keysTaken().has(k)) return;
+    e.preventDefault();
+    if (k === "t") { const tb = document.getElementById("theme-btn"); if (tb) tb.click(); else toggleTheme(); toast(isDark() ? "Dark colours" : "Light colours", 1200); }
+    else if (k === "g") {
+      if (pageKind() === "glossary") { const s = document.querySelector("main input[type=search], main input[type=text]"); if (s) s.focus(); }
+      else location.href = BASE + "glossary.html";
+    } else {
+      const nav = document.getElementById("next-nav") || document.getElementById("chapter-nav");
+      const a = nav && nav.querySelector(k === "n" ? "a.right" : "a:not(.right)");
+      if (a) location.href = a.href; else toast(k === "n" ? "No next lesson on this page" : "No previous lesson on this page", 1600);
+    }
+  }
+
+  // ---------- 4. first-visit tip ----------
+  let tipEl = null;
+  function dismissTip() { if (tipEl) { tipEl.remove(); tipEl = null; } }
+  function firstVisitTip() {
+    if (pageKind() !== "demo" || !helpFab || store.get("helpTipSeen")) return;
+    store.set("helpTipSeen", true);
+    setTimeout(() => {
+      if (helpDlg.open) return;
+      tipEl = document.createElement("div");
+      tipEl.className = "help-tip" + (helpFab.classList.contains("at-left") ? " at-left" : "");
+      tipEl.setAttribute("role", "status");
+      tipEl.innerHTML = `<p><b>Stuck?</b> Tap me for hints and word helpers. You can also press <kbd>?</kbd></p><button type="button" class="icon-btn" aria-label="Got it, hide this tip">${icon("x")}</button>`;
+      tipEl.querySelector("button").addEventListener("click", dismissTip);
+      document.body.appendChild(tipEl);
+      setTimeout(dismissTip, 12000);
+    }, 1500);
+  }
+
+  function initHelpers() {
+    buildHelp();
+    bindGlossEvents();
+    window.addEventListener("keydown", onShortcut);
+    const p = pageKind();
+    if ((p === "demo" || p === "topic") && prefs.words === "on") loadGlossary().then(annotateGlossary);
+    firstVisitTip();
+  }
+
   function init() {
     addFavicon();
     hydrateIcons();
@@ -515,6 +1185,25 @@
     buildNextNav();
     buildDoneButton();
     buildFooter();
+    initHelpers();
+    consoleHello();
+  }
+  // A little hello for curious developers who open DevTools. Shown once per tab.
+  function consoleHello() {
+    try { if (sessionStorage.getItem("ml-hello")) return; sessionStorage.setItem("ml-hello", "1"); } catch (e) {}
+    const big = "font: 700 20px Fredoka, Nunito, sans-serif; color: #c9722a;";
+    const txt = "font: 600 13px Nunito, sans-serif; color: inherit;";
+    const code = "font: 600 12px monospace; background: rgba(201,114,42,.15); padding: 2px 6px; border-radius: 4px;";
+    console.log(
+      "%c🤖 Beep boop, a curious human!%c\n\n" +
+      "No framework. No bundler. No build step. No npm install.\n" +
+      "Just plain vanilla HTML, CSS and JavaScript, the way your browser likes it.\n" +
+      "Every model on this site trains right here, in your tab, with hand-written maths.\n\n" +
+      "Poke around: %cML%c is the shared toolkit, and each lesson keeps its brain in %cdemos/js/*-core.js%c.\n" +
+      "Try %cML.confetti(80)%c. You've earned it.\n\n" +
+      "Found a bug or want to add a lesson? Come say hi → https://github.com/nuhmanpk/explore-machine-learning",
+      big, txt, code, txt, code, txt, code, txt
+    );
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
@@ -522,5 +1211,6 @@
   window.ML = {
     ticks, BASE, progress, clamp, lerp, rand, randInt, randn, seeded, $, $$, cssVar, store,
     setupCanvas, canvasPoint, say, toast, confetti, bindRange, isDark, roboSVG, icon, hydrateIcons, ICONS,
+    loadGlossary, openHelp,
   };
 })();

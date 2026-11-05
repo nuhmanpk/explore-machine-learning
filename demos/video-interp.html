@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>In-Between Frames · Explore ML</title>
+  <meta name="description" content="Make slow motion from two frames: repeat a frame, cross-fade (and get ghosts), or follow the motion arrows. See occlusion artefacts and compare each method with the true in-between frame.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    canvas.px { image-rendering: pixelated; }
+    .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+    .trio figure { margin: 0; min-width: 0; }
+    .view-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px 4px; display: flex; align-items: center; gap: 6px; }
+    .view-label .tag { margin-left: auto; text-transform: none; letter-spacing: 0; color: var(--accent); }
+    .howto { display: flex; gap: 10px; align-items: flex-start; background: var(--bg-2); border: 2px dashed var(--line); border-radius: 14px; padding: 10px 12px; margin: 0 0 12px; font-weight: 700; font-size: .9rem; }
+    .howto b { color: var(--accent); }
+    .howto ol { margin: 0; padding-left: 18px; }
+    .timeline { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 10px; }
+    .timeline input { width: 100%; }
+    .timeline .tval { font-family: var(--font-mono); font-weight: 700; color: var(--accent); min-width: 5.5em; text-align: right; }
+    #out { cursor: crosshair; }
+    .stat .v { font-size: 1.3rem; }
+    .stat { min-width: 0; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done > span:last-child > span:first-child { color: var(--good); }
+    .chal .try { display: none; font-weight: 600; color: var(--ink-2); font-size: .86rem; margin-top: 2px; }
+    .chal.done .try { display: block; }
+    .cap { margin: 6px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .src-field.hide { display: none; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="video" data-demo="video-interp">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="film"></i> Video generation</span>
+      <h1>In-Between <span class="em">Frames</span></h1>
+      <p class="hero-sub">Slow motion needs extra pictures between the real ones. The camera never took them, so the computer has to <b>make them up</b>. Some ways look smooth; some make spooky ghosts!</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">I only have picture A and picture B. The big picture is my made-up picture from exactly <b>halfway</b> between them. I made it by <b>following the motion arrows</b>. Press <b>Play slow-mo</b>, then try the other ways!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="howto"><i data-icon="info"></i><ol>
+          <li>Pick a <b>way to make frames</b> on the right.</li>
+          <li>Drag the <b>time slider</b> from A to B, or press <b>Play slow-mo</b>.</li>
+          <li>Compare my made-up picture with the <b>real</b> one (middle, top). The bar chart shows who is closest.</li>
+        </ol></div>
+        <div class="trio">
+          <figure><p class="view-label"><i data-icon="image"></i> Picture A</p><canvas id="fa" class="cv px" role="img" aria-label="Real frame A"></canvas></figure>
+          <figure><p class="view-label"><i data-icon="eye"></i> Real <span class="tag" id="realtag">t = 0.50</span></p><canvas id="ft" class="cv px" role="img" aria-label="The true in-between frame at the chosen time, for checking"></canvas></figure>
+          <figure><p class="view-label"><i data-icon="image"></i> Picture B</p><canvas id="fb" class="cv px" role="img" aria-label="Real frame B"></canvas></figure>
+        </div>
+        <p class="view-label"><i data-icon="sparkles"></i> Robo's made-up picture <span class="tag" id="outtag"></span></p>
+        <canvas id="out" class="cv px" role="img" aria-label="Robo's made-up in-between frame for the chosen method and time"></canvas>
+        <div class="timeline">
+          <button class="btn primary small" id="play"><i data-icon="play"></i> Play slow-mo</button>
+          <input type="range" id="t" min="0" max="48" step="1" value="24" aria-label="Time between picture A and picture B" aria-describedby="t-hint">
+          <span class="tval" data-for="t">t = 0.50</span>
+        </div>
+        <div class="hint cap" id="t-hint">Time slider: left end is picture A, right end is picture B. Everything in between is made up.</div>
+        <p class="view-label" style="margin-top:12px"><i data-icon="layers"></i> The slow-mo film strip <span class="tag" id="striptag"></span></p>
+        <canvas id="strip" class="cv px" role="img" aria-label="Film strip: picture A, the made-up frames, and picture B in a row"></canvas>
+        <p class="cap">Grey labels are real pictures, coloured labels are made up. Tap a frame to jump to it.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wand"></i> Way to make frames</h3>
+          <div class="seg" id="method">
+            <button type="button" data-v="repeat" title="Show A for the first half, then B">Repeat</button>
+            <button type="button" data-v="blend" title="Mix A and B like see-through paper">Fade</button>
+            <button type="button" data-v="motion" class="on" title="Move each bit part of the way along its arrow">Follow arrows</button>
+          </div>
+          <div class="hint" id="mhint"></div>
+          <div class="field src-field" id="srcf">
+            <span class="lbl">Which arrows?</span>
+            <div class="seg" id="src">
+              <button type="button" data-v="robo" class="on" title="Arrows found by block matching (like Spot the Motion)">My arrows</button>
+              <button type="button" data-v="true" title="The perfect true motion">Perfect arrows</button>
+            </div>
+            <div class="hint">My arrows come from comparing blocks, like in Spot the Motion. Perfect arrows are a cheat to test the idea.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="film"></i> Video and playback</h3>
+          <div class="field">
+            <label for="speed">How fast things move <span class="val"><b data-for="speed">2×</b></span></label>
+            <input type="range" id="speed" min="1" max="3" step="0.5" value="2" aria-describedby="sp-hint">
+            <div class="hint" id="sp-hint">Faster things jump further between A and B, so the in-between is harder to guess.</div>
+          </div>
+          <div class="field">
+            <span class="lbl">Slow-mo amount</span>
+            <div class="seg" id="slow">
+              <button type="button" data-v="2">2×</button><button type="button" data-v="4" class="on">4×</button><button type="button" data-v="8">8×</button>
+            </div>
+            <div class="hint">8× slow-mo means 7 made-up pictures between each real pair.</div>
+          </div>
+          <div class="field">
+            <span class="lbl">Show</span>
+            <div class="seg" id="view">
+              <button type="button" data-v="pic" class="on" title="The made-up picture">Picture</button>
+              <button type="button" data-v="oops" title="Bright red where the made-up picture is wrong">Oops map</button>
+            </div>
+            <div class="hint">The oops map glows red wherever my picture differs from the real one.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How close is it?</h3>
+          <div class="two">
+            <div class="stat"><div class="k">Off by (now)</div><div class="v" id="err">0</div></div>
+            <div class="stat"><div class="k">Made-up per pair</div><div class="v" id="per">3</div></div>
+          </div>
+          <p class="view-label" style="margin:4px 0 0"><i data-icon="trend"></i> Mistakes at the halfway picture (lower is better)</p>
+          <canvas id="bars" class="cv" role="img" aria-label="Bar chart of each method's error against the true halfway frame"></canvas>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-ghost"><span class="tick"></span><span><span>Ghost hunter: choose <b>Fade</b> and put the time slider near the middle. Can you see two see-through squares?</span>
+        <span class="try">Try this: play the Fade at 8× slow-mo. Things don't move at all: one copy fades out while another fades in.</span></span></div>
+      <div class="chal" id="c-smooth"><span class="tick"></span><span><span>Super slow-mo: with speed 2× or more, choose <b>Follow arrows</b> and play it all the way through at <b>8×</b> slow-mo.</span>
+        <span class="try">Try this: play Repeat at 8× too. It just sits still and then jumps: that's the jerky look of cheap slow motion.</span></span></div>
+      <div class="chal" id="c-tear"><span class="tick"></span><span><span>Find the tear: choose <b>Follow arrows</b> with <b>Perfect arrows</b>, switch to the <b>Oops map</b>, and tap a spot that is still red.</span>
+        <span class="try">Try this: drag the time slider. The red bits sit just behind and in front of moving things, where the background was hidden in one of the pictures.</span></span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li><b>Repeat</b> just shows picture A, then picture B. No new information, so the slow-mo looks jerky.</li>
+      <li><b>Fade</b> mixes the two pictures like see-through paper. Moving things show up twice, faded: ghosts!</li>
+      <li><b>Follow arrows</b> first works out where every bit moved (the motion arrows), then puts each bit part of the way along its arrow. Things really slide.</li>
+      <li>Even perfect arrows leave small mistakes where something was hidden in one picture, like the background just behind a moving ball. Nobody saw it there, so it has to be guessed.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="image"></i></div><h3>Two real pictures</h3><p>We have picture A and picture B, a moment apart.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="arrow-right"></i></div><h3>Find the arrows</h3><p>Block matching finds which way each bit moved, just like Spot the Motion.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="clock"></i></div><h3>Pick a moment</h3><p>Halfway? Then each bit should be halfway along its arrow.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Fetch from both</h3><p>For every dot, look back along the arrow into A and forward into B, and fetch the colour from both.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="palette"></i></div><h3>Mix</h3><p>Mix the two colours, using more of the nearer picture. Repeat for every made-up frame.</p></div>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">video frame interpolation</span> (frame-rate up-conversion), used for slow motion, 24→60 fps TV "motion smoothing" and video codecs (B-frames).</p>
+        <ul>
+          <li><b>Frame repetition</b> (sample-and-hold) is <code>I<sub>t</sub> = I<sub>0</sub></code> for <code>t ≤ ½</code>, else <code>I<sub>1</sub></code>: judder.</li>
+          <li><b>Cross-fade</b> is <code>I<sub>t</sub> = (1−t)I<sub>0</sub> + tI<sub>1</sub></code>. Its error at moving edges is a double exposure ("ghosting"). It minimises MSE only when there is no motion.</li>
+          <li><b>Motion-compensated interpolation</b> uses <span class="term">backward warping</span>: for each output pixel <code>p</code> it finds a vector <code>v</code> passing through <code>p</code> at time <code>t</code>, then samples (bilinearly) <code>I<sub>0</sub>(p − t·v)</code> and <code>I<sub>1</sub>(p + (1−t)·v)</code> and blends them with weights <code>1−t</code> and <code>t</code>. Since the flow is estimated on frame A's grid, not at time <code>t</code>, we pick <code>v</code> per pixel from nearby flow vectors by minimising a symmetric (bilateral) 3×3 SAD between the two fetches, a classic TV-chip approach. Robo's arrows are 8×8 block matches (search ±12, sub-pixel), refined per pixel.</li>
+          <li><b>Occlusion:</b> background uncovered between A and B exists in only one frame, so blending both fetches mixes foreground into it (the "tear" or halo). The fix is visibility-aware blending: estimate occlusion masks and fetch only from the frame where the pixel is visible. This demo deliberately leaves that out so you can see the artefact; the "Perfect arrows" mode shows it is not a flow-accuracy problem.</li>
+          <li><b>Deep interpolators:</b> Super SloMo approximates intermediate flows from bidirectional flow and learns soft visibility maps; <span class="term">DAIN</span> adds depth to decide which object is in front when vectors collide; <span class="term">RIFE</span> directly predicts intermediate flows with a fast coarse-to-fine network plus a fusion mask; Google's <span class="term">FILM</span> uses multi-scale feature extraction with shared weights to handle large motion and synthesises the frame from warped features rather than raw pixels, reducing tears.</li>
+        </ul>
+        <p>Error is root-mean-square error over RGB in 0..1, shown as a percentage, against the exact frame rendered at time <code>t</code> from the procedural scene. The bar chart always uses <code>t = ½</code>, where interpolation is hardest.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/video-flow-core.js"></script>
+  <script src="js/video-interp-core.js"></script>
+  <script src="js/video-interp.js"></script>
+</body>
+</html>

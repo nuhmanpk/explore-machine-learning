@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Find the Note · Explore ML</title>
+  <meta name="description" content="Build a sound from a note, overtones and hiss, split it into a rainbow of frequencies, and watch Robo find the note two ways: the loudest bar, or the repeating echo.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .view-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 12px 0 6px 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .view-label .muted { text-transform: none; letter-spacing: 0; font-weight: 700; }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .howto { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: 0 0 10px; padding: 0; list-style: none; counter-reset: h; }
+    .howto li { counter-increment: h; display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .88rem; background: var(--accent-soft); border-radius: 12px; padding: 8px 10px; }
+    .howto li::before { content: counter(h); flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: .8rem; }
+    /* mini keyboard */
+    .keys { position: relative; height: 120px; margin-top: 12px; user-select: none; -webkit-user-select: none; }
+    .keys button { position: absolute; top: 0; border: 2px solid var(--ink); border-radius: 0 0 10px 10px; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding: 0 0 6px; font: 800 .72rem var(--font-body, Nunito, sans-serif); }
+    .keys .white { background: #fff; color: #6d6f8f; height: 100%; z-index: 1; }
+    .keys .black { background: #1f2140; color: #c5c3e6; height: 60%; z-index: 2; border-radius: 0 0 7px 7px; font-size: .58rem; }
+    .keys .white.on { background: color-mix(in srgb, var(--accent) 40%, #fff); color: #1f2140; }
+    .keys .black.on { background: var(--accent); color: #fff; }
+    .keys button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; z-index: 3; }
+    @media (max-width: 520px) { .keys { height: 96px; } .keys .black { font-size: 0; } }
+    /* the two ears */
+    .ear { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--line); }
+    .ear + .ear { margin-top: 8px; }
+    .ear .who { font-weight: 800; font-size: .88rem; display: flex; gap: 6px; align-items: center; }
+    .ear .who .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+    .ear .note { font-family: var(--font-head, Fredoka, sans-serif); font-weight: 700; font-size: 1.5rem; line-height: 1; text-align: right; }
+    .ear .sub { font-size: .8rem; font-weight: 700; color: var(--muted); grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 8px; }
+    .ear .verdict { font-weight: 800; }
+    .ear.ok { border-color: color-mix(in srgb, var(--good) 60%, var(--line)); }
+    .ear.ok .verdict { color: var(--good); }
+    .ear.bad { border-color: color-mix(in srgb, var(--bad) 60%, var(--line)); }
+    .ear.bad .verdict { color: var(--bad); }
+    .meter { grid-column: 1 / -1; position: relative; height: 10px; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--bad) 30%, var(--bg-2)), color-mix(in srgb, var(--good) 35%, var(--bg-2)) 45% 55%, color-mix(in srgb, var(--bad) 30%, var(--bg-2))); margin-top: 4px; }
+    .meter i { position: absolute; top: -3px; width: 4px; height: 16px; border-radius: 2px; background: var(--ink); transform: translateX(-2px); transition: left .2s; }
+    .truth { font-weight: 800; font-size: .88rem; margin: 0 0 8px; }
+    .third { font-size: .82rem; font-weight: 700; color: var(--muted); margin: 8px 2px 0; }
+    .chk { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: .9rem; cursor: pointer; }
+    .chk input { width: 18px; height: 18px; accent-color: var(--accent); }
+    /* mystery tune */
+    .slots { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .slot { min-width: 44px; height: 38px; border-radius: 10px; border: 2px dashed var(--line); display: grid; place-items: center; font-weight: 800; font-family: var(--font-mono); }
+    .slot.full { border-style: solid; border-color: var(--accent); color: var(--accent); }
+    .slot.right { border-color: var(--good); color: var(--good); }
+    .slot.wrong { border-color: var(--bad); color: var(--bad); }
+    .pick-notes { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+    .pick-notes button { min-width: 40px; }
+    .tune-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-top: 8px; }
+    /* challenges */
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done > span > b { color: var(--good); }
+    .chal .try { display: block; font-weight: 600; font-size: .84rem; color: var(--muted); margin-top: 2px; }
+    .mic-note { font-size: .8rem; font-weight: 700; color: var(--muted); margin: 6px 0 0; }
+    .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="audio" data-demo="audio-pitch">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="music"></i> Sound &amp; music</span>
+      <h1>Find the <span class="em">Note</span></h1>
+      <p class="hero-sub">A sound is a wiggle in the air. Robo splits the wiggle into a rainbow of pitches, then tries to name the note. Can you trick it?</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">This is a <b>flute</b> playing the note <b>A</b>. See the bars? The tall one on the left is the note, and the little ones are its sparkly <b>overtones</b>. Press <b>Play</b> to hear it, then tap a different key!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <ol class="howto" aria-label="How to play">
+          <li>Tap a key to pick a note.</li>
+          <li>Change the instrument, the hiss and the missing note.</li>
+          <li>Watch Robo's two ears. Do they agree?</li>
+        </ol>
+        <div class="cp-head">
+          <h3 style="margin:0"><i data-icon="wave"></i> Your sound <span class="muted" id="nowname"></span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="play"><i data-icon="play"></i> Play</button>
+            <button class="btn ghost small" id="mic" aria-pressed="false"><i data-icon="wave"></i> Use my microphone</button>
+          </div>
+        </div>
+        <p class="mic-note" id="micnote">Sound is quiet on purpose. The microphone is optional: it only starts when you press the button, and nothing is recorded or sent anywhere.</p>
+
+        <p class="view-label"><i data-icon="wave"></i> The wiggle <span class="muted">(how the air moves, for a split second)</span></p>
+        <canvas id="wave" class="cv" role="img" aria-label="Waveform of the current sound"></canvas>
+
+        <p class="view-label"><i data-icon="palette"></i> The rainbow of pitches <span class="muted">(each bar is how loud one pitch is)</span></p>
+        <canvas id="spec" class="cv" role="img" aria-label="Spectrum bars of the current sound with the detected notes marked"></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--good)"></i>the real note</span><span><i style="background:var(--warn)"></i>Biggest-bar ear</span><span><i style="background:var(--accent)"></i>Echo ear</span></div>
+
+        <div class="keys" id="keys" role="group" aria-label="Mini keyboard: pick a note"></div>
+        <p class="cap">Tip: on a computer you can also use the keys <kbd>A</kbd> to <kbd>K</kbd> (white) and <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> (black).</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="wrench"></i> Build your sound</h3>
+          <div class="field">
+            <span class="lbl">Instrument</span>
+            <div class="seg" id="timbre" role="radiogroup" aria-label="Instrument">
+              <label><input type="radio" name="timbre" value="pure"><span>Whistle</span></label>
+              <label><input type="radio" name="timbre" value="flute" checked><span>Flute</span></label>
+              <label><input type="radio" name="timbre" value="violin"><span>Violin</span></label>
+              <label><input type="radio" name="timbre" value="robot"><span>Robot</span></label>
+            </div>
+            <div class="hint">Same note, different overtones. That is why a violin and a flute sound different.</div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <span class="lbl">Octave</span>
+            <div class="seg" id="octave" role="radiogroup" aria-label="Octave">
+              <label><input type="radio" name="octave" value="3"><span>Low</span></label>
+              <label><input type="radio" name="octave" value="4" checked><span>Middle</span></label>
+              <label><input type="radio" name="octave" value="5"><span>High</span></label>
+            </div>
+            <div class="hint">Moves the keyboard down or up. Same letter, half or double the speed.</div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="noise">Hiss <span class="val"><b data-for="noise">10%</b></span></label>
+            <input type="range" id="noise" min="0" max="100" step="5" value="10">
+            <div class="hint">Adds random "shhh" noise, like wind on a microphone.</div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="detune">Out of tune <span class="val"><b data-for="detune">0 cents</b></span></label>
+            <input type="range" id="detune" min="-45" max="45" step="1" value="0">
+            <div class="hint">Nudges the note a tiny bit sharp (+) or flat (−). 100 cents is one whole key.</div>
+          </div>
+          <label class="chk" style="margin-top:12px"><input type="checkbox" id="missing"> Take away the bottom note</label>
+          <div class="field"><div class="hint" id="misshint">Removes the main pitch and keeps only the overtones. Do you still hear the same note?</div></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="search"></i> Robo's two ears</h3>
+          <p class="truth" id="truth"></p>
+          <div class="ear" id="ear-peak">
+            <span class="who"><span class="dot" style="background:var(--warn)"></span>Biggest-bar ear</span><span class="note" id="peak-note">-</span>
+            <span class="sub"><span id="peak-hz"></span><span class="verdict" id="peak-v"></span></span>
+            <div class="meter" title="Cents off the nearest key: middle = spot on"><i id="peak-m"></i></div>
+          </div>
+          <div class="ear" id="ear-acf">
+            <span class="who"><span class="dot" style="background:var(--accent)"></span>Echo ear</span><span class="note" id="acf-note">-</span>
+            <span class="sub"><span id="acf-hz"></span><span class="verdict" id="acf-v"></span></span>
+            <div class="meter" title="Cents off the nearest key: middle = spot on"><i id="acf-m"></i></div>
+          </div>
+          <p class="third" id="hps-line"></p>
+          <p class="cap">The little line shows how sharp or flat the sound is compared with the nearest key.</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="repeat"></i> The echo test</h3>
+          <canvas id="acf" class="cv" role="img" aria-label="Autocorrelation: how well the sound matches a delayed copy of itself"></canvas>
+          <p class="cap">Robo slides a copy of the wiggle along until it lines up again. The first big bump (<span style="color:var(--accent)">coloured line</span>) is one wiggle long, and that gives the note.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <div class="cp-head">
+        <h3><i data-icon="question"></i> Mystery tune</h3>
+        <div class="btn-row">
+          <button class="btn primary small" id="tplay"><i data-icon="play"></i> Play the tune</button>
+          <button class="btn ghost small" id="tnew"><i data-icon="shuffle"></i> New tune</button>
+        </div>
+      </div>
+      <p class="cap" style="margin-bottom:8px">Four notes, shown as a picture over time (a <b>spectrogram</b>). Bright = loud. The <b>dots</b> are where Robo's echo ear thinks the note is. Read the note names on the side, then type your answer below. It uses your instrument, hiss and missing-note settings.</p>
+      <canvas id="sg" class="cv" role="img" aria-label="Spectrogram of a four-note mystery tune with Robo's pitch track"></canvas>
+      <div class="tune-row">
+        <div class="slots" id="slots" aria-live="polite"></div>
+        <button class="btn ghost small" id="tclear"><i data-icon="eraser"></i> Clear my answer</button>
+      </div>
+      <div class="pick-notes" id="picknotes" role="group" aria-label="Answer notes"></div>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-fool"><span class="tick"></span><span><b>Fool the biggest-bar ear.</b> Make it name the wrong note while the echo ear still gets it right.<span class="try">Try this: pick the Violin, or tick "Take away the bottom note".</span></span></div>
+      <div class="chal" id="c-noise"><span class="tick"></span><span><b>Spot on in the storm.</b> Set the hiss to 60% or more and put the note out of tune by at least 10 cents. Can the echo ear still land within 5 cents of the real pitch?<span class="try">Try this: drag "Out of tune" to +20, then turn the hiss way up.</span></span></div>
+      <div class="chal" id="c-tune"><span class="tick"></span><span><b>Name that tune.</b> Work out all four notes of the mystery tune.<span class="try">Try this: find Robo's dots, follow them across to the note names, and press Play the tune to listen.</span></span></div>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>A note is a wiggle that repeats. The faster it repeats, the higher the note. A4 repeats 440 times every second.</li>
+      <li>Real instruments add <b>overtones</b>: extra wiggles at 2, 3, 4… times the note. The rainbow bars show each one. Their mix is what makes a flute sound like a flute.</li>
+      <li>The <b>biggest-bar ear</b> just names the loudest bar. When an overtone is louder than the note itself (violin) or the note is missing, it jumps to the wrong note, often a whole octave too high.</li>
+      <li>The <b>echo ear</b> asks a cleverer question: how long until the wiggle repeats? The overtones all repeat together with the note, so it still finds the right one, even with the bottom note taken away. Your own ears do this too!</li>
+      <li>Hiss is random, so it never lines up with itself. That is why the echo test shrugs it off.</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>Robo builds the sound out of numbers: one sine wave for the note, one for each overtone, plus random hiss. 16,000 numbers make one second.</li>
+      <li>It splits 4,096 of those numbers into a rainbow of pitches with a fast maths trick called the <b>FFT</b>. Each bar is about 4 Hz wide.</li>
+      <li>Biggest-bar ear: pick the tallest bar between 60 and 2,400 Hz.</li>
+      <li>Echo ear: compare the wiggle with a slid-along copy of itself, find the first slide where it lines up well, and turn that time into a pitch. Then fine-tune it using the exact spots of the overtone bars.</li>
+      <li>The note name and the cents come from counting keys away from A4 = 440 Hz.</li>
+    </ol></div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Everything here is computed in plain JavaScript on generated sample arrays (f<sub>s</sub> = 16 kHz, frame N = 4096), so it runs identically in Node. Web Audio is used only to play the sound and, if you opt in, to read the microphone.</p>
+        <ul>
+          <li><b>Spectrum.</b> The frame is multiplied by a <span class="term">Hann window</span> <code>w[n] = ½ − ½cos(2πn/(N−1))</code> to reduce spectral leakage, then transformed with an iterative radix-2 Cooley–Tukey <span class="term">FFT</span> (O(N log N); checked against a naive O(N²) DFT). <span class="term">Bin resolution</span> is <code>f<sub>s</sub>/N ≈ 3.9 Hz</code>, so a peak is refined by fitting a parabola to the log magnitudes of its three bins.</li>
+          <li><b>Peak picking</b> returns the loudest bin. It is wrong whenever harmonic 2 or 3 outweighs the fundamental (our violin preset) or the fundamental is absent, giving classic <span class="term">octave errors</span>.</li>
+          <li><b>Autocorrelation</b> <code>r(τ) = Σ x[n]x[n+τ]</code> is computed via the FFT (Wiener–Khinchin: inverse transform of |X|², zero-padded to avoid wrap-around), made unbiased by dividing by <code>N−τ</code> and normalised by <code>r(0)</code>. We take the first local maximum (parabola-interpolated) whose height is at least 85% of the global maximum within 60–1100 Hz; picking the <em>first</em> such peak avoids sub-octave errors. Because every harmonic of f<sub>0</sub> is periodic in <code>1/f<sub>0</sub></code>, the peak sits at the true period even when the fundamental is missing. White noise is uncorrelated with itself at non-zero lags, so it mainly lowers the peak rather than moving it.</li>
+          <li><b>Fine tuning.</b> Lag resolution is coarse at high pitch (1 sample at 16 kHz is ~10 cents at 440 Hz), so the autocorrelation estimate is refined by locating each visible harmonic's interpolated peak near <code>h·f<sub>0</sub></code> and averaging <code>f<sub>h</sub>/h</code>, weighted by power. Typical error: under 1 cent clean, a few cents at 0 dB SNR.</li>
+          <li><b>Harmonic product spectrum</b> (the "third opinion"): <code>HPS(f) = Π<sub>h=1..5</sub> |X(hf)|</code>, computed as a sum of logs with a floor so a single missing harmonic is a penalty rather than a zero, with ties broken towards the higher candidate. It handles the missing fundamental well but can still be fooled, for example by the buzzy robot with its fundamental removed.</li>
+          <li><b>Cents</b>: <code>1200·log<sub>2</sub>(f/f<sub>ref</sub>)</code>, with equal temperament and A4 = 440 Hz (MIDI note 69, <code>f = 440·2<sup>(m−69)/12</sup></code>). 100 cents is one semitone; trained listeners notice about 5–10 cents.</li>
+          <li><b>Spectrogram</b>: a short-time Fourier transform (1024-sample Hann frames, hop 256), drawn on a logarithmic frequency axis like a piano. The pitch track runs the same autocorrelation detector on each frame, skipping quiet or unvoiced frames.</li>
+        </ul>
+        <p>The "missing fundamental" is a real perceptual effect: you hear the pitch of a tone whose fundamental has been removed, which is why small phone speakers can still play bass lines. Production pitch trackers such as YIN, pYIN and the neural CREPE build on exactly these ideas; speech and music systems often feed log-mel spectrograms (like the strip above) into neural networks.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/audio-pitch-core.js"></script>
+  <script src="js/audio-pitch.js"></script>
+</body>
+</html>

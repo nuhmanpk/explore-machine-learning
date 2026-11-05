@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Glossary · Explore ML</title>
+  <meta name="description" content="Every machine learning word in the Explore ML course, explained twice: once in simple words for kids and once precisely for grown-ups, with links to the lessons where you can try it.">
+  <link rel="canonical" href="https://nuhmanpk.github.io/explore-machine-learning/glossary.html">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Glossary · Explore Machine Learning">
+  <meta property="og:description" content="Every ML word explained simply, with lessons to try it in.">
+  <meta property="og:url" content="https://nuhmanpk.github.io/explore-machine-learning/glossary.html">
+  <meta property="og:image" content="https://nuhmanpk.github.io/explore-machine-learning/og-image.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .gl-tools { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 0 10px; border-bottom: 2px solid var(--line); margin-bottom: 18px; display: grid; gap: 10px; }
+    .gl-search-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .gl-search { flex: 1 1 240px; min-width: 0; font: inherit; font-weight: 700; font-size: 1.05rem; padding: 12px 16px; border-radius: 999px; border: 3px solid var(--line); background: var(--card); color: var(--ink); }
+    .gl-search:focus { outline: none; border-color: var(--accent); }
+    .gl-count { color: var(--muted); font-weight: 700; font-size: 0.9rem; }
+    .gl-az, .gl-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .gl-az a, .gl-az span { min-width: 30px; text-align: center; padding: 4px 6px; border-radius: 8px; font-weight: 800; font-family: var(--font-head); text-decoration: none; color: var(--accent); background: var(--card); border: 2px solid var(--line); }
+    .gl-az span { color: var(--muted); opacity: 0.5; }
+    .gl-chips { gap: 6px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+    .gl-chips button { font: inherit; cursor: pointer; }
+    .gl-chips button[aria-pressed="true"] { background: var(--c, var(--accent)); color: #fff; border-color: transparent; }
+    .gl-letter { font-family: var(--font-head); font-size: 1.8rem; color: var(--accent); margin: 26px 0 10px; scroll-margin-top: 190px; }
+    .gl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 14px; }
+    .gl-card { background: var(--card); border: 3px solid var(--line); border-radius: var(--radius-sm); padding: 16px 18px; box-shadow: var(--shadow-sm); scroll-margin-top: 190px; display: flex; flex-direction: column; gap: 8px; }
+    .gl-card h3 { margin: 0; font-size: 1.25rem; }
+    .gl-card h3 a { color: inherit; text-decoration: none; }
+    .gl-card h3 a:hover { text-decoration: underline; }
+    .gl-card .aka { color: var(--muted); font-size: 0.82rem; font-weight: 700; margin: 0; }
+    .gl-card .kid { margin: 0; color: var(--ink-2); font-weight: 600; }
+    .gl-card details { background: var(--bg-2); border-radius: 10px; padding: 6px 10px; }
+    .gl-card summary { cursor: pointer; font-weight: 800; font-size: 0.88rem; color: var(--ink-2); }
+    .gl-card details p { margin: 6px 0 2px; font-size: 0.93rem; }
+    .gl-card .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.85rem; }
+    .gl-card .row b { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .gl-card .row a.chip { text-decoration: none; }
+    .gl-card .row a.see { font-weight: 700; color: var(--accent); }
+    .gl-card.hit { border-color: var(--accent); animation: gl-flash 1.6s ease-out 2; }
+    @keyframes gl-flash { 0%, 100% { box-shadow: var(--shadow-sm); } 40% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent); } }
+    .gl-empty { text-align: center; color: var(--muted); font-weight: 700; padding: 30px 0; }
+    mark { background: color-mix(in srgb, var(--warn) 45%, transparent); color: inherit; border-radius: 3px; }
+    @media (prefers-reduced-motion: reduce) { .gl-card.hit { animation: none; } }
+    @media print {
+      .topbar, .gl-tools, .gl-hero .btn-row, .robo-say, footer { display: none !important; }
+      body { background: #fff; color: #000; }
+      .gl-grid { display: block; }
+      .gl-card { break-inside: avoid; box-shadow: none; border: 1px solid #999; margin-bottom: 8px; }
+      .gl-card details > *:not(summary) { display: block !important; }
+      .gl-card summary { list-style: none; }
+      .gl-card .row a.chip { border: 1px solid #999; }
+    }
+  </style>
+</head>
+<body data-page="glossary" data-topic="intro">
+  <header class="topbar"></header>
+  <main class="wrap" id="glossary-app">
+    <section class="hero hero-split gl-hero">
+      <div>
+        <span class="kicker"><i data-icon="book"></i> Glossary</span>
+        <h1>Every word, <span class="rainbow">explained simply</span></h1>
+        <p class="hero-sub">Stuck on a word in a lesson? Look it up here. Each word has a kid-sized explanation, a precise one for grown-ups, and lessons where you can try it with your own hands.</p>
+        <div class="cta-row btn-row">
+          <button class="btn primary" id="gl-random" type="button" style="--b: var(--intro)"><i data-icon="dice"></i> Random word</button>
+          <button class="btn" id="gl-print" type="button"><i data-icon="pencil"></i> Print the glossary</button>
+        </div>
+      </div>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Type a word in the search box, tap a letter, or pick a chapter. Open <b>For grown-ups</b> for the proper maths name. Feeling curious? Press <b>Random word</b>!</p>
+      </div>
+    </section>
+
+    <div class="gl-tools" role="search">
+      <div class="gl-search-row">
+        <label for="gl-q" class="sr-only" style="position:absolute;left:-9999px">Search the glossary</label>
+        <input id="gl-q" class="gl-search" type="search" placeholder="Search words, like overfitting or token" autocomplete="off" aria-controls="gl-list">
+        <span class="gl-count" id="gl-count" aria-live="polite"></span>
+      </div>
+      <nav class="gl-az" id="gl-az" aria-label="Jump to letter"></nav>
+      <div class="gl-chips" id="gl-chips" role="group" aria-label="Filter by chapter"></div>
+    </div>
+
+    <div id="gl-list"></div>
+  </main>
+  <script src="js/catalog.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/glossary.js"></script>
+  <script src="js/glossary-page.js"></script>
+</body>
+</html>

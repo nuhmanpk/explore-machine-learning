@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crowds and Loners · Explore ML</title>
+  <meta name="description" content="Paint dots and watch Robo find crowds of any shape by how packed they are, and spot the loners, with DBSCAN density-based clustering.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    #cv { touch-action: none; cursor: crosshair; }
+    .stat .v { font-size: 1.35rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .sets .btn.on, .tools .btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-col { display: grid; gap: 8px; margin-top: 10px; }
+    .btn-col .btn { justify-content: flex-start; white-space: normal; text-align: left; }
+    .gridmaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .gridmaps figure { margin: 0; min-width: 0; }
+    .gridmaps figcaption { font-weight: 800; font-size: .9rem; margin-bottom: 4px; }
+    .key { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .key svg { width: 16px; height: 16px; }
+    .check { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .9rem; margin-top: 8px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="unsup" data-demo="unsup-dbscan">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Finding Groups</span>
+      <h1>Crowds and <span class="em">Loners</span></h1>
+      <p class="hero-sub">At a party, people bunch up into crowds. A crowd can be any shape: a long queue, a circle round the cake. And some people stand all alone. Robo finds crowds by asking one question: <b>how many friends are close to me?</b></p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Each dot is a person. Every dot draws a <b>friend circle</b> around itself. If enough friends fit inside, it is part of a crowd! My circles are too small right now, so these two curvy crowds are broken into bits. Make the <b>friend circle</b> bigger!</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <div class="btn-row sets" role="group" aria-label="Pick a set of dots">
+            <button class="btn small" data-set="moons"><i data-icon="moon"></i> Moons</button>
+            <button class="btn small" data-set="rings"><i data-icon="target"></i> Rings</button>
+            <button class="btn small" data-set="blobs"><i data-icon="groups"></i> Blobs + loners</button>
+            <button class="btn small" data-set="snake"><i data-icon="wave"></i> Snake</button>
+            <button class="btn small ghost" data-set="empty"><i data-icon="eraser"></i> Empty</button>
+          </div>
+        </div>
+        <canvas id="cv" class="cv" role="img" aria-label="Dots coloured by crowd. Grey crosses are loners."></canvas>
+        <div class="row" style="margin-top:8px; justify-content:space-between; flex-wrap:wrap; gap:8px">
+          <div class="btn-row tools" role="group" aria-label="What your finger does">
+            <button class="btn small on" data-tool="look" aria-pressed="true" title="Tap or hover to see a dot's friend circle"><i data-icon="search"></i> Look</button>
+            <button class="btn small" data-tool="paint" aria-pressed="false" title="Drag to add people"><i data-icon="pencil"></i> Paint dots</button>
+            <button class="btn small" data-tool="erase" aria-pressed="false" title="Drag to remove people"><i data-icon="eraser"></i> Rubber</button>
+          </div>
+        </div>
+        <p class="cap" id="toolhint">Look: hover or tap anywhere to see a friend circle and count the dots inside it.</p>
+        <p class="cap"><span class="key"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="var(--nn)"/></svg>crowd member (lots of friends)</span><span class="key"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="var(--card)" stroke="var(--nn)" stroke-width="2.5"/></svg>edge of a crowd</span><span class="key"><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--muted)" stroke-width="2.5"/></svg>loner</span></p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <p class="hint" style="margin:0 0 8px"><b>How to play:</b> slide the friend circle bigger or smaller and watch the colours change. Each colour is one crowd.</p>
+          <div class="field">
+            <label for="eps">Friend circle size <span class="val"><b data-for="eps">16</b></span></label>
+            <input type="range" id="eps" min="8" max="60" step="1" value="16" title="How far away a friend can be">
+            <div class="hint">How far away someone can stand and still count as your friend.</div>
+          </div>
+          <div class="field" style="margin-top:8px">
+            <label for="minp">Friends needed for a crowd <span class="val"><b data-for="minp">5</b></span></label>
+            <input type="range" id="minp" min="2" max="12" step="1" value="5" title="How many dots must fit in the circle">
+            <div class="hint">How many dots (counting yourself) must fit inside your circle before you are in a crowd.</div>
+          </div>
+          <label class="check"><input type="checkbox" id="circles"> Show every crowd member's friend circle</label>
+          <div class="btn-col">
+            <button class="btn primary" id="play"><i data-icon="play"></i> Watch Robo do it step by step</button>
+            <button class="btn small ghost" id="skip" disabled><i data-icon="step"></i> Skip to the end</button>
+            <button class="btn small ghost" id="reseed"><i data-icon="shuffle"></i> New dots</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> What Robo sees</h3>
+          <div class="stats">
+            <div class="stat"><div class="k">Crowds</div><div class="v" id="s-cl" style="color:var(--accent)">0</div></div>
+            <div class="stat"><div class="k">Loners</div><div class="v" id="s-no">0</div></div>
+            <div class="stat"><div class="k">Crowd members</div><div class="v" id="s-co">0</div></div>
+            <div class="stat"><div class="k">Edge dots</div><div class="v" id="s-bo">0</div></div>
+          </div>
+          <p class="cap" id="truth" aria-live="polite"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card lesson-row">
+      <div class="cp-head"><h3><i data-icon="map"></i> Crowd finder vs pizza magnets</h3></div>
+      <p class="cap" style="margin-bottom:8px">The same dots, grouped two ways. Pizza magnets (k-means, from the Pizza Shop lesson) pull dots to the nearest middle, so they cut curvy shapes in half.</p>
+      <div class="gridmaps">
+        <figure><figcaption style="color:var(--accent)">Crowd finder (DBSCAN) <span class="muted" id="sc-d"></span></figcaption><canvas id="cmpD" class="cv" role="img" aria-label="Groups found by the crowd finder"></canvas></figure>
+        <figure><figcaption style="color:var(--rl)">Pizza magnets (k-means) <span class="muted" id="sc-k"></span></figcaption><canvas id="cmpK" class="cv" role="img" aria-label="Groups found by k-means"></canvas></figure>
+      </div>
+    </section>
+
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-moons"><span class="tick"></span><span>Two moons: on Moons, find exactly 2 crowds that match the two curves.</span></div>
+      <div class="chal" id="c-loners"><span class="tick"></span><span>Spot the loners: on Blobs + loners, find the 3 blobs and call at least 3 out of 4 scattered dots loners.</span></div>
+      <div class="chal" id="c-rings"><span class="tick"></span><span>Ring in a ring: on Rings, find the 2 rings exactly, while the pizza magnets get it wrong.</span></div>
+      <p class="cap" id="trynext" aria-live="polite">Try this: slide the friend circle up slowly on Moons and watch the little bits join together.</p>
+    </section>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Nobody told Robo how many crowds there were. It worked that out by itself.</li>
+      <li>A dot with enough friends inside its circle is a <b>crowd member</b>. Crowd members pass the crowd along to their friends, so a crowd can snake around any shape.</li>
+      <li>A dot near a crowd, without enough friends of its own, joins at the <b>edge</b>. A dot near nobody is a <b>loner</b>.</li>
+      <li>Too small a circle breaks crowds into bits and makes lots of loners. Too big a circle glues separate crowds together. The right size depends on how packed your dots are.</li>
+      <li>Pizza magnets always make round-ish groups and give every dot a group. The crowd finder follows shapes and is allowed to say "this one belongs to nobody".</li>
+    </ul></div>
+
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="search"></i></div><h3>Count friends</h3><p>Every dot counts how many dots are inside its friend circle.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="star"></i></div><h3>Start a crowd</h3><p>Pick a dot with enough friends. It starts a new crowd with a new colour.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>Spread it</h3><p>Its friends join. Any friend who also has enough friends passes the crowd on to their friends too.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="flag"></i></div><h3>Leftovers are loners</h3><p>When nobody is left to visit, any dot that never joined a crowd is a loner.</p></div>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">DBSCAN</span> (Density-Based Spatial Clustering of Applications with Noise; Ester, Kriegel, Sander and Xu, 1996). Two parameters: the radius <code>ε</code> ("friend circle size", in pixels here) and <code>minPts</code> ("friends needed", counting the point itself, as scikit-learn's <code>min_samples</code> does).</p>
+        <ul>
+          <li>A <span class="term">core point</span> has at least <code>minPts</code> points in its ε-neighbourhood. A <span class="term">border point</span> is not core but lies within ε of a core point. Everything else is <span class="term">noise</span>.</li>
+          <li>Clusters are the connected components of core points under "within ε", plus their border points (<span class="term">density-reachability</span>). Border points touching two clusters go to whichever reaches them first, which is the only order-dependent part.</li>
+          <li>The step-by-step replay is the standard queue-based expansion. Neighbourhoods are found by brute force (O(n²)); real libraries use a k-d tree or grid to get close to O(n log n).</li>
+          <li>Unlike <span class="term">k-means</span>, DBSCAN needs no <code>k</code>, finds non-convex shapes and labels outliers. It struggles when clusters have very different densities (one ε cannot suit both); <span class="term">HDBSCAN</span> and <span class="term">OPTICS</span> address that. A common way to choose ε is the elbow of the sorted k-distance plot.</li>
+          <li>The "% match" scores use the <span class="term">adjusted Rand index</span> against the generating groups (each noise point treated as its own group), clipped at 0. k-means uses k-means++ seeding with k set to the true number of groups.</li>
+        </ul>
+        <p>Every preset comes from a seeded random generator (mulberry32), so a seed always gives the same dots.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/unsup-dbscan-core.js"></script>
+  <script src="js/unsup-dbscan.js"></script>
+</body>
+</html>

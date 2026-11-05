@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chase the Leftovers · Explore ML</title>
+  <meta name="description" content="Watch gradient boosting fit a wavy curve: every new little tree learns only what the trees before it still got wrong.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.35rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ensemble" data-demo="ens-gbm">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Ensembles &amp; Boosting</span>
+      <h1>Chase the <span class="em">Leftovers</span></h1>
+      <p class="hero-sub">Gradient boosting. The first helper makes a rough guess. Every next helper only looks at the <b>leftovers</b>: how far off the team still is. Add up all the helpers and the wiggly curve appears.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Dots are ice-cream sales across a year. The thick line is the team's guess, a flat average to start. The little sticks are the leftovers. Press <b>Add one helper</b>!</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="layers"></i> Helpers: <span id="round">0</span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="step"><i data-icon="step"></i> Add one helper</button>
+            <button class="btn small" id="ten"><i data-icon="plus"></i> Add 10</button>
+            <button class="btn small" id="auto"><i data-icon="play"></i> Auto</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <canvas id="map" class="cv" role="img" aria-label="Sales dots across the year, the team's guessed curve, and leftover sticks from each dot to the curve."></canvas>
+        <p class="cap">Thick line = all helpers added up. Dashed line = what the newest helper added (times the step size). Sticks = leftovers still to learn.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="settings"></i> Knobs</h3>
+          <div class="field">
+            <label for="lr">Step size (learning rate) <span class="val"><b data-for="lr">0.30</b></span></label>
+            <input type="range" id="lr" min="0.05" max="1" step="0.05" value="0.3">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>How many questions each helper asks (tree depth)</label>
+            <div class="seg" id="depth">
+              <button class="btn small primary" data-d="1">1 (a stump)</button>
+              <button class="btn small" data-d="2">2</button>
+              <button class="btn small" data-d="3">3</button>
+            </div>
+          </div>
+          <p class="cap">Changing a knob starts the team over.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How far off? (smaller is better)</h3>
+          <div class="three">
+            <div class="stat"><div class="k">Training dots</div><div class="v" id="s-train" style="color:var(--good)">-</div></div>
+            <div class="stat"><div class="k">Fresh dots</div><div class="v" id="s-test" style="color:var(--accent)">-</div></div>
+            <div class="stat"><div class="k">Biggest leftover</div><div class="v" id="s-big" style="color:var(--warn)">-</div></div>
+          </div>
+          <div class="btn-row" style="margin-top:8px"><button class="btn small ghost" id="newdata"><i data-icon="shuffle"></i> New dots</button></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Error as helpers join</h3>
+          <canvas id="chart" class="cv" role="img" aria-label="Chart of typical error against number of helpers, for training and fresh dots"></canvas>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>fresh dots</span><span><i style="background:var(--good)"></i>training dots</span></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> The newest helper</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-step"><span class="tick"></span><span>Watch closely: add 3 helpers one at a time and see the sticks shrink.</span></div>
+      <div class="chal" id="c-fit"><span class="tick"></span><span>Close enough: get the fresh-dot error under 0.18 using stumps (depth 1).</span></div>
+      <div class="chal" id="c-slow"><span class="tick"></span><span>Slow and steady: set the step size to 0.1 or less and reach 100 helpers.</span></div>
+      <div class="chal" id="c-over"><span class="tick"></span><span>Too eager: with step size 1 and depth 3, get training error under 0.05. Is the fresh-dot error happy too?</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>The team starts with the plain average. Every dot has a leftover: the gap between the dot and the guess.</li>
+      <li>A new little tree learns to predict <b>those leftovers</b>, not the sales themselves.</li>
+      <li>The team adds a small slice of that tree (the step size), so the guess moves a bit closer to every dot.</li>
+      <li>Repeat. Leftovers shrink and the curve gets wigglier. Too many big steps and it starts chasing the noise too.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>Start the guess at the average sales.</li>
+      <li>Work out each dot's leftover: real sales minus the guess.</li>
+      <li>Grow a tiny tree that splits the year into pieces and gives each piece its average leftover.</li>
+      <li>Add step size × that tree to the guess.</li>
+      <li>Go back to step 2.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is <span class="term">gradient boosting</span> (Friedman, 2001) with squared loss and small regression trees. The model is an additive expansion <code>F<sub>M</sub>(x) = F<sub>0</sub> + ν Σ<sub>m</sub> h<sub>m</sub>(x)</code> with <code>F<sub>0</sub> = ȳ</code>. Each round fits <code>h<sub>m</sub></code> to the <span class="term">pseudo-residuals</span> <code>r<sub>i</sub> = −∂L/∂F(x<sub>i</sub>)</code>, which for <code>L = ½(y − F)²</code> are just <code>y<sub>i</sub> − F(x<sub>i</sub>)</code>.</p>
+        <ul>
+          <li>It is <span class="term">gradient descent in function space</span>: each tree is a step in the direction that lowers the loss fastest, restricted to what a small tree can express.</li>
+          <li>The <span class="term">learning rate</span> ν (shrinkage) trades rounds for generalisation: smaller ν needs more trees but usually tests better. Friedman found ν ≤ 0.1 with many trees works well.</li>
+          <li>Swap the loss and the same recipe gives classification (log loss), robust regression (Huber) and ranking. AdaBoost from the last lesson is the special case with exponential loss.</li>
+          <li>Tree depth controls interactions: stumps make a sum of one-feature step functions; depth d allows d-way interactions.</li>
+        </ul>
+        <p>Data: 80 training dots from <code>0.55 sin 2πx + 0.25 sin 6πx + 0.4x</code> plus Gaussian noise (σ = 0.15); 400 fresh dots from the same curve. The error shown is RMSE, so about 0.15 is the best any model can do.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ens-gbm-core.js"></script>
+  <script src="js/ens-gbm.js"></script>
+</body>
+</html>

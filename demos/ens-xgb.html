@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Careful Booster · Explore ML</title>
+  <meta name="description" content="XGBoost-style boosting: race a wild booster against a careful one with brakes (lambda, gamma, min child weight) and see which one copes with noisy dots.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.25rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .who { font-weight: 800; font-size: .85rem; margin: 0 0 4px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ensemble" data-demo="ens-xgb">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Ensembles &amp; Boosting</span>
+      <h1>The Careful <span class="em">Booster</span></h1>
+      <p class="hero-sub">This is the idea behind XGBoost, a famous booster that wins lots of competitions. Two boosters race on the same noisy dots. The <b>wild</b> one grows big trees and believes every dot. The <b>careful</b> one has brakes: it shrinks its guesses, skips splits that do not help much, and ignores tiny groups.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Both boosters use the same trees and the same step size. Only the brakes are different. Press <b>Add 10 trees</b> and watch the two curves.</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="layers"></i> Trees: <span id="round">0</span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="ten"><i data-icon="plus"></i> Add 10 trees</button>
+            <button class="btn small" id="auto"><i data-icon="play"></i> Auto</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <canvas id="map" class="cv" role="img" aria-label="Noisy dots with two fitted curves: the wild booster and the careful booster."></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--bad)"></i>wild booster</span><span><i style="background:var(--accent)"></i>careful booster</span><span><i style="background:var(--muted)"></i>the real pattern</span></div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="settings"></i> The careful booster's brakes</h3>
+          <div class="field">
+            <label for="lambda">Shrink every guess (λ, lambda) <span class="val"><b data-for="lambda">4</b></span></label>
+            <input type="range" id="lambda" min="0" max="20" step="0.5" value="4">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="gamma">A split must help at least (γ, gamma) <span class="val"><b data-for="gamma">0.05</b></span></label>
+            <input type="range" id="gamma" min="0" max="6" step="0.05" value="0.05">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="mc">Smallest group allowed (min child weight) <span class="val"><b data-for="mc">4</b></span></label>
+            <input type="range" id="mc" min="1" max="15" step="1" value="4">
+          </div>
+          <p class="cap">Changing a brake starts both boosters over. Both use trees up to 4 questions deep and step size 0.5.</p>
+        </div>
+        <div class="card">
+          <h3><i data-icon="gauge"></i> How far off on fresh dots? (smaller is better)</h3>
+          <div class="two">
+            <div><p class="who" style="color:var(--bad)">Wild</p>
+              <div class="stat"><div class="k">Fresh dots</div><div class="v" id="w-test">-</div></div>
+              <div class="stat"><div class="k">Training dots</div><div class="v" id="w-train">-</div></div>
+              <div class="stat"><div class="k">Leaves grown</div><div class="v" id="w-leaves">0</div></div></div>
+            <div><p class="who" style="color:var(--accent)">Careful</p>
+              <div class="stat"><div class="k">Fresh dots</div><div class="v" id="c-test">-</div></div>
+              <div class="stat"><div class="k">Training dots</div><div class="v" id="c-train">-</div></div>
+              <div class="stat"><div class="k">Leaves grown</div><div class="v" id="c-leaves">0</div></div></div>
+          </div>
+          <div class="btn-row" style="margin-top:8px"><button class="btn small ghost" id="newdata"><i data-icon="shuffle"></i> New dots</button></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> Fresh-dot error as trees join</h3>
+          <canvas id="chart" class="cv" role="img" aria-label="Chart of fresh-dot error for both boosters against number of trees"></canvas>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> Inside the careful booster's newest tree</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-win"><span class="tick"></span><span>Brakes win: after 50 trees, the careful booster beats the wild one on fresh dots.</span></div>
+      <div class="chal" id="c-small"><span class="tick"></span><span>Less is more: the careful booster wins with fewer than a quarter of the wild one's leaves.</span></div>
+      <div class="chal" id="c-off"><span class="tick"></span><span>No brakes: set λ to 0, γ to 0 and the smallest group to 1. Are the two boosters now the same?</span></div>
+      <div class="chal" id="c-stuck"><span class="tick"></span><span>Too careful: push γ so high that the careful booster stops growing any splits at all.</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>Both boosters chase the leftovers, like in the last lesson. Big trees can chase them all the way into the noise.</li>
+      <li>The careful booster pulls every leaf's guess a little towards zero (λ), so a leaf built from only a few dots cannot shout.</li>
+      <li>It only keeps a split if it lowers the error by at least γ. Splits that just chase one noisy dot get cut off.</li>
+      <li>It never makes a group smaller than the minimum. Result: simpler trees that do better on dots they have never seen.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>For every dot, work out how wrong the team is (the gradient) and how sure that number is (the hessian).</li>
+      <li>Try every split. Score it with a formula that already includes the λ shrink.</li>
+      <li>If the best split's score is less than γ, stop and make a leaf instead.</li>
+      <li>Each leaf's value is the summed gradient divided by (summed hessian + λ).</li>
+      <li>Add step size × the tree to the team. Repeat.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p><span class="term">XGBoost</span> (Chen and Guestrin, 2016) is gradient boosting with a <span class="term">regularised objective</span> <code>Σ l(y<sub>i</sub>, ŷ<sub>i</sub>) + Σ<sub>k</sub> [γT<sub>k</sub> + ½λ‖w<sub>k</sub>‖²]</code>, where T is the number of leaves and w the leaf weights. Each tree is fitted with a <span class="term">second-order Taylor expansion</span> of the loss using gradients <code>g<sub>i</sub></code> and hessians <code>h<sub>i</sub></code>.</p>
+        <ul>
+          <li>Optimal leaf weight: <code>w* = −G / (H + λ)</code>. Split gain: <code>½[G<sub>L</sub>²/(H<sub>L</sub>+λ) + G<sub>R</sub>²/(H<sub>R</sub>+λ) − G²/(H+λ)] − γ</code>. A split is kept only if the gain is positive, which is pre-pruning by γ.</li>
+          <li><code>min_child_weight</code> is the minimum hessian sum in a child. For squared loss h = 1, so it is just a minimum number of dots.</li>
+          <li>This demo uses exact greedy split finding on one feature. Real XGBoost adds column and row subsampling, histogram/approximate splits, sparsity-aware default directions, and a fast parallel C++ core. LightGBM is a close cousin with leaf-wise growth and histogram binning.</li>
+          <li>The wild booster is the same code with λ = γ = 0 and min child weight 1, so any difference you see comes from the regulariser alone.</li>
+        </ul>
+        <p>Data: 80 training dots from a wavy curve plus Gaussian noise (σ = 0.15), 400 fresh dots. Error is RMSE; about 0.15 is the noise floor.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ens-gbm-core.js"></script>
+  <script src="js/ens-xgb.js"></script>
+</body>
+</html>

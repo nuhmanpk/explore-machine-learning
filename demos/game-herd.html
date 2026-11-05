@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sheepdog Round-Up · Explore ML</title>
+  <meta name="description" content="Steer a sheepdog to gather a flock of boids sheep into a pen, then watch evolution breed dog brains that learn to herd, and adapt to wind, stubborn sheep, a bigger flock and a narrow gate.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="rl-games.css">
+  <style>
+    .howto { background: var(--accent-soft); border-radius: 12px; padding: 8px 12px 8px 30px; font-weight: 700; font-size: .86rem; margin: 0; display: grid; gap: 4px; }
+    .howto li::marker { color: var(--accent); font-weight: 800; }
+    .howto-t { font-weight: 800; font-size: .86rem; margin: 0 0 -4px; }
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; text-align: left; }
+    .chal button .tag { margin-left: auto; font-size: .72rem; font-weight: 800; color: var(--muted); white-space: nowrap; }
+    .chal button.on .tag { color: var(--accent); }
+    .chal button.done::after { content: "✓"; margin-left: 6px; color: var(--good); font-weight: 900; }
+    .try { background: color-mix(in srgb, var(--good) 12%, var(--card)); border: 2px dashed color-mix(in srgb, var(--good) 50%, var(--line)); border-radius: 12px; padding: 8px 10px; font-weight: 700; font-size: .86rem; }
+    #field { cursor: crosshair; }
+    #field.auto-dog { cursor: default; touch-action: auto; }
+    .dpad { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: 44px 44px; gap: 6px; justify-content: center; }
+    .dpad .btn { padding: 0; }
+    .dpad .up { grid-column: 2; grid-row: 1; } .dpad .left { grid-column: 1; grid-row: 2; } .dpad .down { grid-column: 2; grid-row: 2; } .dpad .right { grid-column: 3; grid-row: 2; }
+    .dpad .btn.pressed { background: var(--accent-soft); border-color: var(--accent); }
+    .toggle { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: .9rem; cursor: pointer; }
+    .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .field .hint, .toggle + .hint { margin-top: 2px; }
+    .think { display: grid; gap: 6px; font-weight: 700; font-size: .88rem; }
+    .think .row { display: grid; grid-template-columns: 1.6em 1fr; gap: 6px; align-items: start; }
+    .think .row svg { color: var(--accent); }
+    .think .meter { height: 8px; border-radius: 999px; background: var(--bg-2); overflow: hidden; margin-top: 3px; }
+    .think .meter i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .2s; }
+    #net { width: 100%; max-width: 300px; display: block; margin: 2px auto 0; background: var(--bg-2); border-radius: 10px; }
+    .decision b { color: var(--accent); }
+    .ylabel { margin: 0 0 6px; font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .ylabel span { text-transform: none; letter-spacing: 0; }
+    .chart-legend i.dash { background: repeating-linear-gradient(90deg, var(--warn) 0 5px, transparent 5px 8px) !important; height: 4px; }
+    @media (prefers-reduced-motion: reduce) { .think .meter i { transition: none; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-herd">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="footprints"></i> Game Lab · Neuroevolution + flocking</span>
+      <h1>Sheepdog <span class="em">Round-Up</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">Ten sheep are grazing and they run away from the dog. You are the dog! Move your pointer over the field (or use the arrow keys) and <b>push the flock through the gate</b> into the pen on the right.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="gamepad"></i> Your turn</h3>
+          <div class="seg" id="mode" role="group" aria-label="Who steers the dog">
+            <button data-m="you" class="on" aria-pressed="true">You</button>
+            <button data-m="robo" aria-pressed="false">Robo dogs</button>
+          </div>
+          <p class="howto-t">How to play</p>
+          <ol class="howto" id="howto">
+            <li>Point at the field (or touch it, or use the arrow keys / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>). The dog runs there.</li>
+            <li>Sheep run away from the dog and like to stay together. Get <b>behind</b> them and push.</li>
+            <li>Steer them through the gap in the fence. You have 25 seconds; quicker = more points.</li>
+            <li>Then press <b>Play</b> and watch robot dogs learn the same job.</li>
+          </ol>
+          <div class="dpad" id="dpad" aria-label="Arrow buttons to steer the dog">
+            <button class="btn up" data-k="up" aria-label="Run up"><i data-icon="arrow-up"></i></button>
+            <button class="btn left" data-k="left" aria-label="Run left"><i data-icon="arrow-left"></i></button>
+            <button class="btn down" data-k="down" aria-label="Run down"><i data-icon="arrow-down"></i></button>
+            <button class="btn right" data-k="right" aria-label="Run right"><i data-icon="arrow-right"></i></button>
+          </div>
+          <button class="btn small" id="again" aria-label="New field: start a fresh try"><i data-icon="repeat"></i> New field <kbd>Space</kbd></button>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.86rem">Best thrown at the robot dogs once they can herd. The chart marks the moment; watch the score dip, then climb back.</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="wind" aria-pressed="false"><i data-icon="wave"></i> Windy day <span class="tag">blows sheep away</span></button>
+            <button class="btn small" data-c="stubborn" aria-pressed="false"><i data-icon="shuffle"></i> Stubborn sheep <span class="tag">two wander off</span></button>
+            <button class="btn small" data-c="big" aria-pressed="false"><i data-icon="groups"></i> Bigger flock <span class="tag">18 sheep</span></button>
+            <button class="btn small" data-c="narrow" aria-pressed="false"><i data-icon="ruler"></i> Narrow gate <span class="tag">half as wide</span></button>
+          </div>
+          <div class="try hidden" id="try" aria-live="polite"></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="eye"></i> Show me</h3>
+          <label class="toggle"><input type="checkbox" id="senses" checked aria-describedby="senses-hint"> What the dog sees</label>
+          <div class="hint" id="senses-hint">Draws the flock's middle, the sheep furthest out, the way to the gate, and the dog's chosen direction.</div>
+          <label class="toggle"><input type="checkbox" id="scare" checked aria-describedby="scare-hint"> Scare circle</label>
+          <div class="hint" id="scare-hint">Sheep inside this ring around the dog run away from it. Outside it, they ignore the dog.</div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="field" role="img" tabindex="0" aria-label="A green field with a flock of sheep, a sheepdog, and a pen with a gate on the right side"></canvas>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the dogs did, generation by generation</h3>
+          <p class="ylabel">Score out of 100 <span>(average of the best half of the dogs)</span></p>
+          <canvas id="chart" aria-label="Line chart of the dogs' score per generation"></canvas>
+          <div class="legend chart-legend"><span><i style="background:var(--accent)"></i>Herding score</span><span><i style="background:var(--lang)"></i>Sheep penned (%)</span><span id="lg-you" class="hidden"><i class="dash"></i>Your best score</span><span><i style="background:var(--bad);height:3px"></i>A challenge started</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play" aria-pressed="false"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip" aria-label="Finish this generation right away"><i data-icon="step"></i> Next gen</button>
+            <button class="btn ghost small" id="reset" aria-label="Throw away every dog brain and start over"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed" role="group" aria-label="Speed"><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="10">10×</button><button data-v="0">Turbo</button></div>
+            <div class="hint">Faster = the dogs practise more each second. Turbo is fastest, the field just shows highlights.</div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Generation</div><div class="v" id="st-gen">1</div></div>
+            <div class="stat"><div class="k">Penned now</div><div class="v" id="st-pen">0</div></div>
+            <div class="stat"><div class="k">Best half score</div><div class="v" id="st-score">–</div></div>
+            <div class="stat"><div class="k">Your best</div><div class="v" id="st-you">–</div></div>
+          </div>
+          <div class="hint" id="testing" style="margin-top:8px"></div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What is the dog thinking?</h3>
+          <div class="think" id="think"></div>
+          <canvas id="net" aria-label="The dog's tiny brain: 10 senses, 10 thinking neurons, 2 answers. Bright = busy."></canvas>
+          <div class="decision" id="decision" aria-live="off"></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="sparkles"></i> Evolution knobs</h3>
+          <div class="field">
+            <label for="mut">How different are the babies? <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.05" max="0.8" step="0.05" value="0.3" aria-describedby="mut-hint">
+            <div class="hint" id="mut-hint">Small = careful copies of the parents. Big = wild new ideas (and more silly dogs).</div>
+          </div>
+          <div class="field">
+            <label for="tries">Fields per test <span class="val" data-for="tries"></span></label>
+            <input type="range" id="tries" min="1" max="3" step="1" value="2" aria-describedby="tries-hint">
+            <div class="hint" id="tries-hint">How many different fields each dog is tested on. More = a fairer test (less luck), but slower.</div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion dog saved along the way (its path on a test field). Tap one to watch it herd today's field.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="groups"></i></div><h3>Flock rules</h3><p>Every sheep looks at its neighbours: move toward their middle, match their way, keep a little space. If the dog is inside the scare circle, run away from it.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="eye"></i></div><h3>Ten senses</h3><p>The dog feels where the flock's middle is, where the sheep furthest out is, which way the gate is, how spread out the flock is, and where it is in the field. Everything is measured as "toward the gate" and "to the side".</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="network"></i></div><h3>A tiny brain</h3><p>The ten numbers go through ten thinking neurons. Two answers come out: how much to run toward the gate, and how much to run sideways.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Score each dog</h3><p>Thirty dogs each try the same fields. Points for every sheep in the pen, a bonus for being quick, and some credit for moving the flock closer to the gate.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="sparkles"></i></div><h3>Copy with changes</h3><p>The best dogs stay; the rest are replaced by babies of good dogs, each with small random changes to its brain. Repeat, generation after generation.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>The <b>sheep</b> never learn anything. Each one follows three simple flocking rules: stay near friends, go the same way as them, don't bump into them. Plus one more: run from the dog. Those few rules make a whole flock move like one animal.</li>
+        <li>You probably found out that chasing straight at the sheep scatters them. Good herding means getting <b>behind</b> the flock and fetching the sheep that wander off.</li>
+        <li>The first robot dogs had random brains. They ran in circles, into corners, or nowhere at all, and penned zero sheep.</li>
+        <li>Each generation, the dogs that got the flock closer to the gate (and penned more, faster) became the parents. Their babies got slightly changed copies of their brains. Nobody ever told them "go behind the flock".</li>
+        <li>When you switched on a challenge, the old tricks worked less well. The score dropped, and then the dogs that coped best had the babies, so the population <b>adapted</b>.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>Two classic ideas meet here: <span class="term">boids</span> (Reynolds, 1987) for the flock, and <span class="term">neuroevolution</span> (a genetic algorithm over the weights of a fixed-topology neural network) for the dog. There are no gradients and no labelled examples; the only signal is a fitness number per dog.</p>
+        <ul>
+          <li><b>Sheep (boids):</b> for each free sheep, neighbours within 70 px give <i>cohesion</i> (acceleration 0.0035 × (neighbour centroid − position)), <i>alignment</i> (0.04 × (mean neighbour velocity − velocity)) and <i>separation</i> (a linear push inside 15 px). Within the flight zone (95 px) the dog adds a repulsion growing linearly as the dog gets closer. A small random heading drift (grazing), fence repulsion near the field edge, velocity damping 0.9 and a speed cap of 2.1 px/step complete the model. The pen fence is solid except for the gate.</li>
+          <li><b>Dog:</b> top speed 3 px/step with first-order velocity smoothing (it cannot turn on the spot) and it may not enter the pen.</li>
+          <li><b>Network:</b> <code>[10 &rarr; 10 &rarr; 2]</code>, tanh, 132 weights. Inputs are expressed in a <i>task frame</i> whose x-axis points from the flock centroid to a target point just outside the gate (switching to just inside once the flock reaches the gate): flock centroid relative to the dog (along, across), the outermost sheep relative to the dog (along, across), the target direction in screen coordinates (2), centroid-to-target distance, flock spread (max distance from centroid) and the dog's own position (2). The two outputs are a velocity command in that same frame, rotated back to screen coordinates. Using an egocentric task frame makes the policy largely rotation-invariant, which is why a small net can learn it.</li>
+          <li><b>Fitness:</b> 100 × (fraction penned) + 40 × (mean time bonus of penned sheep, 1 − t/T) + 40 × (1 − mean free-sheep distance to the gate ÷ the starting distance). The last term is <span class="term">reward shaping</span>: without it, random dogs all score 0 and selection has nothing to work with. The kid-facing score is 50 points per penned sheep share plus a 50-point share for speed.</li>
+          <li><b>Genetic algorithm:</b> population 30, each dog tested on the same 1 to 3 random fields per generation (common random numbers, so comparisons are fair). The top 8% survive unchanged (elitism); the rest are children of the top quarter (rank-biased choice, 30% uniform crossover) with Gaussian mutation on 30% of genes, the step size spread from 0.25&times; to 2&times; the slider value.</li>
+          <li><b>Measured in Node</b> (population 30, two fields per dog, three seeds): generations 1 to 3 score about 0 to 1 out of 100 and pen no sheep; by generation 35 the best half scores 77 to 85 (about 0.5 s of computing per generation on a laptop). A dog that stands still scores 0. A hand-written "collect the straggler, otherwise drive from behind" controller (the classic rule from shepherding research, e.g. Str&ouml;mbom et al., 2014) scores about 90 and pens every sheep on the default field, so evolution gets close to a strong engineered rule. Wind and the bigger flock with a narrow gate cause a dip that recovers within 20 to 30 generations; stubborn sheep are the hardest, and scores stay noisier.</li>
+          <li><b>Why it matters:</b> herding is a real testbed for swarm robotics and multi-agent control (drones guiding animals, robots moving crowds of other robots). The same neuroevolution recipe, scaled up, is used for game agents and robot controllers where gradients are unavailable.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-net.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-herd-core.js"></script>
+  <script src="js/game-herd.js"></script>
+</body>
+</html>

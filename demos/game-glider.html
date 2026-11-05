@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Plane Designer · Explore ML</title>
+  <meta name="description" content="Design a paper plane with sliders and throw it. Then watch a genetic algorithm breed a flock of planes, generation by generation, to fly further, cut through headwind, stay under a cave roof and land on a target pad.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="rl-games.css">
+  <style>
+    .howto { background: var(--accent-soft); border-radius: 12px; padding: 8px 12px 8px 30px; font-weight: 700; font-size: .86rem; margin: 0; display: grid; gap: 4px; }
+    .howto li::marker { color: var(--accent); font-weight: 800; }
+    .howto-t { font-weight: 800; font-size: .86rem; margin: 0 0 -4px; }
+    .chal { display: grid; gap: 8px; }
+    .chal button { justify-content: flex-start; width: 100%; text-align: left; }
+    .chal button .tag { margin-left: auto; font-size: .72rem; font-weight: 800; color: var(--muted); white-space: nowrap; }
+    .chal button.on .tag { color: var(--accent); }
+    .chal button.done::after { content: "✓"; margin-left: 6px; color: var(--good); font-weight: 900; }
+    .try { background: color-mix(in srgb, var(--good) 12%, var(--card)); border: 2px dashed color-mix(in srgb, var(--good) 50%, var(--line)); border-radius: 12px; padding: 8px 10px; font-weight: 700; font-size: .86rem; }
+    #scene { max-width: none; background: #cfeeff; cursor: default; }
+    #blueprint { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); }
+    #tree { width: 100%; max-width: 960px; display: block; margin: 0 auto; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); cursor: pointer; }
+    .throw-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .throw-row .btn { flex: 1; justify-content: center; }
+    #throw { font-size: 1.05rem; }
+    .last-throw { font-weight: 800; font-size: .9rem; min-height: 1.3em; color: var(--ink-2); }
+    .field { margin-top: 2px; }
+    .genes { display: grid; gap: 6px; }
+    .gene { display: grid; grid-template-columns: 6.2em 1fr 3.6em; gap: 8px; align-items: center; font-weight: 800; font-size: .8rem; }
+    .gene .tr { position: relative; height: 14px; border-radius: 999px; background: var(--bg-2); border: 2px solid var(--line); }
+    .gene .rng { position: absolute; top: 1px; bottom: 1px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 30%, transparent); }
+    .gene .dot { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--accent); border: 2px solid var(--card); }
+    .gene .you { position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1.5px; background: var(--good); border-radius: 2px; }
+    .gene .num { font-family: var(--font-mono); text-align: right; color: var(--ink-2); }
+    .inside-sub { font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 10px 0 4px; }
+    .readout { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .readout div { background: var(--bg-2); border-radius: 10px; padding: 5px 8px; font-weight: 800; font-size: .82rem; }
+    .readout small { display: block; color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; }
+    .readout .stall { color: var(--bad); }
+    .recipe { font-weight: 700; font-size: .85rem; line-height: 1.45; }
+    .tree-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .8rem; font-weight: 700; color: var(--ink-2); margin-top: 8px; }
+    .tree-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: -2px; }
+    .ylabel { margin: 0 0 6px; font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .ylabel span { text-transform: none; letter-spacing: 0; }
+    .ghost-toggle { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: .9rem; cursor: pointer; }
+    .ghost-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+  </style>
+</head>
+<body data-page="demo" data-topic="games" data-demo="game-glider">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="rocket"></i> Game Lab · Genetic algorithm</span>
+      <h1>Paper Plane <span class="em">Designer</span></h1>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say" aria-live="polite">Fold a plane with the sliders, then press <b>Throw!</b> How far can you make it glide? After that, 40 robot planes will <b>evolve</b> to beat you.</p>
+      </div>
+    </section>
+
+    <section class="stage three">
+      <aside class="panel left">
+        <div class="card">
+          <h3><i data-icon="pencil"></i> Your plane</h3>
+          <p class="howto-t">How to play</p>
+          <ol class="howto">
+            <li>Move the sliders to fold your plane. The picture changes as you go.</li>
+            <li>Press <b>Throw!</b> (or <kbd>Space</kbd>) and read what Robo says about the flight.</li>
+            <li>Beat your best distance. Then press <b>Play</b> (<kbd>P</kbd>) and let 40 planes evolve.</li>
+            <li>Switch on a challenge and watch the flock adapt.</li>
+          </ol>
+          <canvas id="blueprint" role="img" aria-label="Your plane seen from above and from the side, with its balance point and lift point"></canvas>
+          <div class="field">
+            <label for="g-wing">Wing size <span class="val" data-for="g-wing"></span></label>
+            <input type="range" id="g-wing" min="0.6" max="2" step="0.1" value="1.2" aria-describedby="h-wing">
+            <div class="hint" id="h-wing">Bigger wings give more lift but more drag. Huge paper wings get floppy.</div>
+          </div>
+          <div class="field">
+            <label for="g-tilt">Wing tilt <span class="val" data-for="g-tilt"></span></label>
+            <input type="range" id="g-tilt" min="-2" max="12" step="1" value="4" aria-describedby="h-tilt">
+            <div class="hint" id="h-tilt">Bending the back edge up lifts the nose. A little helps it glide; too much and it stalls.</div>
+          </div>
+          <div class="field">
+            <label for="g-clips">Nose weight <span class="val" data-for="g-clips"></span></label>
+            <input type="range" id="g-clips" min="0" max="4" step="0.5" value="2" aria-describedby="h-clips">
+            <div class="hint" id="h-clips">Paper clips on the nose keep it pointing forward. Too many and it dives.</div>
+          </div>
+          <div class="field">
+            <label for="g-angle">Throw angle <span class="val" data-for="g-angle"></span></label>
+            <input type="range" id="g-angle" min="-10" max="45" step="1" value="20" aria-describedby="h-angle">
+            <div class="hint" id="h-angle">0° throws it straight ahead. Higher aims it up at the sky.</div>
+          </div>
+          <div class="field">
+            <label for="g-speed">Throw speed <span class="val" data-for="g-speed"></span></label>
+            <input type="range" id="g-speed" min="4" max="16" step="0.5" value="9" aria-describedby="h-speed">
+            <div class="hint" id="h-speed">How hard you throw. Fast throws climb first, then slow down to glide.</div>
+          </div>
+          <div class="throw-row">
+            <button class="btn primary" id="throw" aria-keyshortcuts="Space"><i data-icon="rocket"></i> Throw!</button>
+            <button class="btn small" id="inject" title="Your design joins the next generation of the flock"><i data-icon="plus"></i> Add my plane to the flock</button>
+          </div>
+          <div class="last-throw" id="last-throw" aria-live="polite"></div>
+        </div>
+
+        <div class="card">
+          <h3><i data-icon="zap"></i> Challenges</h3>
+          <p class="muted" style="margin:0;font-size:.86rem">Best switched on once the flock flies far. The chart marks the moment. You can try them too!</p>
+          <div class="chal" id="chal">
+            <button class="btn small" data-c="wind" aria-pressed="false"><i data-icon="wave"></i> Headwind <span class="tag">gusty, blows back</span></button>
+            <button class="btn small" data-c="cave" aria-pressed="false"><i data-icon="layers"></i> Low cave roof <span class="tag">don't bonk!</span></button>
+            <button class="btn small" data-c="pad" aria-pressed="false"><i data-icon="target"></i> Land on the pad <span class="tag">aim, not distance</span></button>
+          </div>
+          <div class="try hidden" id="try" aria-live="polite"></div>
+        </div>
+      </aside>
+
+      <div class="stage-left">
+        <div class="canvas-box">
+          <div class="overlay-msg" id="overlay"></div>
+          <canvas id="scene" role="img" aria-label="Side view of a park with a little hill. Planes are thrown from the hill and glide to the right; a ruler on the ground shows metres." tabindex="0"></canvas>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> How the flock did, generation by generation</h3>
+          <p class="ylabel">Metres flown <span>(and % on the pad, once that challenge is on)</span></p>
+          <canvas id="chart" role="img" aria-label="Chart of the best distance and the average of the best half in each generation"></canvas>
+          <div class="legend"><span><i style="background:var(--rl)"></i>Best plane (m)</span><span><i style="background:var(--lang)"></i>Average of the best half (m)</span><span id="lg-pad" class="hidden"><i style="background:var(--good)"></i>Landed on the pad (% of flock)</span><span><i style="background:var(--bad);height:3px"></i>A challenge switched</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="btn-row">
+            <button class="btn primary" id="play" aria-keyshortcuts="P"><i data-icon="play"></i> Play</button>
+            <button class="btn" id="skip" aria-keyshortcuts="N"><i data-icon="step"></i> Next generation</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+          <div class="field">
+            <span class="lbl">Speed</span>
+            <div class="seg" id="speed" role="group" aria-label="Playback speed"><button data-v="1">1×</button><button data-v="3" class="on">3×</button><button data-v="8">8×</button><button data-v="0">Turbo</button></div>
+            <div class="hint">Turbo skips the flying pictures and just breeds, fast.</div>
+          </div>
+          <div class="field">
+            <label for="mut">Random nudges <span class="val" data-for="mut"></span></label>
+            <input type="range" id="mut" min="0.02" max="0.4" step="0.02" value="0.12" aria-describedby="h-mut">
+            <div class="hint" id="h-mut">How much a baby plane's design gets jiggled. Small = careful copies, big = wild new ideas.</div>
+          </div>
+          <label class="ghost-toggle"><input type="checkbox" id="ghosts" checked> Show all 40 planes</label>
+          <div class="hint" style="font-size:.82rem;color:var(--muted)">Off = only the pink champion flies.</div>
+          <div class="stats">
+            <div class="stat"><div class="k">Generation</div><div class="v" id="st-gen">1</div></div>
+            <div class="stat"><div class="k">Best this gen</div><div class="v" id="st-best">–</div></div>
+            <div class="stat"><div class="k">Best ever</div><div class="v" id="st-ever">–</div></div>
+            <div class="stat"><div class="k">Your best</div><div class="v" id="st-you">–</div></div>
+          </div>
+        </div>
+
+        <div class="card inside">
+          <h3><i data-icon="cpu"></i> What's happening inside</h3>
+          <div id="inside"><span class="muted">Throw your plane, or press Play, to peek inside.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="card">
+      <h3><i data-icon="flag"></i> Checkpoints <span class="muted" style="font-weight:700;font-size:.9rem">— the champion plane of each generation. Tap one to throw it again, with today's challenges.</span></h3>
+      <div class="checkpoints" id="ckpts"></div>
+    </div>
+
+    <div class="card">
+      <h3><i data-icon="groups"></i> The champion's family tree <span class="muted" style="font-weight:700;font-size:.9rem">— its parents, grandparents and great-grandparents. Tap any plane to throw it.</span></h3>
+      <canvas id="tree" role="img" aria-label="Family tree of the current champion plane"></canvas>
+      <div class="tree-legend">
+        <span><i style="background:#9aa0b8"></i>Random first-generation plane</span>
+        <span><i style="background:#8b5cf6"></i>Mix of two parents (crossover)</span>
+        <span><i style="background:#3b82f6"></i>Copy of one parent</span>
+        <span><i style="background:#ff5c9a"></i>Kept unchanged (a champion)</span>
+        <span><i style="background:#2fbf62"></i>Your design</span>
+        <span>✦ = got a random nudge (mutation)</span>
+      </div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="bulb"></i> How it works</h2>
+    <div class="steps">
+      <div class="step"><div class="s-emoji"><i data-icon="dice"></i></div><h3>40 random planes</h3><p>Each plane is just five numbers, its <b>genes</b>: wing size, wing tilt, nose weight, throw angle and throw speed. The first 40 are picked at random.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="rocket"></i></div><h3>Throw them all</h3><p>Every plane is thrown in the same pretend air. Lift, drag, weight and balance decide the flight. The distance is its score.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="trophy"></i></div><h3>Pick parents</h3><p>Grab three planes at random; the best of the three becomes a parent. Good planes win more often, but lucky weaker ones sometimes get picked too.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="shuffle"></i></div><h3>Mix and nudge</h3><p>A baby gets a mix of two parents' numbers (crossover) and sometimes a small random nudge (mutation). The two best planes are kept unchanged.</p></div>
+      <div class="step"><div class="s-emoji"><i data-icon="repeat"></i></div><h3>Repeat</h3><p>New flock, new throws. Nobody tells the planes how to fly: designs that happen to fly further simply have more babies.</p></div>
+    </div>
+
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap">
+      <ul>
+        <li>In generation 1 most planes stalled, flipped or dived. A few lucky ones glided.</li>
+        <li>Each generation, the better flyers became parents. Their good numbers spread through the flock, and the chart climbed in just a few generations.</li>
+        <li>The flock found the same tricks a paper-plane expert knows: enough nose weight to stay steady, only a little tilt, and a gentle flat throw.</li>
+        <li>When the challenge changed (wind, cave, pad), the old champions stopped winning. The flock didn't need re-programming: the new rules simply picked new parents.</li>
+        <li>Engineers use genetic algorithms like this to design real things: antenna shapes, wing profiles, even car parts.</li>
+      </ul>
+    </div>
+
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p>This is a real-valued <span class="term">genetic algorithm</span> optimising five design parameters against a black-box simulator. There are no gradients and no neural network: the "model" is the population itself.</p>
+        <ul>
+          <li><b>Genome:</b> 5 genes in [0, 1], decoded linearly to wing area scale (0.6–2.0), elevator tilt (−2° to 12°), nose ballast (0–4 clips), launch angle (−10° to 45°) and launch speed (4–16 m/s).</li>
+          <li><b>Physics:</b> a 2-D rigid-body glider integrated with semi-implicit Euler at 240 Hz. Lift <code>L = ½ρv²S·C<sub>L</sub>(α)</code> with <code>C<sub>L</sub> = 5α</code> in attached flow; drag <code>D = ½ρv²(S(C<sub>D0</sub> + kC<sub>L</sub>²) + body)</code>. Above about 14° angle of attack a logistic blend switches to flat-plate behaviour (<code>C<sub>L</sub> ≈ 0.9 sin 2α</code>, <code>C<sub>D</sub> ≈ 1.6 sin²α</code>): the <span class="term">stall</span>.</li>
+          <li><b>Pitch:</b> moment coefficient <code>C<sub>m</sub> = C<sub>m0</sub>(tilt) − h·C<sub>Lα</sub> sin α</code>, where the <span class="term">static margin</span> <i>h</i> grows with nose ballast (negative with no clips, so the plane is statically unstable and tumbles), plus aerodynamic pitch damping. The trim angle of attack is roughly <code>C<sub>m0</sub>/(h·C<sub>Lα</sub>)</code>: tilt and nose weight must be balanced together, which is exactly why one-slider-at-a-time tuning is hard.</li>
+          <li><b>Safety:</b> airspeed, pitch rate and speed are clamped, angles wrapped, and the flight capped at 24 s. Verified in Node over thousands of random designs: no NaN or runaway values.</li>
+          <li><b>GA operators:</b> population 40; tournament selection (k = 3); blend crossover (BLX-α style, α = 0.15) with probability 0.7; per-gene Gaussian mutation with probability 0.4 and σ set by the "Random nudges" slider; elitism of 2. Your design can be injected as an immigrant.</li>
+          <li><b>Fitness:</b> distance flown (minus a penalty for hitting the cave roof). In pad mode: <code>100 − 2.5·|miss| − 6·max(0, v<sub>impact</sub> − 3)</code>, so it must aim <i>and</i> touch down gently.</li>
+          <li><b>Headwind:</b> −4 m/s with two sine gusts, which is close to the plane's own gliding speed. Large light wings get blown back, so evolution shifts towards smaller wings and higher wing loading (a faster glide), which is what real glider pilots do with water ballast.</li>
+          <li><b>Measured in Node</b> (seeds 1–5, 30 generations = 1,200 throws): the best-half average rose from 18–30 m to 53–58 m (already 50–55 m by generation 5), the best plane from 43–57 m to 60–65 m. Switching a challenge on at generation 15: headwind dropped the best to about 22–25 m and it passed 27 m within 3–12 generations; the cave roof dropped it to 7–50 m and it passed 40 m within 1–9; on the pad the champion landed softly within 4–8 generations.</li>
+          <li><b>An honest baseline:</b> with only 5 genes, a pure random search over the same 1,200 throws finds a single plane about as good (59–66 m). The GA's real strengths show elsewhere: the whole population moves to good designs (useful when the rules change), and its advantage grows quickly with more genes, where random search drowns. The landscape also has a thin ridge of nearly neutrally-stable designs that sometimes reaches the end of the park: evolution occasionally finds it, random search rarely does.</li>
+          <li><b>The family tree</b> follows parent links back through the population; chains of unchanged elites are collapsed into one node ("kept ×n").</li>
+        </ul>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/xray.js"></script>
+  <script src="js/game-lab.js"></script>
+  <script src="js/game-glider-core.js"></script>
+  <script src="js/alive-chip.js"></script>
+  <script src="js/game-glider.js"></script>
+</body>
+</html>

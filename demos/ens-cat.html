@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>No Peeking, Snacks! · Explore ML</title>
+  <meta name="description" content="CatBoost-style boosting with categories: turn snack names into numbers without peeking at the answer, and see why ordered target statistics beat naive target encoding.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="sup-kit.css">
+  <style>
+    canvas.cv { width: 100%; background: var(--bg-2); border-radius: 12px; border: 2px solid var(--line); display: block; }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .v { font-size: 1.25rem; }
+    .stat { min-width: 0; }
+    .chal { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: .92rem; padding: 6px 0; }
+    .chal .tick { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); flex: none; margin-top: 2px; }
+    .chal.done .tick { background: var(--good); border-color: var(--good); }
+    .chal.done { color: var(--good); }
+    .cap { margin: 4px 2px 0; font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .who { font-weight: 800; font-size: .85rem; margin: 0 0 4px; }
+    .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+    table.snk { width: 100%; border-collapse: collapse; font-size: .85rem; font-weight: 700; }
+    table.snk th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); padding: 2px 4px; }
+    table.snk td { padding: 3px 4px; border-top: 2px solid var(--line); }
+    table.snk td.n { font-family: var(--font-mono, monospace); text-align: right; }
+    table.snk .leak { color: var(--bad); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body data-page="demo" data-topic="ensemble" data-demo="ens-cat">
+  <header class="topbar"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><i data-icon="groups"></i> Ensembles &amp; Boosting</span>
+      <h1>No Peeking, <span class="em">Snacks!</span></h1>
+      <p class="hero-sub">This is the idea behind CatBoost. Trees need numbers, but "Cookie" and "Celery" are names. A common trick swaps each name for "how often kids liked it". Done carelessly, that number <b>peeks at the answer</b>. CatBoost's fix: each row only looks at the rows that came <b>before</b> it.</p>
+      <div class="robo-say">
+        <div class="robo"></div>
+        <p class="bubble" id="say">Two boosters learn whether a kid likes a snack, from its sweetness and its name. One peeks, one does not. Press <b>Train 10 rounds</b> and compare their scores on new kids.</p>
+      </div>
+    </section>
+    <section class="stage">
+      <div class="canvas-box">
+        <div class="cp-head" style="margin-bottom:8px">
+          <h3 style="margin:0"><i data-icon="layers"></i> Rounds: <span id="round">0</span></h3>
+          <div class="btn-row">
+            <button class="btn primary small" id="ten"><i data-icon="plus"></i> Train 10 rounds</button>
+            <button class="btn small" id="auto"><i data-icon="play"></i> Auto</button>
+            <button class="btn ghost small" id="reset"><i data-icon="reset"></i> Start over</button>
+          </div>
+        </div>
+        <div class="seg" id="view" style="margin-bottom:8px">
+          <button class="btn small primary" data-v="n">Show: peeking numbers</button>
+          <button class="btn small" data-v="o">Show: no-peeking numbers (CatBoost)</button>
+        </div>
+        <canvas id="map" class="cv" role="img" aria-label="Each training row as a dot: sweetness left to right, the snack-name number bottom to top. Colour shows whether the kid liked it."></canvas>
+        <div class="legend" style="margin-top:6px"><span><i style="background:var(--good)"></i>liked it</span><span><i style="background:var(--bad)"></i>did not</span><span>shading = the booster's guess</span></div>
+        <p class="cap">Left to right: how sweet. Bottom to top: the number that stands in for the snack's name. With peeking, rare snacks jump to the very top or bottom, right next to their own answer.</p>
+      </div>
+
+      <aside class="panel">
+        <div class="card">
+          <h3><i data-icon="gauge"></i> Scores (bigger is better)</h3>
+          <div class="two">
+            <div><p class="who" style="color:var(--bad)">Peeking</p>
+              <div class="stat"><div class="k">Training kids</div><div class="v" id="n-train">-</div></div>
+              <div class="stat"><div class="k">New kids</div><div class="v" id="n-test">-</div></div>
+              <div class="stat"><div class="k">Too good to be true</div><div class="v" id="n-gap">-</div></div></div>
+            <div><p class="who" style="color:var(--accent)">No peeking</p>
+              <div class="stat"><div class="k">Training kids</div><div class="v" id="o-train">-</div></div>
+              <div class="stat"><div class="k">New kids</div><div class="v" id="o-test">-</div></div>
+              <div class="stat"><div class="k">Too good to be true</div><div class="v" id="o-gap">-</div></div></div>
+          </div>
+          <p class="cap">"Too good to be true" = training score minus new-kid score. A big number means the booster fooled itself.</p>
+          <div class="btn-row" style="margin-top:8px"><button class="btn small ghost" id="newdata"><i data-icon="shuffle"></i> New kids</button></div>
+        </div>
+        <div class="card">
+          <h3><i data-icon="trend"></i> New-kid score as rounds pass</h3>
+          <canvas id="chart" class="cv" role="img" aria-label="Chart of new-kid accuracy for both boosters against rounds"></canvas>
+          <div class="legend" style="margin-top:6px"><span><i style="background:var(--bad)"></i>peeking</span><span><i style="background:var(--accent)"></i>no peeking</span></div>
+        </div>
+        <div class="card inside">
+          <h3><i data-icon="eye"></i> Rare snacks: where peeking cheats</h3>
+          <div class="inside-body" id="inside"></div>
+        </div>
+      </aside>
+    </section>
+    <section class="card lesson-row">
+      <h3><i data-icon="zap"></i> Challenges</h3>
+      <div class="chal" id="c-look"><span class="tick"></span><span>Spot the cheat: switch between both views and find the rare snacks at the very top and bottom.</span></div>
+      <div class="chal" id="c-train"><span class="tick"></span><span>Fooled itself: train until the peeking booster's training score is higher than the no-peeking one's.</span></div>
+      <div class="chal" id="c-win"><span class="tick"></span><span>Honest wins: after 20 rounds or more, the no-peeking booster scores higher on new kids.</span></div>
+      <div class="chal" id="c-gap"><span class="tick"></span><span>Too good to be true: get the peeking booster's gap at least 3 points bigger than the no-peeking one's.</span></div>
+    </section>
+    <h2 class="section-title"><i data-icon="check"></i> What just happened?</h2>
+    <div class="card recap"><ul>
+      <li>A snack name is a <b>category</b>, not a number. One neat trick: replace it with how often kids liked that snack.</li>
+      <li>But if Fig was only eaten once, and that kid loved it, Fig's number is "loved": the row's own answer sneaks into its clue.</li>
+      <li>The peeking booster learns to trust that clue. It looks brilliant on the kids it trained on, then flops on new kids.</li>
+      <li>The no-peeking way lines the kids up in a random order. Each kid only sees how the kids <b>before</b> them liked the snack, never their own answer.</li>
+    </ul></div>
+    <h2 class="section-title"><i data-icon="wrench"></i> How it works</h2>
+    <div class="card"><ol class="steps">
+      <li>Shuffle the training kids into a random line.</li>
+      <li>Walk down the line. For each kid, count how many earlier kids had the same snack and how many liked it.</li>
+      <li>Snack number = (liked so far + a little of the overall average) ÷ (seen so far + a little). The first kid to try a snack just gets the average.</li>
+      <li>Boost trees on sweetness and that snack number.</li>
+      <li>For new kids, use all the training kids' counts. Their own answers were never in it.</li>
+    </ol></div>
+    <details class="grownups">
+      <summary><i data-icon="flask"></i> For grown-ups: what's really going on</summary>
+      <div class="gu-body">
+        <p><span class="term">CatBoost</span> (Prokhorenkova et al., 2018) handles categorical features with <span class="term">ordered target statistics</span>. For a random permutation σ, example k gets <code>x̂<sub>k</sub> = (Σ<sub>j: σ(j) &lt; σ(k), x<sub>j</sub> = x<sub>k</sub></sub> y<sub>j</sub> + a·p) / (#{j: σ(j) &lt; σ(k), x<sub>j</sub> = x<sub>k</sub>} + a)</code>, with prior p (the mean label) and strength a.</p>
+        <ul>
+          <li>Greedy <span class="term">target encoding</span> uses each example's own label, so <code>E[x̂<sub>k</sub> | y<sub>k</sub>]</code> differs between train and test. This <span class="term">target leakage</span> causes a <span class="term">prediction shift</span>, which hurts most for rare categories.</li>
+          <li>CatBoost also uses <span class="term">ordered boosting</span>: the residuals for example k come from a model that never saw k, using the same permutation idea. It averages several permutations and grows symmetric (oblivious) trees. This demo shows only the ordered statistics, with ordinary boosting on top.</li>
+          <li>Other fixes for the leak: K-fold target encoding, or leave-one-out encoding plus noise. One-hot encoding avoids leakage but explodes with many categories.</li>
+        </ul>
+        <p>Data: 300 training rows, 1500 fresh rows. 40 snacks with skewed popularity; P(like) = σ(6·(sweet − 0.5) + bonus), where only 6 snacks have a real bonus. Boosting: log loss, depth-2 trees, learning rate 0.2, prior strength a = 1.</p>
+      </div>
+    </details>
+
+    <div id="next-nav"></div>
+  </main>
+
+  <script src="../js/catalog.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="js/ens-gbm-core.js"></script>
+  <script src="js/ens-cat.js"></script>
+</body>
+</html>
